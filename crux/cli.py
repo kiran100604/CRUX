@@ -200,6 +200,11 @@ def cmd_mcp(args):
     run()
 
 
+def cmd_hotkey(args):
+    from .hotkey import run
+    run(install=args.install, out_dir=Config.load().home / "hotkey")
+
+
 def _hook_installed(settings: str = ".claude/settings.json") -> bool:
     p = Path(settings)
     if not p.exists():
@@ -260,6 +265,10 @@ def build_parser() -> argparse.ArgumentParser:
     ih.add_argument("--settings", default=".claude/settings.json")
     ih.add_argument("--yes", action="store_true")
     ih.set_defaults(func=cmd_install_hook)
+
+    hk = sub.add_parser("hotkey", help="set up a global capture hotkey (writes platform snippets)")
+    hk.add_argument("--install", action="store_true", help="write snippet files to ~/.crux/hotkey/")
+    hk.set_defaults(func=cmd_hotkey)
 
     sub.add_parser("hook-inject").set_defaults(func=cmd_hook_inject)
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)

@@ -60,6 +60,17 @@ pip install -e ".[server]"
 crux serve               # http://127.0.0.1:7432
 ```
 
+## Global hotkey capture
+`crux capture` reads your clipboard and captures it. Bind it to a system-wide key:
+```bash
+crux hotkey --install     # writes platform snippets to ~/.crux/hotkey/ + prints setup steps
+```
+- **macOS:** Hammerspoon snippet (copies your selection, then captures) or a Raycast script command.
+- **Windows:** an AutoHotkey `.ahk`.
+- **Linux:** a script that grabs the X selection → `crux add` (bind via GNOME custom shortcuts or sxhkd).
+
+Default chord is `Cmd/Ctrl + Shift + Space`. Select text anywhere → press it → it's in your working layer.
+
 ## Eval
 ```bash
 python -m eval.run_eval    # recall@k / MRR over eval/queries.json
