@@ -110,6 +110,13 @@ def cmd_promote(args):
     store.close()
 
 
+def cmd_edit(args):
+    store = _store()
+    ok = store.edit(args.id, title=args.title, summary=args.summary, type=args.type)
+    print("✓ edited (re-embedded, conflicts rechecked)" if ok else "not found")
+    store.close()
+
+
 def cmd_demote(args):
     store = _store()
     ok = store.demote(args.id)
@@ -233,6 +240,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("id")
     pr.add_argument("--title"); pr.add_argument("--summary"); pr.add_argument("--type")
     pr.set_defaults(func=cmd_promote)
+
+    ed = sub.add_parser("edit", help="edit a fact's text (re-embeds + rechecks conflicts)")
+    ed.add_argument("id"); ed.add_argument("--title"); ed.add_argument("--summary"); ed.add_argument("--type")
+    ed.set_defaults(func=cmd_edit)
 
     de = sub.add_parser("demote", help="move a main item back to the working layer")
     de.add_argument("id"); de.set_defaults(func=cmd_demote)

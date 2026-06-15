@@ -7,12 +7,25 @@ Requires the optional `server` extra:  pip install "crux[server]"
 # NOTE: no `from __future__ import annotations` here — FastAPI must see the real
 # Pydantic model objects as body annotations, not stringized forward refs.
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .config import Config
 from .store import Store
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _bg_process(cfg: Config, episode_id: str, content: str,
+                source_type: str, source_ref: str | None) -> None:
+    """Run heavy document extraction off the request thread, on its own DB
+    connection (WAL makes concurrent access with request threads safe)."""
+    worker = Store(cfg)
+    try:
+        worker.process_episode(episode_id, content, source_type=source_type,
+                               source_ref=source_ref)
+    finally:
+        worker.close()
 
 
 def create_app(cfg: Config):
@@ -25,6 +38,7 @@ def create_app(cfg: Config):
 
     store = Store(cfg)
     app = FastAPI(title="CRUX")
+    app.state.executor = ThreadPoolExecutor(max_workers=1)  # serial background ingest
 
     class CaptureIn(BaseModel):
         content: str
@@ -61,6 +75,11 @@ def create_app(cfg: Config):
         source_ref: str | None = None
         source_type: str = "paste"
 
+    class EditIn(BaseModel):
+        title: str | None = None
+        summary: str | None = None
+        type: str | None = None
+
     @app.post("/capture")
     def capture(body: CaptureIn):
         item = store.capture(body.content, source=body.source,
@@ -69,10 +88,18 @@ def create_app(cfg: Config):
 
     @app.post("/ingest")
     def ingest(body: IngestIn):
-        res = store.ingest(body.content, source_type=body.source_type,
-                           source_ref=body.source_ref)
-        return {"episode_id": res["episode"].id,
-                "facts": _enrich(res["facts"])}
+        # Episode saved synchronously (so we can return its id); facts extracted
+        # in the background so a big document never blocks the request.
+        ep = store.create_episode(body.content, source_type=body.source_type,
+                                  source_ref=body.source_ref)
+        app.state.executor.submit(_bg_process, cfg, ep.id, body.content,
+                                  body.source_type, body.source_ref)
+        return {"episode_id": ep.id, "status": "processing"}
+
+    @app.post("/items/{item_id}/edit")
+    def edit(item_id: str, body: EditIn):
+        return {"ok": store.edit(item_id, title=body.title,
+                                 summary=body.summary, type=body.type)}
 
     @app.get("/search")
     def search(q: str, limit: int = 5, scope: str | None = None):

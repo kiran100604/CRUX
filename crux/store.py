@@ -43,6 +43,15 @@ class Store:
             id=str(uuid.uuid4()), raw_content=content, source_type=source_type,
             source_ref=source_ref, title=title))
 
+    def create_episode(self, content: str, *, source_type: str = "paste",
+                       source_ref: str | None = None, title: str | None = None) -> Episode:
+        """Public: persist the raw episode synchronously (so callers get an id),
+        then process_episode() can run the heavy extraction — in a worker if async."""
+        content = content.strip()
+        if not content:
+            raise ValueError("cannot ingest empty content")
+        return self._episode(content, source_type, source_ref, title)
+
     def _store_fact(self, *, raw: str, enr: Enrichment, episode_id: str,
                     locator: str | None, source: str | None, scope: str,
                     confidence: float) -> ContextItem:
@@ -86,16 +95,46 @@ class Store:
         if not content:
             raise ValueError("cannot ingest empty content")
         ep = self._episode(content, source_type, source_ref, title)
+        facts = self.process_episode(ep.id, content, source_type=source_type,
+                                     source_ref=source_ref, scope=scope, confidence=confidence)
+        return {"episode": ep, "facts": facts}
+
+    def process_episode(self, episode_id: str, content: str, *, source_type: str = "file",
+                        source_ref: str | None = None, scope: str = "individual",
+                        confidence: float = 0.6) -> list[ContextItem]:
+        """Chunk an already-created episode's content into facts. Separate from
+        ingest() so a background worker can run it on its own DB connection."""
         facts: list[ContextItem] = []
         seen: set[str] = set()
         for locator, piece in chunk(content, source_type):
             for enr in self.processor.extract_facts(piece):
-                f = self._store_fact(raw=piece, enr=enr, episode_id=ep.id,
+                f = self._store_fact(raw=piece, enr=enr, episode_id=episode_id,
                                      locator=locator, source=source_ref,
                                      scope=scope, confidence=confidence)
                 if f.id not in seen:
                     seen.add(f.id); facts.append(f)
-        return {"episode": ep, "facts": facts}
+        return facts
+
+    def edit(self, item_id: str, *, title: str | None = None, summary: str | None = None,
+             type: str | None = None, tags: list | None = None) -> bool:
+        """Edit a fact's text. Re-embeds and re-checks contradictions so search
+        and conflict detection never go stale on edited facts."""
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return False
+        item = self.db.get(full)
+        fields: dict = {"version": item.version + 1}
+        if title is not None: fields["title"] = title
+        if summary is not None: fields["summary"] = summary
+        if type is not None: fields["type"] = type
+        if tags is not None: fields["tags"] = tags
+        self.db.update(full, fields, now_iso())
+        updated = self.db.get(full)
+        if title is not None or summary is not None:  # text changed → re-embed
+            vec = self.embedder.embed(f"{updated.title}\n{updated.summary}\n{updated.raw_content}")
+            self.db.set_embedding(full, vec, self.embedder.model, now_iso())
+            self._detect_conflicts(self.db.get(full))
+        return True
 
     def ingest_file(self, path: str, *, scope: str = "individual") -> dict:
         p = Path(path)
@@ -197,6 +236,10 @@ class Store:
             fields["type"] = type
         ok = self.db.update(full, fields, now_iso())
         if ok:
+            if title is not None or summary is not None:  # refined text → re-embed
+                it = self.db.get(full)
+                vec = self.embedder.embed(f"{it.title}\n{it.summary}\n{it.raw_content}")
+                self.db.set_embedding(full, vec, self.embedder.model, now_iso())
             self._detect_conflicts(self.db.get(full))  # now verified — recheck vs truth
         return ok
 

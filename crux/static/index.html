@@ -369,7 +369,11 @@ function conflictCard(c){
       </div></div></div>`;
 }
 async function dismissConflict(id){await post(`/conflicts/${id}/dismiss`,{}); toast("Dismissed — won't resurface"); await load();}
-window.dismissConflict=dismissConflict;
+async function saveEdit(id){
+  const t=document.getElementById('et').value.trim(), s=document.getElementById('es').value.trim();
+  await post(`/items/${id}/edit`,{title:t||null,summary:s||null});
+  toast("✓ Edited & re-embedded"); closeDrawer(); await load();}
+window.dismissConflict=dismissConflict; window.saveEdit=saveEdit;
 function workingCard(w){
   return `<div class="dcard">
     <div class="top"><span class="chip peach">● WORKING · ${esc(w.type)}</span>
@@ -413,9 +417,11 @@ function toast(m){const t=document.getElementById("toast");t.textContent=m;t.cla
 
 async function doCapture(){const i=document.getElementById("cap");const v=i.value.trim();if(!v)return;
   i.value=""; document.getElementById("res").classList.remove("on");
-  if(v.length>400||v.includes("\n")){ // long paste / document → multi-fact ingest
-    const r=await post("/ingest",{content:v,source_type:"paste"});
-    toast("● Ingested → "+r.facts.length+" fact(s) staged for review"); await load(); setView("decisions"); return;}
+  if(v.length>400||v.includes("\n")){ // long paste / document → async multi-fact ingest
+    await post("/ingest",{content:v,source_type:"paste"});
+    toast("● Ingesting document in the background…"); setView("decisions");
+    for(let i=0;i<6;i++){await new Promise(r=>setTimeout(r,1200)); await load();}  // poll as facts appear
+    return;}
   const it=await post("/capture",{content:v}); toast("● Captured to working layer");
   await load(); setTimeout(()=>openItem(it.id),200);}
 function wireCapture(){const i=document.getElementById("cap"); if(!i)return;
@@ -456,9 +462,15 @@ function openItem(id){const it=state.items.find(x=>x.id===id)||state.working.fin
       ${it.source?`<div><b>source</b> ${esc(it.source)}</div>`:''}
       <div><b>confidence</b> ${Math.round((it.confidence||0)*100)}%</div></div>
     <div class="tags">${(it.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div>
+    <div class="refine" id="edit-${it.id}" style="display:none;margin-bottom:14px">
+      <input id="et" value="${esc(it.title)}" placeholder="Title…"/>
+      <input id="es" value="${esc(it.summary||'')}" placeholder="Summary…"/>
+      <button class="btn teal" onclick="saveEdit('${it.id}')">Save changes</button>
+    </div>
     <div class="acts">
       ${isM?`<button class="btn out" onclick="demote('${it.id}')">↩ Return to working</button>`
             :`<button class="btn teal" onclick="promote('${it.id}');closeDrawer()">✓ Verify &amp; promote</button>`}
+      <button class="btn out" onclick="document.getElementById('edit-${it.id}').style.display='flex'">✎ Edit text</button>
       <button class="btn danger" onclick="archive('${it.id}')">Archive</button>
     </div>`;
   document.getElementById("drawer").classList.add("on");

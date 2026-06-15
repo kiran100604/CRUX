@@ -131,6 +131,32 @@ def test_dismiss_conflict_sticks(store):
     assert not store.open_conflicts()  # dismissed ones don't resurface
 
 
+def test_edit_reembeds(store):
+    it = store.capture("We will deploy on AWS.", type_hint="decision")
+    before = store.db.embedding_of(it.id)
+    assert store.edit(it.id, summary="We will deploy on Google Cloud Platform instead.")
+    after = store.db.embedding_of(it.id)
+    assert before != after, "editing the text must re-embed"
+    assert store.db.get(it.id).version == 2
+    # the edited text is now findable by its new meaning
+    titles = [r.item.id for r in store.search("google cloud platform", limit=5)]
+    assert it.id in titles
+
+
+def test_promote_with_refine_reembeds(store):
+    it = store.capture("price note", type_hint="exploration")
+    before = store.db.embedding_of(it.id)
+    store.promote(it.id, title="Pricing is fixed at $29/seat", summary="Seat price is $29 per month.")
+    after = store.db.embedding_of(it.id)
+    assert before != after, "refining text during promote must re-embed"
+
+
+def test_process_episode_links_back(store):
+    ep = store.create_episode("# T\nUse Redis for caching.", source_type="file", source_ref="n.md")
+    facts = store.process_episode(ep.id, ep.raw_content, source_type="file", source_ref="n.md")
+    assert facts and all(f.source_episode_id == ep.id for f in facts)
+
+
 def test_usage_payoff_loop(store):
     item = store.capture("Errors go to Sentry.", type_hint="constraint")
     store.record_usage([item.id, item.id], "error handling", session="s1")

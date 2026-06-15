@@ -103,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
 
 # columns a caller may update via `update()` — whitelist guards against injection
 _UPDATABLE = {"title", "summary", "type", "tags", "source", "scope",
-              "confidence", "superseded_by", "archived", "promoted_at"}
+              "confidence", "superseded_by", "archived", "promoted_at", "version"}
 
 
 class Database:
@@ -113,6 +113,10 @@ class Database:
         # single-user local access makes shared-connection use safe enough here.
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        # WAL + a busy timeout let a background ingest worker (its own connection)
+        # write while request threads read the same file, without "database locked".
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
         self.conn.executescript(SCHEMA)
         self._migrate()
         self.conn.commit()
@@ -158,6 +162,12 @@ class Database:
         )
         self.conn.commit()
         return item
+
+    def set_embedding(self, item_id: str, vec: list[float], model: str, updated_at: str) -> None:
+        self.conn.execute(
+            "UPDATE items SET embedding=?, embedding_model=?, updated_at=? WHERE id=?",
+            (pack(vec), model, updated_at, item_id))
+        self.conn.commit()
 
     def update(self, item_id: str, fields: dict, updated_at: str) -> bool:
         """Update a whitelisted set of columns. `tags` may be passed as a list."""
