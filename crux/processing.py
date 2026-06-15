@@ -187,5 +187,10 @@ def _guess_tags(text: str) -> list[str]:
 
 def get_processor(cfg):
     if cfg.processing_provider == "anthropic":
-        return AnthropicProcessor(cfg.processing_model, cfg.anthropic_api_key)
+        try:
+            return AnthropicProcessor(cfg.processing_model, cfg.anthropic_api_key)
+        except Exception as e:  # missing package / bad key — never break the tool
+            import sys
+            print(f"[crux] Anthropic unavailable ({e}); using offline enrichment. "
+                  f"Install with: pip install 'crux[anthropic]'", file=sys.stderr)
     return FakeProcessor()

@@ -79,6 +79,11 @@ def _tokens(text: str) -> list[str]:
 
 def get_embedding_provider(cfg) -> EmbeddingProvider:
     if cfg.embedding_provider == "openai":
-        return OpenAIEmbedding(cfg.embedding_model, cfg.openai_api_key)
+        try:
+            return OpenAIEmbedding(cfg.embedding_model, cfg.openai_api_key)
+        except Exception as e:  # missing package / bad key — never break the tool
+            import sys
+            print(f"[crux] OpenAI embeddings unavailable ({e}); using offline embeddings. "
+                  f"Install with: pip install 'crux[openai]'", file=sys.stderr)
     # voyage could be added here the same way.
     return FakeEmbedding()

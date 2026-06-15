@@ -167,27 +167,39 @@ def cmd_hook_capture(args):
 
 def cmd_install_hook(args):
     """Explicit, transparent hook install — prints exactly what it writes."""
-    settings = Path(args.settings).expanduser()
-    block = {
-        "matcher": "",
-        "statusMessage": "Loading CRUX context...",
-        "hooks": [{"type": "command", "command": "crux hook-inject"}],
-    }
+    from .install import HOOK_BLOCK, claude_settings_path, hook_present, install_claude_hook
+    settings = Path(args.settings).expanduser() if args.settings \
+        else claude_settings_path(globally=args.globally)
     data = json.loads(settings.read_text()) if settings.exists() else {}
-    hooks = data.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-    if any("crux hook-inject" in h.get("command", "")
-           for entry in hooks for h in entry.get("hooks", [])):
+    if hook_present(data):
         print("hook already installed in", settings)
         return
-    hooks.append(block)
-    print(f"Will write the following UserPromptSubmit hook to {settings}:\n")
-    print(json.dumps(block, indent=2))
+    scope = "every Claude Code project" if args.globally else "this project"
+    print(f"Will add this UserPromptSubmit hook to {settings} ({scope}):\n")
+    print(json.dumps(HOOK_BLOCK, indent=2))
     if not args.yes and input("\nProceed? [y/N] ").strip().lower() != "y":
         print("aborted")
         return
-    settings.parent.mkdir(parents=True, exist_ok=True)
-    settings.write_text(json.dumps(data, indent=2))
-    print("✓ installed. CRUX now injects context on every prompt in this project.")
+    install_claude_hook(settings)
+    print(f"✓ installed. CRUX now injects context on every prompt in {scope}.")
+
+
+def cmd_setup(args):
+    from .setup_wizard import run
+    run()
+
+
+def cmd_ctx(args):
+    """Print the context block for a task — paste into any tool without the hook."""
+    from .hooks import _format
+    store = _store()
+    results = store.search(args.task, limit=args.limit)
+    if results:
+        store.record_usage([r.item.id for r in results], args.task)
+        print(_format(results))
+    else:
+        print("(no relevant context yet)")
+    store.close()
 
 
 def cmd_serve(args):
@@ -261,8 +273,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("status").set_defaults(func=cmd_status)
 
-    ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook (explicit)")
-    ih.add_argument("--settings", default=".claude/settings.json")
+    sub.add_parser("setup", help="one-command guided setup (keys, hook, hotkey)").set_defaults(func=cmd_setup)
+
+    cx = sub.add_parser("ctx", help="print relevant context for a task (paste into any tool)")
+    cx.add_argument("task"); cx.add_argument("--limit", type=int, default=5)
+    cx.set_defaults(func=cmd_ctx)
+
+    ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook")
+    ih.add_argument("--global", dest="globally", action="store_true",
+                    help="install for every Claude Code project (~/.claude/settings.json)")
+    ih.add_argument("--settings", default=None, help="explicit settings.json path")
     ih.add_argument("--yes", action="store_true")
     ih.set_defaults(func=cmd_install_hook)
 

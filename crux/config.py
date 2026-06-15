@@ -15,6 +15,30 @@ def _home() -> Path:
     return Path(os.environ.get("CRUX_HOME", Path.home() / ".crux")).expanduser()
 
 
+def _load_env_file(home: Path) -> dict:
+    """Read ~/.crux/config.env (KEY=VALUE lines) so keys persist without the user
+    editing their shell rc. Real environment variables still take precedence."""
+    out: dict[str, str] = {}
+    f = home / "config.env"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+def save_env_file(home: Path, values: dict) -> Path:
+    """Persist config values (merging with any existing file)."""
+    home.mkdir(parents=True, exist_ok=True)
+    current = _load_env_file(home)
+    current.update({k: v for k, v in values.items() if v})
+    f = home / "config.env"
+    f.write_text("\n".join(f"{k}={v}" for k, v in current.items()) + "\n")
+    return f
+
+
 @dataclass(frozen=True)
 class Config:
     home: Path
@@ -40,19 +64,21 @@ class Config:
     @staticmethod
     def load() -> "Config":
         home = _home()
+        # file values are defaults; real env vars override them
+        env = {**_load_env_file(home), **os.environ}
         return Config(
             home=home,
-            db_path=Path(os.environ.get("CRUX_DB_PATH", home / "crux.db")).expanduser(),
-            embedding_provider=os.environ.get("CRUX_EMBEDDING_PROVIDER", "fake"),
-            processing_provider=os.environ.get("CRUX_PROCESSING_PROVIDER", "fake"),
+            db_path=Path(env.get("CRUX_DB_PATH", home / "crux.db")).expanduser(),
+            embedding_provider=env.get("CRUX_EMBEDDING_PROVIDER", "fake"),
+            processing_provider=env.get("CRUX_PROCESSING_PROVIDER", "fake"),
             # text-embedding-3-small (1536 dims) when using OpenAI; voyage-3 for Voyage.
-            embedding_model=os.environ.get("CRUX_EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_model=env.get("CRUX_EMBEDDING_MODEL", "text-embedding-3-small"),
             # Current Haiku. Anthropic has no embeddings API, so Haiku is enrichment only.
-            processing_model=os.environ.get("CRUX_PROCESSING_MODEL", "claude-haiku-4-5"),
-            anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
-            openai_api_key=os.environ.get("OPENAI_API_KEY"),
-            host=os.environ.get("CRUX_HOST", "127.0.0.1"),
-            port=int(os.environ.get("CRUX_PORT", "7432")),
+            processing_model=env.get("CRUX_PROCESSING_MODEL", "claude-haiku-4-5"),
+            anthropic_api_key=env.get("ANTHROPIC_API_KEY"),
+            openai_api_key=env.get("OPENAI_API_KEY"),
+            host=env.get("CRUX_HOST", "127.0.0.1"),
+            port=int(env.get("CRUX_PORT", "7432")),
         )
 
     def ensure_home(self) -> None:

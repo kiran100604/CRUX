@@ -35,6 +35,15 @@ crux query "payment provider" --scope main                   # verified truth on
 crux status
 ```
 
+## One-command setup
+```bash
+crux setup     # guided: API keys (saved locally), global Claude Code hook, capture hotkey
+```
+Does everything below in one interactive flow. Keys persist in `~/.crux/config.env`
+(no shell-rc editing). Then `crux serve` and restart Claude Code.
+
+`crux ctx "<task>"` prints the context block for any tool without a hook (paste into Cursor/ChatGPT).
+
 ## Turn on real models
 ```bash
 export CRUX_PROCESSING_PROVIDER=anthropic ANTHROPIC_API_KEY=...   # Haiku enrichment
