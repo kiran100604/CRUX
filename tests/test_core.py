@@ -10,10 +10,10 @@ import pytest
 @pytest.fixture()
 def store():
     tmp = tempfile.mkdtemp()
-    os.environ["CORTEX_HOME"] = tmp
-    os.environ["CORTEX_DB_PATH"] = os.path.join(tmp, "test.db")
-    from cortex.config import Config
-    from cortex.store import Store
+    os.environ["CRUX_HOME"] = tmp
+    os.environ["CRUX_DB_PATH"] = os.path.join(tmp, "test.db")
+    from crux.config import Config
+    from crux.store import Store
     s = Store(Config.load())
     yield s
     s.close()
@@ -55,7 +55,7 @@ def test_pin_and_archive(store):
 
 
 def test_hook_inject_is_crash_safe(monkeypatch, capsys):
-    from cortex import hooks
+    from crux import hooks
     monkeypatch.setattr("sys.stdin", _FakeStdin("not valid json"))
     rc = hooks.hook_inject()
     assert rc == 0

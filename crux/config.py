@@ -1,7 +1,7 @@
 """Configuration. Everything is env-overridable; sane local-first defaults.
 
-CORTEX is single-user and local, so config is just environment variables plus a
-home directory under ~/.cortex. No config file format to maintain in v1.
+CRUX is single-user and local, so config is just environment variables plus a
+home directory under ~/.crux. No config file format to maintain in v1.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 def _home() -> Path:
-    return Path(os.environ.get("CORTEX_HOME", Path.home() / ".cortex")).expanduser()
+    return Path(os.environ.get("CRUX_HOME", Path.home() / ".crux")).expanduser()
 
 
 @dataclass(frozen=True)
@@ -42,17 +42,17 @@ class Config:
         home = _home()
         return Config(
             home=home,
-            db_path=Path(os.environ.get("CORTEX_DB_PATH", home / "cortex.db")).expanduser(),
-            embedding_provider=os.environ.get("CORTEX_EMBEDDING_PROVIDER", "fake"),
-            processing_provider=os.environ.get("CORTEX_PROCESSING_PROVIDER", "fake"),
+            db_path=Path(os.environ.get("CRUX_DB_PATH", home / "crux.db")).expanduser(),
+            embedding_provider=os.environ.get("CRUX_EMBEDDING_PROVIDER", "fake"),
+            processing_provider=os.environ.get("CRUX_PROCESSING_PROVIDER", "fake"),
             # text-embedding-3-small (1536 dims) when using OpenAI; voyage-3 for Voyage.
-            embedding_model=os.environ.get("CORTEX_EMBEDDING_MODEL", "text-embedding-3-small"),
+            embedding_model=os.environ.get("CRUX_EMBEDDING_MODEL", "text-embedding-3-small"),
             # Current Haiku. Anthropic has no embeddings API, so Haiku is enrichment only.
-            processing_model=os.environ.get("CORTEX_PROCESSING_MODEL", "claude-haiku-4-5"),
+            processing_model=os.environ.get("CRUX_PROCESSING_MODEL", "claude-haiku-4-5"),
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
             openai_api_key=os.environ.get("OPENAI_API_KEY"),
-            host=os.environ.get("CORTEX_HOST", "127.0.0.1"),
-            port=int(os.environ.get("CORTEX_PORT", "7432")),
+            host=os.environ.get("CRUX_HOST", "127.0.0.1"),
+            port=int(os.environ.get("CRUX_PORT", "7432")),
         )
 
     def ensure_home(self) -> None:

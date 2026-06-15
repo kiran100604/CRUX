@@ -1,7 +1,7 @@
-# CORTEX
+# CRUX
 
 Local-first context layer for AI coding agents. Capture what you decide and learn;
-CORTEX **automatically injects** the relevant pieces into your coding agent so you
+CRUX **automatically injects** the relevant pieces into your coding agent so you
 stop re-explaining context and agents stop contradicting decisions you already made.
 
 > Design rationale, architecture decisions, and the build roadmap live in
@@ -22,35 +22,35 @@ stop re-explaining context and agents stop contradicting decisions you already m
 ## Quickstart (offline, zero keys)
 ```bash
 pip install -e .
-cortex add "We decided to use Stripe over Razorpay for better international SDK support."
-cortex add "All payment errors must be logged to Sentry." --type constraint
-cortex query "building the payment webhook handler"
-cortex status
+crux add "We decided to use Stripe over Razorpay for better international SDK support."
+crux add "All payment errors must be logged to Sentry." --type constraint
+crux query "building the payment webhook handler"
+crux status
 ```
 
 ## Turn on real models
 ```bash
-export CORTEX_PROCESSING_PROVIDER=anthropic ANTHROPIC_API_KEY=...   # Haiku enrichment
-export CORTEX_EMBEDDING_PROVIDER=openai     OPENAI_API_KEY=...      # real embeddings
+export CRUX_PROCESSING_PROVIDER=anthropic ANTHROPIC_API_KEY=...   # Haiku enrichment
+export CRUX_EMBEDDING_PROVIDER=openai     OPENAI_API_KEY=...      # real embeddings
 ```
 
 ## Automatic injection into Claude Code
 ```bash
-cortex install-hook        # explicit; prints exactly what it writes to .claude/settings.json
+crux install-hook        # explicit; prints exactly what it writes to .claude/settings.json
 ```
-From then on, every prompt in that project gets a `[CORTEX CONTEXT]` block injected
+From then on, every prompt in that project gets a `[CRUX CONTEXT]` block injected
 automatically. Remove it any time by editing `.claude/settings.json`.
 
 ## MCP (fallback / other agents)
 ```bash
 pip install -e ".[mcp]"
-cortex mcp                 # exposes get_context / add_context
+crux mcp                 # exposes get_context / add_context
 ```
 
 ## Dashboard
 ```bash
 pip install -e ".[server]"
-cortex serve               # http://127.0.0.1:7432
+crux serve               # http://127.0.0.1:7432
 ```
 
 ## Eval

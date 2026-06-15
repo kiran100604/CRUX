@@ -16,16 +16,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-from cortex.config import Config
-from cortex.store import Store
+from crux.config import Config
+from crux.store import Store
 
 
 def main(k: int = 5) -> None:
     seed = json.loads((Path(__file__).parent / "queries.json").read_text())
     with tempfile.TemporaryDirectory() as tmp:
         import os
-        os.environ["CORTEX_HOME"] = tmp
-        os.environ["CORTEX_DB_PATH"] = str(Path(tmp) / "eval.db")
+        os.environ["CRUX_HOME"] = tmp
+        os.environ["CRUX_DB_PATH"] = str(Path(tmp) / "eval.db")
         store = Store(Config.load())
         for doc in seed["corpus"]:
             store.capture(doc["text"], type_hint=doc.get("type"))

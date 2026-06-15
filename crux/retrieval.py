@@ -1,4 +1,4 @@
-"""Hybrid retrieval — the part that decides whether CORTEX is useful.
+"""Hybrid retrieval — the part that decides whether CRUX is useful.
 
 Vector cosine + FTS5 lexical, fused with Reciprocal Rank Fusion, then re-weighted
 by intent (type), pin state, recency, and superseded status. Pure vector search

@@ -1,7 +1,7 @@
 """FastAPI backend for the dashboard. ONE port; the SPA is served from here too.
 Exists only for the human UI — the inject (hook) and MCP paths never need it.
 
-Requires the optional `server` extra:  pip install "cortex[server]"
+Requires the optional `server` extra:  pip install "crux[server]"
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ def create_app(cfg: Config):
         from fastapi import FastAPI
         from pydantic import BaseModel
     except ImportError as e:  # pragma: no cover
-        raise SystemExit("FastAPI not installed. Run: pip install 'cortex[server]'") from e
+        raise SystemExit("FastAPI not installed. Run: pip install 'crux[server]'") from e
 
     store = Store(cfg)
-    app = FastAPI(title="CORTEX")
+    app = FastAPI(title="CRUX")
 
     class CaptureIn(BaseModel):
         content: str

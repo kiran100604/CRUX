@@ -18,13 +18,13 @@ MAX_ITEMS = 5
 
 
 def _format(results) -> str:
-    lines = ["[CORTEX CONTEXT] (retrieved automatically — verify before trusting)"]
+    lines = ["[CRUX CONTEXT] (retrieved automatically — verify before trusting)"]
     for r in results:
         i = r.item
         tag = i.type.upper()
         cite = i.source or i.id[:8]
         lines.append(f"• ({tag}) {i.title} — {i.summary} [src: {cite}]")
-    lines.append("[END CORTEX CONTEXT]")
+    lines.append("[END CRUX CONTEXT]")
     return "\n".join(lines)
 
 
@@ -45,7 +45,7 @@ def hook_inject() -> int:
         print(json.dumps({"additionalContext": _format(results)}))
         return 0
     except Exception:
-        # Never break the user's turn because of CORTEX.
+        # Never break the user's turn because of CRUX.
         print("{}")
         return 0
 

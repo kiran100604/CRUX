@@ -1,4 +1,4 @@
-"""CLI — `cortex <command>`. Thin shell over Store; no logic of its own."""
+"""CLI — `crux <command>`. Thin shell over Store; no logic of its own."""
 
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ def cmd_status(args):
     print(f"embeddings: {cfg.embedding_provider} ({store.embedder.model})")
     print(f"processing: {cfg.processing_provider} ({cfg.processing_model})")
     print(f"hook:       {'installed' if _hook_installed() else 'not installed'} "
-          f"(run `cortex install-hook`)")
+          f"(run `crux install-hook`)")
     store.close()
 
 
@@ -109,12 +109,12 @@ def cmd_install_hook(args):
     settings = Path(args.settings).expanduser()
     block = {
         "matcher": "",
-        "statusMessage": "Loading CORTEX context...",
-        "hooks": [{"type": "command", "command": "cortex hook-inject"}],
+        "statusMessage": "Loading CRUX context...",
+        "hooks": [{"type": "command", "command": "crux hook-inject"}],
     }
     data = json.loads(settings.read_text()) if settings.exists() else {}
     hooks = data.setdefault("hooks", {}).setdefault("UserPromptSubmit", [])
-    if any("cortex hook-inject" in h.get("command", "")
+    if any("crux hook-inject" in h.get("command", "")
            for entry in hooks for h in entry.get("hooks", [])):
         print("hook already installed in", settings)
         return
@@ -126,7 +126,7 @@ def cmd_install_hook(args):
         return
     settings.parent.mkdir(parents=True, exist_ok=True)
     settings.write_text(json.dumps(data, indent=2))
-    print("✓ installed. CORTEX now injects context on every prompt in this project.")
+    print("✓ installed. CRUX now injects context on every prompt in this project.")
 
 
 def cmd_serve(args):
@@ -145,13 +145,13 @@ def _hook_installed(settings: str = ".claude/settings.json") -> bool:
         return False
     try:
         data = json.loads(p.read_text())
-        return "cortex hook-inject" in json.dumps(data)
+        return "crux hook-inject" in json.dumps(data)
     except Exception:
         return False
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="cortex", description="Local context layer for AI coding agents.")
+    p = argparse.ArgumentParser(prog="crux", description="Local context layer for AI coding agents.")
     sub = p.add_subparsers(dest="command", required=True)
 
     a = sub.add_parser("add", help="capture text into context")
