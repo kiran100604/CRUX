@@ -237,7 +237,10 @@ input: query string, limit
 - [ ] **Exit criteria:** in a real Claude Code session, starting a task auto-injects relevant context with zero tool calls; recall@5 measured with real embeddings.
 
 ### Week 3 — Dashboard + ingestion + polish
-- [ ] FastAPI HTTP endpoints (done) + minimal React SPA (list, search, promote, archive, supersede, manual add) served on one port.
+- [x] FastAPI HTTP endpoints + **crystalline constellation dashboard** served on one port (`crux serve`).
+      Design language: dark/obsidian, two-state matter metaphor — **fluid** (amber, working layer, decays) → **crystal** (cyan/violet, verified main graph). Promotion is a "crystallize" ritual. Living constellation home with tag-linked crystal nodes that **glow by real agent usage**.
+- [x] **Payoff loop:** every hook injection is logged (`usages` table); dashboard shows "used N× by agents", a live feed ("your past self, helping you now"), and sizes/glows crystals by impact. *This is the emotional core — making the invisible value visible.*
+- [ ] Migrate the single-file dashboard to a componentized React+Vite build if/when it grows (currently zero-build vanilla SVG/JS — on-brand with local-first, no toolchain).
 - [ ] `crux add --file` with **chunking** (a whole doc as one vector retrieves badly).
 - [ ] `crux hook-capture` (Stop hook) → staged low-confidence items for one-click confirm.
 - [ ] Settings screen (API keys, provider choice, hook status).

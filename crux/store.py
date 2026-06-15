@@ -73,6 +73,13 @@ class Store:
         return search(self.db, qvec, query, limit=limit,
                       include_archived=include_archived, scope=scope)
 
+    def record_usage(self, item_ids: list[str], query: str, session: str = "") -> None:
+        """Log that these items were injected into a live agent session — this is
+        what powers the dashboard's 'used N times' payoff loop."""
+        ts = now_iso()
+        for iid in item_ids:
+            self.db.log_usage(iid, query, session, ts)
+
     # --- promotion: the refinement gate (individual -> main) -----------------
 
     def promote(self, item_id: str, *, title: str | None = None,

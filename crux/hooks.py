@@ -39,6 +39,10 @@ def hook_inject() -> int:
             return 0
         store = Store(Config.load())
         results = store.search(prompt, limit=MAX_ITEMS)
+        if results:
+            # record the payoff: these items just helped a real session
+            store.record_usage([r.item.id for r in results], prompt,
+                               session=payload.get("session_id", ""))
         store.close()
         if not results:
             print("{}")

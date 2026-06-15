@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CRUX</title>
+<style>
+  :root{
+    --bg:#080910; --bg2:#0d0f18; --panel:#10131d; --line:#1c2030;
+    --text:#e7eaf4; --muted:#737a92; --faint:#3a4156;
+    --fluid:#f0b25c; --fluid-soft:rgba(240,178,92,.16);
+    --c1:#54e3ff; --c2:#9a73ff; --crystal-glow:rgba(120,170,255,.55);
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #141a2e 0%, transparent 60%),
+      radial-gradient(900px 600px at 85% 110%, #16122a 0%, transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--sans); overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---- top bar ---- */
+  header{
+    position:fixed; inset:0 0 auto 0; height:64px; z-index:30;
+    display:flex; align-items:center; gap:18px; padding:0 22px;
+    background:linear-gradient(180deg, rgba(8,9,16,.92), rgba(8,9,16,0));
+  }
+  .brand{display:flex; align-items:center; gap:10px; user-select:none}
+  .glyph{width:22px; height:22px}
+  .wordmark{font-weight:700; letter-spacing:.32em; font-size:15px; padding-left:2px}
+  .wordmark b{background:linear-gradient(90deg,var(--c1),var(--c2));
+    -webkit-background-clip:text; background-clip:text; color:transparent}
+  .deposit{
+    flex:1; max-width:560px; margin:0 auto; display:flex; align-items:center;
+    background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:12px;
+    padding:0 14px; height:40px; transition:border-color .2s, box-shadow .2s;
+  }
+  .deposit:focus-within{border-color:var(--c2); box-shadow:0 0 0 3px rgba(154,115,255,.12)}
+  .deposit input{
+    flex:1; background:none; border:none; outline:none; color:var(--text);
+    font-family:var(--sans); font-size:14px;
+  }
+  .deposit .k{font-family:var(--mono); font-size:11px; color:var(--faint); border:1px solid var(--line);
+    border-radius:6px; padding:2px 6px}
+  .seg{display:flex; gap:2px; background:rgba(255,255,255,.03); border:1px solid var(--line);
+    border-radius:10px; padding:3px}
+  .seg button{background:none; border:none; color:var(--muted); font-family:var(--mono);
+    font-size:11px; padding:5px 10px; border-radius:7px; cursor:pointer}
+  .seg button.on{background:rgba(120,170,255,.14); color:var(--text)}
+
+  /* ---- stage ---- */
+  #stage{position:fixed; inset:0; z-index:1}
+  .label{font-family:var(--mono); font-size:10.5px; fill:var(--muted);
+    pointer-events:none; text-anchor:middle}
+  .node{cursor:pointer}
+  .node:hover .label{fill:var(--text)}
+
+  /* ---- ambient chips ---- */
+  .chip{
+    position:fixed; bottom:18px; z-index:20; background:rgba(13,15,24,.7);
+    border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+    backdrop-filter:blur(8px); font-family:var(--mono); font-size:12px;
+  }
+  #stats{left:18px; display:flex; gap:16px}
+  #stats .n{color:var(--text); font-weight:600}
+  #stats .crystal .n{color:var(--c1)} #stats .fluidc .n{color:var(--fluid)}
+  #stats .pulse .n{color:#7ee0a0}
+  .muted{color:var(--muted)}
+  #feedwrap{right:18px; max-width:340px; max-height:42vh; overflow:auto; display:none}
+  #feedwrap.show{display:block}
+  #feedwrap h4{margin:0 0 8px; font-family:var(--sans); font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted)}
+  .use{padding:7px 0; border-top:1px solid var(--line); font-size:11.5px; line-height:1.4}
+  .use:first-of-type{border-top:none}
+  .use .t{color:var(--text)} .use .q{color:var(--muted)}
+  .feedtoggle{position:fixed; right:18px; bottom:18px; z-index:21; cursor:pointer;
+    background:rgba(13,15,24,.7); border:1px solid var(--line); border-radius:12px;
+    padding:10px 14px; font-family:var(--mono); font-size:12px; color:var(--muted); backdrop-filter:blur(8px)}
+
+  /* ---- detail drawer ---- */
+  #drawer{
+    position:fixed; top:64px; right:0; bottom:0; width:380px; z-index:25;
+    background:linear-gradient(180deg,var(--panel),#0c0e16);
+    border-left:1px solid var(--line); padding:24px; overflow:auto;
+    transform:translateX(110%); transition:transform .32s cubic-bezier(.4,.2,.2,1);
+  }
+  #drawer.open{transform:none}
+  .tier{display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11px;
+    padding:4px 10px; border-radius:20px; margin-bottom:14px}
+  .tier.crystal{color:var(--c1); background:rgba(84,227,255,.1); border:1px solid rgba(84,227,255,.25)}
+  .tier.fluid{color:var(--fluid); background:var(--fluid-soft); border:1px solid rgba(240,178,92,.3)}
+  #drawer h2{margin:0 0 6px; font-size:19px; line-height:1.3}
+  #drawer .sum{color:var(--muted); font-size:14px; line-height:1.6; margin-bottom:16px}
+  #drawer .meta{font-family:var(--mono); font-size:11px; color:var(--faint); margin-bottom:18px; line-height:1.9}
+  #drawer .meta b{color:var(--muted); font-weight:400}
+  .used-badge{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:12px;
+    color:#7ee0a0; background:rgba(126,224,160,.08); border:1px solid rgba(126,224,160,.2);
+    padding:6px 11px; border-radius:9px; margin-bottom:18px}
+  .tags{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px}
+  .tag{font-family:var(--mono); font-size:11px; color:var(--muted); background:rgba(255,255,255,.04);
+    border:1px solid var(--line); border-radius:7px; padding:3px 8px}
+  .refine{display:none; flex-direction:column; gap:8px; margin-bottom:14px}
+  .refine.show{display:flex}
+  .refine input{background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:9px;
+    padding:9px 11px; color:var(--text); font-family:var(--sans); font-size:13px; outline:none}
+  .refine input:focus{border-color:var(--c2)}
+  .actions{display:flex; flex-direction:column; gap:9px}
+  button.act{font-family:var(--sans); font-size:13.5px; font-weight:600; padding:11px; border-radius:11px;
+    border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--text); cursor:pointer;
+    transition:transform .1s, filter .2s}
+  button.act:active{transform:scale(.98)}
+  button.crystallize{border:none; color:#04121a;
+    background:linear-gradient(100deg,var(--c1),var(--c2)); box-shadow:0 6px 24px rgba(120,170,255,.3)}
+  button.crystallize:hover{filter:brightness(1.08)}
+  button.ghost{color:var(--muted)} button.danger{color:#ff7a8a}
+  .lineage{font-family:var(--mono); font-size:11px; color:var(--muted); margin:12px 0 0;
+    padding-top:12px; border-top:1px solid var(--line)}
+
+  /* ---- search results overlay ---- */
+  #results{position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:28; width:560px;
+    max-width:92vw; background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 24px 60px rgba(0,0,0,.5); padding:8px; display:none}
+  #results.show{display:block}
+  .res{display:flex; gap:10px; align-items:baseline; padding:10px 12px; border-radius:10px; cursor:pointer}
+  .res:hover{background:rgba(255,255,255,.04)}
+  .res .dot{width:8px; height:8px; border-radius:50%; flex:none; transform:translateY(2px)}
+  .res .ti{flex:1} .res .ti b{font-weight:600; font-size:14px}
+  .res .ti span{display:block; color:var(--muted); font-size:12px; margin-top:2px}
+  .res .sc{font-family:var(--mono); font-size:11px; color:var(--faint)}
+
+  .toast{position:fixed; bottom:74px; left:50%; transform:translateX(-50%) translateY(20px); z-index:40;
+    background:rgba(13,15,24,.95); border:1px solid var(--line); border-radius:11px; padding:11px 18px;
+    font-size:13px; opacity:0; transition:all .3s; pointer-events:none}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="glyph" viewBox="0 0 24 24"><defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#54e3ff"/><stop offset="1" stop-color="#9a73ff"/></linearGradient></defs>
+      <path d="M12 1 L21 7 L21 17 L12 23 L3 17 L3 7 Z" fill="none" stroke="url(#g)" stroke-width="1.4"/>
+      <path d="M12 5 L17.5 8.3 L17.5 15 L12 18.5 L6.5 15 L6.5 8.3 Z" fill="url(#g)" opacity=".22"/>
+      <path d="M12 1 L12 23 M3 7 L21 17 M21 7 L3 17" stroke="url(#g)" stroke-width=".5" opacity=".5"/>
+    </svg>
+    <span class="wordmark">CRU<b>X</b></span>
+  </div>
+  <label class="deposit">
+    <input id="capture" placeholder="Deposit a thought…  (it settles in your working layer)" autocomplete="off"/>
+    <span class="k">↵</span>
+  </label>
+  <div class="seg" id="filter">
+    <button data-s="all" class="on">all</button>
+    <button data-s="main">crystal</button>
+    <button data-s="individual">fluid</button>
+  </div>
+</header>
+
+<svg id="stage"></svg>
+
+<div class="chip" id="stats">
+  <span class="crystal"><span class="n" id="s-crystal">0</span> <span class="muted">crystals</span></span>
+  <span class="fluidc"><span class="n" id="s-fluid">0</span> <span class="muted">fluid</span></span>
+  <span class="pulse"><span class="n" id="s-inj">0</span> <span class="muted">injections</span></span>
+</div>
+<div class="feedtoggle" id="feedtoggle">⚡ live payoff</div>
+<div class="chip" id="feedwrap"><h4>Your past self, helping you now</h4><div id="feed"></div></div>
+
+<div id="results"></div>
+<div id="drawer"></div>
+<div class="toast" id="toast"></div>
+
+<svg width="0" height="0"><defs>
+  <radialGradient id="fluidGrad" cx="35%" cy="30%">
+    <stop offset="0" stop-color="#ffd9a0"/><stop offset="55%" stop-color="#f0b25c"/>
+    <stop offset="100%" stop-color="#9c6a23"/></radialGradient>
+  <linearGradient id="crystalGrad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#7ef0ff"/><stop offset="1" stop-color="#9a73ff"/></linearGradient>
+  <filter id="glowF" x="-80%" y="-80%" width="260%" height="260%">
+    <feGaussianBlur stdDeviation="4" result="b"/><feMerge>
+    <feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs></svg>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const stage=document.getElementById("stage");
+const drawer=document.getElementById("drawer");
+let items=[], filter="all", selected=null, t0=performance.now();
+
+const api=async(u,o)=>{const r=await fetch(u,o);return r.json();};
+const post=(u,b)=>api(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b||{})});
+
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(t._);t._=setTimeout(()=>t.classList.remove("show"),2200);}
+
+// ---------- layout ----------
+function layout(){
+  const W=innerWidth, H=innerHeight, cx=W/2, cy=H*0.46;
+  const crystals=items.filter(i=>i.scope==="main");
+  const fluids=items.filter(i=>i.scope==="individual");
+  // crystals: golden-angle spiral cluster — organic "constellation"
+  const GA=2.399963; const rs=Math.min(W,H)*0.052;
+  crystals.forEach((it,i)=>{const r=rs*Math.sqrt(i+0.6)*1.5; const a=i*GA;
+    it._bx=cx+r*Math.cos(a); it._by=cy+r*Math.sin(a)*0.82; it._ph=i*1.7;});
+  // fluids: a gentle pool along the lower band
+  const n=Math.max(fluids.length,1);
+  fluids.forEach((it,i)=>{const t=(i+0.5)/n; it._bx=W*(0.12+0.76*t);
+    it._by=H*0.84+Math.sin(t*Math.PI)* -34; it._ph=i*2.1;});
+}
+
+// ---------- render ----------
+function shown(it){return filter==="all"||it.scope===(filter==="main"?"main":"individual")
+  ||(filter==="individual"&&it.scope==="individual")||(filter==="main"&&it.scope==="main");}
+function visible(it){return filter==="all"?true:(filter==="main"?it.scope==="main":it.scope==="individual");}
+
+function build(){
+  stage.innerHTML="";
+  // tag-based links between crystals → constellation lines
+  const cr=items.filter(i=>i.scope==="main"&&visible(i));
+  for(let a=0;a<cr.length;a++)for(let b=a+1;b<cr.length;b++){
+    const shared=(cr[a].tags||[]).some(t=>(cr[b].tags||[]).includes(t));
+    if(shared){const ln=el("line",{class:"link",stroke:"rgba(120,160,255,.14)","stroke-width":1});
+      cr[a]._links=cr[a]._links||[];cr[a]._links.push([ln,cr[b]]);stage.appendChild(ln);}
+  }
+  items.forEach(it=>{ if(!visible(it)){it._g=null;return;}
+    const g=el("g",{class:"node"}); g.style.opacity=0; g.dataset.id=it.id;
+    if(it.scope==="main"){
+      const sz=12+Math.min((it.usage_count||0),10)*1.6;
+      const poly=el("polygon",{points:hexPts(sz),fill:"url(#crystalGrad)",
+        stroke:"rgba(190,220,255,.9)","stroke-width":.8,filter:"url(#glowF)"});
+      poly.style.opacity=0.55+Math.min((it.usage_count||0),8)*0.05;
+      g.appendChild(poly);
+      g.appendChild(text(it.title,sz+13,"label"));
+    }else{
+      const age=ageDays(it.captured_at); const op=Math.max(0.34,0.85-age*0.05);
+      const c=el("circle",{r:9,fill:"url(#fluidGrad)",filter:"url(#glowF)"}); c.style.opacity=op;
+      g.appendChild(c);
+      const lb=text(it.title, 21, "label"); lb.style.opacity=0; g.appendChild(lb);
+      g.addEventListener("mouseenter",()=>lb.style.opacity=.9);
+      g.addEventListener("mouseleave",()=>lb.style.opacity=0);
+    }
+    g.addEventListener("click",e=>{e.stopPropagation();select(it.id);});
+    stage.appendChild(g); it._g=g;
+    requestAnimationFrame(()=>{g.style.transition="opacity .6s";g.style.opacity=1;});
+  });
+}
+function hexPts(s){let p=[];for(let i=0;i<6;i++){const a=Math.PI/6+i*Math.PI/3;
+  p.push((s*Math.cos(a)).toFixed(1)+","+(s*Math.sin(a)).toFixed(1));}return p.join(" ");}
+function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+function text(s,dy,cls){const t=el("text",{class:cls,y:dy});t.textContent=s.length>26?s.slice(0,25)+"…":s;return t;}
+function ageDays(iso){return (Date.now()-new Date(iso).getTime())/86400000;}
+
+// ---------- animation: gentle float ----------
+function tick(now){const tsec=(now-t0)/1000;
+  items.forEach(it=>{ if(!it._g)return;
+    const fx=it._bx+Math.sin(tsec*0.4+it._ph)*6;
+    const fy=it._by+Math.cos(tsec*0.33+it._ph)*6;
+    it._x=fx; it._y=fy; it._g.setAttribute("transform",`translate(${fx},${fy})`);
+    (it._links||[]).forEach(([ln,o])=>{ln.setAttribute("x1",fx);ln.setAttribute("y1",fy);
+      ln.setAttribute("x2",o._x||o._bx);ln.setAttribute("y2",o._y||o._by);});
+  });
+  requestAnimationFrame(tick);
+}
+
+// ---------- drawer ----------
+function select(id){selected=items.find(i=>i.id===id); if(!selected)return; renderDrawer(); }
+function close(){drawer.classList.remove("open"); selected=null;}
+function renderDrawer(){
+  const it=selected, isC=it.scope==="main";
+  const used=it.usage_count||0;
+  drawer.innerHTML=`
+    <div class="tier ${isC?'crystal':'fluid'}">${isC?'◆ CRYSTAL · verified':'● FLUID · working'} · ${it.type}</div>
+    <h2>${esc(it.title)}</h2>
+    <div class="sum">${esc(it.summary||'')}</div>
+    ${used?`<div class="used-badge">⚡ used ${used}× by agents${it.last_used?` · last ${rel(it.last_used)}`:''}</div>`:''}
+    <div class="meta">
+      <div><b>id</b>  ${it.id.slice(0,8)}</div>
+      <div><b>captured</b>  ${it.captured_at.slice(0,10)}</div>
+      ${it.promoted_at?`<div><b>crystallized</b>  ${it.promoted_at.slice(0,10)}</div>`:''}
+      ${it.source?`<div><b>source</b>  ${esc(it.source)}</div>`:''}
+      <div><b>confidence</b>  ${Math.round((it.confidence||0)*100)}%</div>
+    </div>
+    <div class="tags">${(it.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>
+    <div class="refine" id="refine">
+      <input id="r-title" placeholder="Refine title…" value="${esc(it.title)}"/>
+      <input id="r-sum" placeholder="Refine summary…" value="${esc(it.summary||'')}"/>
+    </div>
+    <div class="actions">
+      ${isC
+        ? `<button class="act ghost" onclick="demote()">↩ Return to working layer</button>`
+        : `<button class="act crystallize" onclick="toggleRefine()">✦ Crystallize → main graph</button>
+           <button class="act" id="confirm" style="display:none" onclick="crystallize()">Confirm & crystallize</button>`}
+      <button class="act danger" onclick="archive()">Archive</button>
+      <button class="act ghost" onclick="close()">Close</button>
+    </div>
+    ${it.superseded_by?`<div class="lineage">⤳ superseded — newer truth exists for this</div>`:''}`;
+  drawer.classList.add("open");
+}
+function toggleRefine(){document.getElementById("refine").classList.toggle("show");
+  document.getElementById("confirm").style.display="block";
+  document.querySelector(".crystallize").textContent="✦ Review, then confirm below";}
+
+// ---------- the crystallize ritual ----------
+async function crystallize(){
+  const id=selected.id, g=selected._g;
+  const title=document.getElementById("r-title").value.trim();
+  const sum=document.getElementById("r-sum").value.trim();
+  if(g){ // shimmer + pull toward the cluster before the data refresh
+    g.style.transition="transform .9s cubic-bezier(.5,0,.1,1), opacity .9s";
+    const cx=innerWidth/2, cy=innerHeight*0.46;
+    g.setAttribute("transform",`translate(${cx},${cy}) scale(1.6)`);
+    g.querySelector("circle").setAttribute("fill","url(#crystalGrad)");
+    g.style.opacity=0;
+  }
+  await post(`/items/${id}/promote`,{title:title||null,summary:sum||null});
+  toast("✦ Crystallized — your agents will prioritize this");
+  close(); await load();
+}
+async function demote(){await post(`/items/${selected.id}/demote`);toast("Returned to working layer");close();await load();}
+async function archive(){await post(`/items/${selected.id}/archive`);toast("Archived");close();await load();}
+
+// ---------- capture ----------
+document.getElementById("capture").addEventListener("keydown",async e=>{
+  if(e.key!=="Enter")return; const v=e.target.value.trim(); if(!v)return;
+  e.target.value=""; const it=await post("/capture",{content:v});
+  toast("● Deposited — settling into your working layer"); await load();
+  setTimeout(()=>select(it.id),350);
+});
+
+// ---------- search ----------
+let st; document.getElementById("capture").addEventListener("input",e=>{
+  clearTimeout(st); const q=e.target.value.trim();
+  const box=document.getElementById("results");
+  if(q.length<3){box.classList.remove("show");return;}
+  st=setTimeout(async()=>{
+    const {items:res}=await api("/search?limit=6&q="+encodeURIComponent(q));
+    if(!res.length){box.classList.remove("show");return;}
+    box.innerHTML=res.map(r=>`<div class="res" onclick="select('${r.id}');document.getElementById('results').classList.remove('show')">
+      <span class="dot" style="background:${r.scope==='main'?'var(--c1)':'var(--fluid)'}"></span>
+      <span class="ti"><b>${esc(r.title)}</b><span>${esc(r.summary||'')}</span></span>
+      <span class="sc">${r.score.toFixed(3)}</span></div>`).join("");
+    box.classList.add("show");
+  },180);
+});
+document.addEventListener("click",e=>{if(!e.target.closest("#results")&&!e.target.closest(".deposit"))
+  document.getElementById("results").classList.remove("show");});
+stage.addEventListener("click",close);
+
+// ---------- filter ----------
+document.getElementById("filter").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  filter=b.dataset.s; build();
+});
+
+// ---------- feed ----------
+document.getElementById("feedtoggle").addEventListener("click",()=>{
+  document.getElementById("feedwrap").classList.toggle("show"); loadFeed();});
+async function loadFeed(){const {usages}=await api("/feed?limit=14");
+  document.getElementById("feed").innerHTML = usages.length?usages.map(u=>
+    `<div class="use"><span class="t">${u.scope==='main'?'◆':'●'} ${esc(u.title)}</span>
+     <div class="q">↳ “${esc(u.query||'').slice(0,60)}” · ${rel(u.used_at)}</div></div>`).join("")
+    : `<div class="muted" style="font-size:12px">No injections yet. Once an agent pulls your context, it shows here.</div>`;}
+
+// ---------- data ----------
+async function load(){
+  const {items:its}=await api("/items"); items=its;
+  const s=await api("/stats");
+  document.getElementById("s-crystal").textContent=s.crystals;
+  document.getElementById("s-fluid").textContent=s.fluid;
+  document.getElementById("s-inj").textContent=s.injections;
+  layout(); build();
+  if(document.getElementById("feedwrap").classList.contains("show")) loadFeed();
+}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function rel(iso){const d=(Date.now()-new Date(iso).getTime())/1000;
+  if(d<60)return"just now"; if(d<3600)return Math.floor(d/60)+"m ago";
+  if(d<86400)return Math.floor(d/3600)+"h ago"; return Math.floor(d/86400)+"d ago";}
+window.addEventListener("resize",()=>{layout();});
+window.crystallize=crystallize;window.demote=demote;window.archive=archive;
+window.close=close;window.select=select;window.toggleRefine=toggleRefine;
+load(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

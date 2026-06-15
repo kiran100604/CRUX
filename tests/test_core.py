@@ -78,6 +78,15 @@ def test_scope_filter_and_main_ranks_higher(store):
         assert ranks[truth.id] < ranks[work.id]
 
 
+def test_usage_payoff_loop(store):
+    item = store.capture("Errors go to Sentry.", type_hint="constraint")
+    store.record_usage([item.id, item.id], "error handling", session="s1")
+    assert store.db.usage_counts()[item.id] == 2
+    assert item.id in store.db.usage_last()
+    feed = store.db.recent_usages(10)
+    assert feed and feed[0]["item_id"] == item.id and feed[0]["title"]
+
+
 def test_hook_inject_is_crash_safe(monkeypatch, capsys):
     from crux import hooks
     monkeypatch.setattr("sys.stdin", _FakeStdin("not valid json"))

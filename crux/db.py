@@ -62,6 +62,17 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
     INSERT INTO items_fts(rowid, title, summary, tags, raw_content)
     VALUES (new.rowid, new.title, new.summary, new.tags, new.raw_content);
 END;
+
+-- the payoff loop: one row every time an item is injected into a real agent
+-- session, so the dashboard can show "used N times" and glow crystals by impact.
+CREATE TABLE IF NOT EXISTS usages (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id   TEXT NOT NULL,
+    query     TEXT,
+    session   TEXT,
+    used_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_usages_item ON usages(item_id);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
@@ -72,7 +83,9 @@ _UPDATABLE = {"title", "summary", "type", "tags", "source", "scope",
 class Database:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        # check_same_thread=False: uvicorn runs sync endpoints in a threadpool;
+        # single-user local access makes shared-connection use safe enough here.
+        self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
@@ -177,6 +190,30 @@ class Database:
         sql = f"SELECT * FROM items WHERE {' AND '.join(clauses)} ORDER BY captured_at DESC LIMIT ?"
         params.append(limit)
         return [ContextItem.from_row(r) for r in self.conn.execute(sql, params)]
+
+    # --- usage / payoff loop -------------------------------------------------
+
+    def log_usage(self, item_id: str, query: str, session: str, used_at: str) -> None:
+        self.conn.execute(
+            "INSERT INTO usages (item_id, query, session, used_at) VALUES (?,?,?,?)",
+            (item_id, query, session, used_at),
+        )
+        self.conn.commit()
+
+    def usage_counts(self) -> dict[str, int]:
+        return {r["item_id"]: r["n"] for r in self.conn.execute(
+            "SELECT item_id, COUNT(*) n FROM usages GROUP BY item_id")}
+
+    def usage_last(self) -> dict[str, str]:
+        return {r["item_id"]: r["last"] for r in self.conn.execute(
+            "SELECT item_id, MAX(used_at) last FROM usages GROUP BY item_id")}
+
+    def recent_usages(self, limit: int = 20) -> list[dict]:
+        rows = self.conn.execute(
+            """SELECT u.item_id, u.query, u.used_at, i.title, i.scope, i.type
+               FROM usages u JOIN items i ON i.id = u.item_id
+               ORDER BY u.id DESC LIMIT ?""", (limit,))
+        return [dict(r) for r in rows]
 
 
 def _fts_query(query: str) -> str:
