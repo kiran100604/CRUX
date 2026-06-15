@@ -353,20 +353,23 @@ function vDecisions(){
     ${state.working.map(workingCard).join("")}`);
 }
 function conflictCard(c){
+  const reason = c.reason ? ` · ${esc(c.reason)}` : "";
   return `<div class="dcard">
-    <div class="top"><span class="chip coral">⚠ POSSIBLE CONTRADICTION · ${Math.round(c.similarity*100)}% similar</span></div>
+    <div class="top"><span class="chip coral">⚠ POSSIBLE CONTRADICTION · ${Math.round(c.similarity*100)}% similar${reason}</span></div>
     <div class="compare">
-      <div class="pane a"><div class="pl">Option A · ${esc(c.a.type)}</div><div class="pt">${esc(c.a.summary||c.a.title)}</div></div>
+      <div class="pane a"><div class="pl">Option A · ${esc(c.a.type)}${c.a.scope==='main'?' · verified':''}</div><div class="pt">${esc(c.a.summary||c.a.title)}</div></div>
       <div class="arrow">⇄</div>
-      <div class="pane b"><div class="pl">Option B · ${esc(c.b.type)}</div><div class="pt">${esc(c.b.summary||c.b.title)}</div></div>
+      <div class="pane b"><div class="pl">Option B · ${esc(c.b.type)}${c.b.scope==='main'?' · verified':''}</div><div class="pt">${esc(c.b.summary||c.b.title)}</div></div>
     </div>
     <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">Keeping one supersedes the other (history is kept)</span>
       <div class="dactions">
         <button class="btn sm out" onclick="supersede('${c.b.id}','${c.a.id}')">Keep A</button>
         <button class="btn sm out" onclick="supersede('${c.a.id}','${c.b.id}')">Keep B</button>
-        <button class="btn sm ghost" onclick="toast('Left as-is')">Not a conflict</button>
+        <button class="btn sm ghost" onclick="dismissConflict(${c.id})">Not a conflict</button>
       </div></div></div>`;
 }
+async function dismissConflict(id){await post(`/conflicts/${id}/dismiss`,{}); toast("Dismissed — won't resurface"); await load();}
+window.dismissConflict=dismissConflict;
 function workingCard(w){
   return `<div class="dcard">
     <div class="top"><span class="chip peach">● WORKING · ${esc(w.type)}</span>

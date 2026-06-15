@@ -57,7 +57,9 @@ class Store:
             embedding_model=self.embedder.model, content_hash=h,
             source_episode_id=episode_id, locator=locator or None)
         vec = self.embedder.embed(f"{enr.title}\n{enr.summary}\n{raw}")
-        return self.db.insert(item, vec)
+        stored = self.db.insert(item, vec)
+        self._detect_conflicts(stored)  # flag contradictions at write time
+        return stored
 
     def capture(self, content: str, *, source: str | None = None,
                 type_hint: str | None = None, scope: str = "individual",
@@ -116,35 +118,64 @@ class Store:
         for iid in item_ids:
             self.db.log_usage(iid, query, session, ts)
 
-    # --- triage: what needs the human's attention ----------------------------
+    # --- contradiction-aware writes (the "neighborhood update") --------------
 
-    def conflicts(self, threshold: float = 0.82, limit: int = 8) -> list[dict]:
-        """Find pairs of verified (main) items that look like they might
-        contradict — high semantic similarity, neither already superseded. The
-        human resolves by superseding one. (Sharper with real embeddings.)"""
+    NEIGH_THRESHOLD = 0.80   # only check genuinely close neighbors
+    HEURISTIC_FLAG = 0.90    # offline (no LLM judge): flag above this similarity
+    MAX_CHECK = 3            # cap judgments per new fact (bounds cost on bulk ingest)
+
+    def _detect_conflicts(self, item: ContextItem) -> None:
+        """When a fact lands, scan its neighborhood and flag likely
+        contradictions — LLM-judged with a real key, similarity-based offline.
+        Never auto-resolves; just records candidates for the human in Review."""
         from .embeddings import cosine
-        mains = [i for i in self.db.list(scope="main", archived=False, limit=500)
-                 if not i.superseded_by]
-        embs = dict(self.db.all_embeddings(scope="main"))
-        by_id = {i.id: i for i in mains}
-        pairs = []
-        ids = list(by_id)
-        for a in range(len(ids)):
-            for b in range(a + 1, len(ids)):
-                va, vb = embs.get(ids[a]), embs.get(ids[b])
-                if va and vb:
-                    s = cosine(va, vb)
-                    if s >= threshold:
-                        pairs.append((s, ids[a], ids[b]))
-        pairs.sort(reverse=True)
-        return [{"similarity": round(s, 3),
-                 "a": by_id[x].to_public_dict(), "b": by_id[y].to_public_dict()}
-                for s, x, y in pairs[:limit]]
+        vec = self.db.embedding_of(item.id)
+        if not vec:
+            return
+        sims = []
+        for oid, ovec in self.db.all_embeddings():  # non-archived only
+            if oid == item.id or not ovec:
+                continue
+            s = cosine(vec, ovec)
+            if s >= self.NEIGH_THRESHOLD:
+                sims.append((s, oid))
+        sims.sort(reverse=True)
+        for s, oid in sims[: self.MAX_CHECK]:
+            other = self.db.get(oid)
+            if not other or other.superseded_by:
+                continue
+            if other.source_episode_id and other.source_episode_id == item.source_episode_id:
+                continue  # facts from the same document aren't contradictions
+            verdict, reason = self.processor.judge_contradiction(item.summary, other.summary)
+            flagged = (s >= self.HEURISTIC_FLAG) if verdict is None else verdict
+            if flagged:
+                self.db.add_conflict(item.id, oid, round(s, 3),
+                                     reason or f"{int(s * 100)}% similar", now_iso())
+
+    def open_conflicts(self, limit: int = 12) -> list[dict]:
+        out = []
+        for row in self.db.conflict_rows(limit * 3):
+            a, b = self.db.get(row["new_id"]), self.db.get(row["existing_id"])
+            if (not a or not b or a.archived or b.archived
+                    or a.superseded_by or b.superseded_by):
+                self.db.set_conflict_status(row["id"], "resolved")  # stale, clean it up
+                continue
+            out.append({"id": row["id"], "similarity": row["similarity"],
+                        "reason": row["reason"], "a": a.to_public_dict(), "b": b.to_public_dict()})
+            if len(out) >= limit:
+                break
+        return out
+
+    def dismiss_conflict(self, conflict_id: int) -> bool:
+        self.db.set_conflict_status(int(conflict_id), "dismissed")
+        return True
+
+    # --- triage: what needs the human's attention ----------------------------
 
     def review(self) -> dict:
         """Everything awaiting the human: working items to promote + conflicts."""
         return {"working": self.db.list(scope="individual", archived=False, limit=200),
-                "conflicts": self.conflicts()}
+                "conflicts": self.open_conflicts()}
 
     # --- promotion: the refinement gate (individual -> main) -----------------
 
@@ -164,7 +195,10 @@ class Store:
             fields["summary"] = summary
         if type is not None:
             fields["type"] = type
-        return self.db.update(full, fields, now_iso())
+        ok = self.db.update(full, fields, now_iso())
+        if ok:
+            self._detect_conflicts(self.db.get(full))  # now verified — recheck vs truth
+        return ok
 
     def demote(self, item_id: str) -> bool:
         """Send a main item back to the working layer (undo a promotion)."""
@@ -179,7 +213,10 @@ class Store:
         full = self.db.resolve_id(item_id)
         if not full:
             return False
-        return self.db.update(full, {"archived": int(value)}, now_iso())
+        ok = self.db.update(full, {"archived": int(value)}, now_iso())
+        if ok and value:
+            self.db.resolve_conflicts_for(full)
+        return ok
 
     def supersede(self, old_id: str, new_id: str) -> bool:
         old_full = self.db.resolve_id(old_id)
@@ -188,7 +225,11 @@ class Store:
             raise ValueError(f"replacement item {new_id} does not exist")
         if not old_full:
             return False
-        return self.db.update(old_full, {"superseded_by": new_full}, now_iso())
+        ok = self.db.update(old_full, {"superseded_by": new_full}, now_iso())
+        if ok:  # resolving a conflict clears it from Review
+            self.db.resolve_conflicts_for(old_full)
+            self.db.resolve_conflicts_for(new_full)
+        return ok
 
 
 def _extract_url(text: str) -> str | None:

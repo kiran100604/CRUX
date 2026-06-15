@@ -118,6 +118,10 @@ def create_app(cfg: Config):
     def supersede(item_id: str, new_id: str):
         return {"ok": store.supersede(item_id, new_id)}
 
+    @app.post("/conflicts/{conflict_id}/dismiss")
+    def dismiss(conflict_id: int):
+        return {"ok": store.dismiss_conflict(conflict_id)}
+
     return app
 
 

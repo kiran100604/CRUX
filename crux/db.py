@@ -86,6 +86,19 @@ CREATE TABLE IF NOT EXISTS usages (
     used_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usages_item ON usages(item_id);
+
+-- contradiction candidates found at write time (the "neighborhood update").
+-- Never auto-applied — the human resolves (supersede) or dismisses; dismissals stick.
+CREATE TABLE IF NOT EXISTS conflicts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    new_id      TEXT NOT NULL,
+    existing_id TEXT NOT NULL,
+    similarity  REAL,
+    reason      TEXT,
+    status      TEXT NOT NULL DEFAULT 'open',  -- open | resolved | dismissed
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
@@ -251,6 +264,35 @@ class Database:
                FROM usages u JOIN items i ON i.id = u.item_id
                ORDER BY u.id DESC LIMIT ?""", (limit,))
         return [dict(r) for r in rows]
+
+    # --- contradiction candidates --------------------------------------------
+
+    def add_conflict(self, new_id: str, existing_id: str, similarity: float,
+                     reason: str, created_at: str) -> None:
+        dup = self.conn.execute(
+            """SELECT 1 FROM conflicts WHERE status='open'
+               AND ((new_id=? AND existing_id=?) OR (new_id=? AND existing_id=?))""",
+            (new_id, existing_id, existing_id, new_id)).fetchone()
+        if dup:
+            return
+        self.conn.execute(
+            """INSERT INTO conflicts (new_id, existing_id, similarity, reason, status, created_at)
+               VALUES (?,?,?,?,'open',?)""", (new_id, existing_id, similarity, reason, created_at))
+        self.conn.commit()
+
+    def conflict_rows(self, limit: int = 40) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM conflicts WHERE status='open' ORDER BY similarity DESC LIMIT ?", (limit,))]
+
+    def set_conflict_status(self, conflict_id: int, status: str) -> None:
+        self.conn.execute("UPDATE conflicts SET status=? WHERE id=?", (status, conflict_id))
+        self.conn.commit()
+
+    def resolve_conflicts_for(self, item_id: str) -> None:
+        self.conn.execute(
+            "UPDATE conflicts SET status='resolved' WHERE status='open' AND (new_id=? OR existing_id=?)",
+            (item_id, item_id))
+        self.conn.commit()
 
 
 def _fts_query(query: str) -> str:

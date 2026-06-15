@@ -102,6 +102,35 @@ def test_capture_creates_episode(store):
     assert ep.source_type == "note" and "Postgres" in ep.raw_content
 
 
+def test_contradiction_flagged_at_write_time(store):
+    # two near-identical pricing facts should trip the offline similarity flag
+    store.capture("SaaS price is 3000 rupees per seat per month.", type_hint="decision")
+    store.capture("SaaS price is 5000 rupees per seat per month.", type_hint="decision")
+    conflicts = store.open_conflicts()
+    assert conflicts, "expected a contradiction candidate"
+    c = conflicts[0]
+    # resolving by superseding one clears it from review
+    store.supersede(c["a"]["id"], c["b"]["id"])
+    assert not store.open_conflicts()
+
+
+def test_same_document_facts_not_flagged(store):
+    doc = ("# A\nWe will use Stripe for payments.\n\n"
+           "# B\nWe will use Stripe for payments.")  # identical across sections
+    store.ingest(doc, source_type="file", source_ref="d.md")
+    # facts from the same episode must never be flagged as contradicting each other
+    assert not store.open_conflicts()
+
+
+def test_dismiss_conflict_sticks(store):
+    store.capture("Plan price is 3000 rupees per seat per month.", type_hint="decision")
+    store.capture("Plan price is 4000 rupees per seat per month.", type_hint="decision")
+    conflicts = store.open_conflicts()
+    assert conflicts
+    store.dismiss_conflict(conflicts[0]["id"])
+    assert not store.open_conflicts()  # dismissed ones don't resurface
+
+
 def test_usage_payoff_loop(store):
     item = store.capture("Errors go to Sentry.", type_hint="constraint")
     store.record_usage([item.id, item.id], "error handling", session="s1")

@@ -42,6 +42,14 @@ Section:
 {content}
 \"\"\""""
 
+_JUDGE_PROMPT = """Two statements from a developer's knowledge base. Do they
+directly contradict each other — i.e. they cannot both be true, or one clearly
+updates/supersedes the other? Unrelated or merely similar statements do NOT count.
+Return ONLY JSON: {{"contradicts": true|false, "reason": "<= 12 words"}}.
+
+A: {a}
+B: {b}"""
+
 
 @dataclass
 class Enrichment:
@@ -69,6 +77,10 @@ class FakeProcessor:
         # emerges across a document because chunking yields many sections.
         return [self.enrich(content)]
 
+    def judge_contradiction(self, a: str, b: str):
+        # Offline can't reason — signal "no judgment", caller falls back to similarity.
+        return None, ""
+
 
 class AnthropicProcessor:
     def __init__(self, model: str, api_key: str | None):
@@ -92,6 +104,17 @@ class AnthropicProcessor:
         text = self._call(_MULTI_PROMPT.format(types=", ".join(ITEM_TYPES), content=content[:8000]), 1200)
         facts = _parse_many(text)
         return facts if facts else [self.enrich(content)]
+
+    def judge_contradiction(self, a: str, b: str):
+        """Return (contradicts: bool, reason: str). One statement may UPDATE the
+        other — that counts as a contradiction worth surfacing."""
+        text = self._call(_JUDGE_PROMPT.format(a=a[:600], b=b[:600]), 120)
+        try:
+            m = re.search(r"\{.*\}", text, re.DOTALL)
+            d = json.loads(m.group(0) if m else text)
+            return bool(d.get("contradicts")), str(d.get("reason", ""))[:120]
+        except Exception:
+            return None, ""
 
 
 def _parse(text: str, content: str) -> Enrichment:
