@@ -80,6 +80,36 @@ class Store:
         for iid in item_ids:
             self.db.log_usage(iid, query, session, ts)
 
+    # --- triage: what needs the human's attention ----------------------------
+
+    def conflicts(self, threshold: float = 0.82, limit: int = 8) -> list[dict]:
+        """Find pairs of verified (main) items that look like they might
+        contradict — high semantic similarity, neither already superseded. The
+        human resolves by superseding one. (Sharper with real embeddings.)"""
+        from .embeddings import cosine
+        mains = [i for i in self.db.list(scope="main", archived=False, limit=500)
+                 if not i.superseded_by]
+        embs = dict(self.db.all_embeddings(scope="main"))
+        by_id = {i.id: i for i in mains}
+        pairs = []
+        ids = list(by_id)
+        for a in range(len(ids)):
+            for b in range(a + 1, len(ids)):
+                va, vb = embs.get(ids[a]), embs.get(ids[b])
+                if va and vb:
+                    s = cosine(va, vb)
+                    if s >= threshold:
+                        pairs.append((s, ids[a], ids[b]))
+        pairs.sort(reverse=True)
+        return [{"similarity": round(s, 3),
+                 "a": by_id[x].to_public_dict(), "b": by_id[y].to_public_dict()}
+                for s, x, y in pairs[:limit]]
+
+    def review(self) -> dict:
+        """Everything awaiting the human: working items to promote + conflicts."""
+        return {"working": self.db.list(scope="individual", archived=False, limit=200),
+                "conflicts": self.conflicts()}
+
     # --- promotion: the refinement gate (individual -> main) -----------------
 
     def promote(self, item_id: str, *, title: str | None = None,

@@ -237,8 +237,9 @@ input: query string, limit
 - [ ] **Exit criteria:** in a real Claude Code session, starting a task auto-injects relevant context with zero tool calls; recall@5 measured with real embeddings.
 
 ### Week 3 — Dashboard + ingestion + polish
-- [x] FastAPI HTTP endpoints + **crystalline constellation dashboard** served on one port (`crux serve`).
-      Design language: dark/obsidian, two-state matter metaphor — **fluid** (amber, working layer, decays) → **crystal** (cyan/violet, verified main graph). Promotion is a "crystallize" ritual. Living constellation home with tag-linked crystal nodes that **glow by real agent usage**.
+- [x] FastAPI HTTP endpoints + **task-first dashboard** served on one port (`crux serve`).
+      Design language (v2, replacing the constellation): **Clay-inspired, warm & approachable** — cream canvas (#fffaf0), navy ink, rounded display headlines, generous radius, no dark footer; mono used only for IDs/sources. **Functional 3-color system**: teal = verified/main, peach = working, coral = conflict. Task-first IA: **Overview** ("N things need your attention" triage) · **Knowledge Base** (verified items by tier) · **Review/Alignment** (promote working notes + resolve contradictions) · **Activity** (payoff feed). Chose usable-and-clear over the visually-impressive constellation.
+- [x] Contradiction triage: `/review` surfaces working items + likely-conflicting verified pairs (embedding similarity); resolve by superseding one (history kept).
 - [x] **Payoff loop:** every hook injection is logged (`usages` table); dashboard shows "used N× by agents", a live feed ("your past self, helping you now"), and sizes/glows crystals by impact. *This is the emotional core — making the invisible value visible.*
 - [ ] Migrate the single-file dashboard to a componentized React+Vite build if/when it grows (currently zero-build vanilla SVG/JS — on-brand with local-first, no toolchain).
 - [ ] `crux add --file` with **chunking** (a whole doc as one vector retrieves badly).

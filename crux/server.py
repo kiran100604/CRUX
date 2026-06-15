@@ -84,6 +84,11 @@ def create_app(cfg: Config):
     def feed(limit: int = 20):
         return {"usages": store.db.recent_usages(limit)}
 
+    @app.get("/review")
+    def review():
+        r = store.review()
+        return {"working": _enrich(r["working"]), "conflicts": r["conflicts"]}
+
     @app.post("/items/{item_id}/promote")
     def promote(item_id: str, body: PromoteIn):
         return {"ok": store.promote(item_id, title=body.title,
