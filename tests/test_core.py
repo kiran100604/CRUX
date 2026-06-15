@@ -78,6 +78,30 @@ def test_scope_filter_and_main_ranks_higher(store):
         assert ranks[truth.id] < ranks[work.id]
 
 
+def test_document_ingest_makes_linked_facts(store):
+    doc = ("# Payments\n\n## Gateway\nWe will use Stripe as the gateway.\n\n"
+           "## Errors\nAll payment errors must be logged to Sentry.\n\n"
+           "# Auth\nAuth uses short-lived JWTs.")
+    res = store.ingest(doc, source_type="file", source_ref="design.md", title="design")
+    facts = res["facts"]
+    # one fact per section, all linked back to the single episode
+    assert len(facts) >= 3
+    assert all(f.source_episode_id == res["episode"].id for f in facts)
+    assert any("Gateway" in (f.locator or "") for f in facts)
+    # the raw episode is preserved whole as the source of truth
+    ep = store.db.get_episode(res["episode"].id)
+    assert ep and "Stripe" in ep.raw_content and ep.source_ref == "design.md"
+    # facts are immediately searchable
+    assert store.search("how are errors logged", limit=5)
+
+
+def test_capture_creates_episode(store):
+    it = store.capture("We chose Postgres.", type_hint="decision")
+    assert it.source_episode_id
+    ep = store.db.get_episode(it.source_episode_id)
+    assert ep.source_type == "note" and "Postgres" in ep.raw_content
+
+
 def test_usage_payoff_loop(store):
     item = store.capture("Errors go to Sentry.", type_hint="constraint")
     store.record_usage([item.id, item.id], "error handling", session="s1")

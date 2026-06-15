@@ -25,6 +25,23 @@ Snippet:
 {content}
 \"\"\""""
 
+_MULTI_PROMPT = """You extract durable, atomic facts from a section of a document
+for a developer/company context store. Pull out each distinct decision,
+constraint, architectural choice, or important reference — one fact each. Ignore
+filler, TODOs, and prose with no lasting signal. If the section holds nothing
+durable, return [].
+
+Return ONLY a minified JSON array; each element has keys: title, summary, type, tags.
+- title: <= 8 words, no trailing punctuation
+- summary: exactly one sentence
+- type: one of {types}
+- tags: 2-4 short lowercase tags
+
+Section:
+\"\"\"
+{content}
+\"\"\""""
+
 
 @dataclass
 class Enrichment:
@@ -47,6 +64,11 @@ class FakeProcessor:
             tags=_guess_tags(clean),
         )
 
+    def extract_facts(self, content: str) -> list[Enrichment]:
+        # Offline can't truly split a chunk; one fact per chunk. Multi-fact still
+        # emerges across a document because chunking yields many sections.
+        return [self.enrich(content)]
+
 
 class AnthropicProcessor:
     def __init__(self, model: str, api_key: str | None):
@@ -55,15 +77,21 @@ class AnthropicProcessor:
         self.model = model
         self._client = anthropic.Anthropic(api_key=api_key)
 
-    def enrich(self, content: str) -> Enrichment:
+    def _call(self, prompt: str, max_tokens: int) -> str:
         msg = self._client.messages.create(
-            model=self.model,
-            max_tokens=300,
-            messages=[{"role": "user", "content": _PROMPT.format(
-                types=", ".join(ITEM_TYPES), content=content[:6000])}],
+            model=self.model, max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
         )
-        text = "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+        return "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+
+    def enrich(self, content: str) -> Enrichment:
+        text = self._call(_PROMPT.format(types=", ".join(ITEM_TYPES), content=content[:6000]), 300)
         return _parse(text, content)
+
+    def extract_facts(self, content: str) -> list[Enrichment]:
+        text = self._call(_MULTI_PROMPT.format(types=", ".join(ITEM_TYPES), content=content[:8000]), 1200)
+        facts = _parse_many(text)
+        return facts if facts else [self.enrich(content)]
 
 
 def _parse(text: str, content: str) -> Enrichment:
@@ -82,6 +110,27 @@ def _parse(text: str, content: str) -> Enrichment:
         )
     except Exception:
         return FakeProcessor().enrich(content)
+
+
+def _parse_many(text: str) -> list[Enrichment]:
+    """Parse a JSON array of facts; tolerant of stray prose around it."""
+    try:
+        m = re.search(r"\[.*\]", text, re.DOTALL)
+        data = json.loads(m.group(0) if m else text)
+        out = []
+        for d in data:
+            t = d.get("type", "context")
+            if t not in ITEM_TYPES:
+                t = "context"
+            out.append(Enrichment(
+                title=str(d.get("title", "Untitled"))[:80].rstrip(".,;:"),
+                summary=str(d.get("summary", "")),
+                type=t,
+                tags=[str(x).lower() for x in d.get("tags", [])[:4]],
+            ))
+        return [e for e in out if e.title and e.title != "Untitled"]
+    except Exception:
+        return []
 
 
 # --- heuristics for the offline path -----------------------------------------

@@ -32,15 +32,56 @@ def _print_item(item, score=None):
 
 def cmd_add(args):
     store = _store()
-    content = args.text
-    if args.file:
-        content = Path(args.file).read_text()
-    if not content:
-        content = sys.stdin.read()
     scope = "main" if args.main else "individual"
-    item = store.capture(content, source=args.source, type_hint=args.type, scope=scope)
-    print(f"✓ captured: {item.title}  (id={item.id[:8]}, type={item.type}, scope={item.scope})")
+    if args.file:
+        res = store.ingest_file(args.file, scope=scope)
+        facts = res["facts"]
+        print(f"✓ ingested {res['episode'].source_ref} → {len(facts)} fact(s) staged for review")
+        for f in facts[:12]:
+            loc = f" · {f.locator}" if f.locator else ""
+            print(f"   • [{f.type}] {f.title}{loc}")
+        if len(facts) > 12:
+            print(f"   … and {len(facts)-12} more")
+    else:
+        content = args.text or sys.stdin.read()
+        item = store.capture(content, source=args.source, type_hint=args.type, scope=scope)
+        print(f"✓ captured: {item.title}  (id={item.id[:8]}, type={item.type}, scope={item.scope})")
     store.close()
+
+
+def cmd_capture(args):
+    """Hotkey entrypoint: grab the clipboard and capture it. Bind a global
+    shortcut to `crux capture` (see README for Raycast/Hammerspoon snippets)."""
+    store = _store()
+    text = read_clipboard()
+    if not text or not text.strip():
+        print("clipboard is empty — nothing to capture")
+        store.close(); return
+    if len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines()):
+        res = store.ingest(text, source_type="paste", source_ref="clipboard")
+        print(f"✓ captured clipboard → {len(res['facts'])} fact(s) staged for review")
+    else:
+        item = store.capture(text, source_type="hotkey")
+        print(f"✓ captured: {item.title}  (id={item.id[:8]})")
+    store.close()
+
+
+def read_clipboard() -> str:
+    import shutil, subprocess
+    for cmd in (["pbpaste"], ["wl-paste", "-n"],
+                ["xclip", "-selection", "clipboard", "-o"], ["xsel", "-b"]):
+        if shutil.which(cmd[0]):
+            try:
+                return subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout
+            except Exception:
+                pass
+    if shutil.which("powershell"):
+        try:
+            return subprocess.run(["powershell", "-command", "Get-Clipboard"],
+                                  capture_output=True, text=True, timeout=5).stdout
+        except Exception:
+            pass
+    return ""
 
 
 def cmd_query(args):
@@ -167,11 +208,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="crux", description="Local context layer for AI coding agents.")
     sub = p.add_subparsers(dest="command", required=True)
 
-    a = sub.add_parser("add", help="capture text into the working layer")
+    a = sub.add_parser("add", help="capture a note, or ingest a document with --file")
     a.add_argument("text", nargs="?", default="")
-    a.add_argument("--file"); a.add_argument("--source"); a.add_argument("--type")
+    a.add_argument("--file", help="ingest any document (md/txt/...) → many facts")
+    a.add_argument("--source"); a.add_argument("--type")
     a.add_argument("--main", action="store_true", help="capture straight into the verified main graph")
     a.set_defaults(func=cmd_add)
+
+    cap = sub.add_parser("capture", help="grab the clipboard (bind to a global hotkey)")
+    cap.set_defaults(func=cmd_capture)
 
     q = sub.add_parser("query", help="hybrid search")
     q.add_argument("query"); q.add_argument("--limit", type=int, default=5)

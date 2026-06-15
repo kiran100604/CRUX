@@ -31,9 +31,37 @@ LOW_VALUE_TYPES = frozenset({"reference", "context", "exploration"})
 #                after refinement. Prioritized in retrieval; never decays.
 SCOPES = ("individual", "main")
 
+# Everything captured — a note, a clipboard grab, a whole document, an agent's
+# observation — is stored first as an Episode: the raw, untouched source of truth
+# with provenance. Facts (ContextItems) are extracted FROM episodes and link back.
+# This is the foundation that scales from solo notes to company document ingestion.
+SOURCE_TYPES = ("note", "file", "paste", "hotkey", "agent")
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class Episode:
+    id: str
+    raw_content: str               # the full original input, never chunked/edited
+    source_type: str               # note | file | paste | hotkey | agent | ...
+    source_ref: str | None = None  # filename, URL, or app name
+    title: str | None = None       # document title, if any
+    added_by: str | None = None    # nullable now; identity for company/multi-user later
+    created_at: str = field(default_factory=now_iso)
+
+    def to_public_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_row(row) -> "Episode":
+        return Episode(
+            id=row["id"], raw_content=row["raw_content"], source_type=row["source_type"],
+            source_ref=row["source_ref"], title=row["title"], added_by=row["added_by"],
+            created_at=row["created_at"],
+        )
 
 
 @dataclass
@@ -53,6 +81,8 @@ class ContextItem:
     content_hash: str = ""
     version: int = 1
     promoted_at: str | None = None
+    source_episode_id: str | None = None  # which episode this fact came from
+    locator: str | None = None            # where in the episode (e.g. section heading)
     captured_at: str = field(default_factory=now_iso)
     updated_at: str = field(default_factory=now_iso)
 
@@ -78,6 +108,8 @@ class ContextItem:
             content_hash=row["content_hash"],
             version=row["version"],
             promoted_at=row["promoted_at"],
+            source_episode_id=row["source_episode_id"],
+            locator=row["locator"],
             captured_at=row["captured_at"],
             updated_at=row["updated_at"],
         )

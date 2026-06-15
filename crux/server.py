@@ -56,11 +56,23 @@ def create_app(cfg: Config):
     def index():
         return FileResponse(STATIC_DIR / "index.html")
 
+    class IngestIn(BaseModel):
+        content: str
+        source_ref: str | None = None
+        source_type: str = "paste"
+
     @app.post("/capture")
     def capture(body: CaptureIn):
         item = store.capture(body.content, source=body.source,
                              type_hint=body.type, scope=body.scope)
         return _enrich([item])[0]
+
+    @app.post("/ingest")
+    def ingest(body: IngestIn):
+        res = store.ingest(body.content, source_type=body.source_type,
+                           source_ref=body.source_ref)
+        return {"episode_id": res["episode"].id,
+                "facts": _enrich(res["facts"])}
 
     @app.get("/search")
     def search(q: str, limit: int = 5, scope: str | None = None):

@@ -9,12 +9,14 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
+from pathlib import Path
 
+from .chunk import chunk
 from .config import Config
 from .db import Database
 from .embeddings import get_embedding_provider
-from .models import ContextItem, now_iso
-from .processing import get_processor
+from .models import ContextItem, Episode, now_iso
+from .processing import Enrichment, get_processor
 from .retrieval import Result, search
 
 
@@ -33,37 +35,71 @@ class Store:
     def close(self) -> None:
         self.db.close()
 
-    # --- capture (always lands in the working/individual layer) ---------------
+    # --- ingestion: every input becomes an Episode, then 1..N facts ----------
+
+    def _episode(self, content: str, source_type: str, source_ref: str | None,
+                 title: str | None = None) -> Episode:
+        return self.db.insert_episode(Episode(
+            id=str(uuid.uuid4()), raw_content=content, source_type=source_type,
+            source_ref=source_ref, title=title))
+
+    def _store_fact(self, *, raw: str, enr: Enrichment, episode_id: str,
+                    locator: str | None, source: str | None, scope: str,
+                    confidence: float) -> ContextItem:
+        h = _hash(f"{enr.title}\n{enr.summary}")
+        existing = self.db.get_by_hash(h)
+        if existing:
+            return existing  # dedup: same fact, don't duplicate
+        item = ContextItem(
+            id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
+            type=enr.type, tags=enr.tags, source=source, scope=scope, confidence=confidence,
+            promoted_at=now_iso() if scope == "main" else None,
+            embedding_model=self.embedder.model, content_hash=h,
+            source_episode_id=episode_id, locator=locator or None)
+        vec = self.embedder.embed(f"{enr.title}\n{enr.summary}\n{raw}")
+        return self.db.insert(item, vec)
 
     def capture(self, content: str, *, source: str | None = None,
                 type_hint: str | None = None, scope: str = "individual",
-                confidence: float = 0.7) -> ContextItem:
+                confidence: float = 0.7, source_type: str = "note") -> ContextItem:
+        """Capture a single note → one Episode, one Fact. (Used by quick add,
+        hotkey, agent.) For documents that should yield many facts, use ingest()."""
         content = content.strip()
         if not content:
             raise ValueError("cannot capture empty content")
-
-        content_hash = _hash(content)
-        existing = self.db.get_by_hash(content_hash)
-        if existing:
-            return existing  # dedup: don't create near-duplicates
-
+        ep = self._episode(content, source_type, source)
         enr = self.processor.enrich(content)
-        item = ContextItem(
-            id=str(uuid.uuid4()),
-            raw_content=content,
-            title=enr.title,
-            summary=enr.summary,
-            type=type_hint or enr.type,
-            tags=enr.tags,
-            source=source or _extract_url(content),
-            scope=scope,
-            confidence=confidence,
-            promoted_at=now_iso() if scope == "main" else None,
-            embedding_model=self.embedder.model,
-            content_hash=content_hash,
-        )
-        vec = self.embedder.embed(f"{item.title}\n{item.summary}\n{content}")
-        return self.db.insert(item, vec)
+        if type_hint:
+            enr.type = type_hint
+        return self._store_fact(raw=content, enr=enr, episode_id=ep.id, locator=None,
+                                source=source or _extract_url(content),
+                                scope=scope, confidence=confidence)
+
+    def ingest(self, content: str, *, source_type: str = "file",
+               source_ref: str | None = None, title: str | None = None,
+               scope: str = "individual", confidence: float = 0.6) -> dict:
+        """Ingest a document (any text/source): one Episode → chunk → extract
+        many facts, each linked back to the episode + its location."""
+        content = content.strip()
+        if not content:
+            raise ValueError("cannot ingest empty content")
+        ep = self._episode(content, source_type, source_ref, title)
+        facts: list[ContextItem] = []
+        seen: set[str] = set()
+        for locator, piece in chunk(content, source_type):
+            for enr in self.processor.extract_facts(piece):
+                f = self._store_fact(raw=piece, enr=enr, episode_id=ep.id,
+                                     locator=locator, source=source_ref,
+                                     scope=scope, confidence=confidence)
+                if f.id not in seen:
+                    seen.add(f.id); facts.append(f)
+        return {"episode": ep, "facts": facts}
+
+    def ingest_file(self, path: str, *, scope: str = "individual") -> dict:
+        p = Path(path)
+        text = p.read_text(errors="ignore")
+        return self.ingest(text, source_type="file", source_ref=p.name,
+                           title=p.stem, scope=scope)
 
     # --- retrieval -----------------------------------------------------------
 

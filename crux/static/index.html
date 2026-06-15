@@ -410,6 +410,9 @@ function toast(m){const t=document.getElementById("toast");t.textContent=m;t.cla
 
 async function doCapture(){const i=document.getElementById("cap");const v=i.value.trim();if(!v)return;
   i.value=""; document.getElementById("res").classList.remove("on");
+  if(v.length>400||v.includes("\n")){ // long paste / document → multi-fact ingest
+    const r=await post("/ingest",{content:v,source_type:"paste"});
+    toast("● Ingested → "+r.facts.length+" fact(s) staged for review"); await load(); setView("decisions"); return;}
   const it=await post("/capture",{content:v}); toast("● Captured to working layer");
   await load(); setTimeout(()=>openItem(it.id),200);}
 function wireCapture(){const i=document.getElementById("cap"); if(!i)return;

@@ -112,7 +112,11 @@ Key property: **the inject path (hook) and the MCP path both go straight to the 
 
 ## 4. Data model
 
-One table, `items`. Individual vs Main is the `scope` column, not separate tables — promotion flips the field so an item is never duplicated. (No graph yet — v2 turns the `main` set into a graph with typed edges.)
+Two tables: **`episodes`** (raw sources of truth — a note, a clipboard grab, a whole document, an agent observation; with provenance) and **`items`** (the *facts* extracted from episodes, each linking back via `source_episode_id` + `locator`). Individual vs Main is the `scope` column on `items`, not separate tables — promotion flips the field so a fact is never duplicated. (No typed-edge graph yet — v2 turns the `main` set into a graph.)
+
+**Ingestion pipeline (every capture surface routes through it):**
+`input → Episode (raw, kept whole) → chunk → extract 1..N facts → embed → stage in Review`.
+A quick note/hotkey grab = 1 episode → 1 fact; a document (`crux add --file`, or a long paste) = 1 episode → many facts, one per section (offline) or per distinct decision/constraint (with Haiku). Facts carry their section path as `locator` for provenance. This is the foundation that scales to company document/connector ingestion — a new source is just another adapter that produces Episodes.
 
 | Field | Type | Notes |
 |---|---|---|

@@ -50,7 +50,8 @@ def run() -> None:
         refines and promotes them to the main graph later, so an over-eager agent
         can never pollute the trusted layer.
         """
-        item = store.capture(content, type_hint=type, scope="individual", confidence=0.4)
+        item = store.capture(content, type_hint=type, scope="individual",
+                             confidence=0.4, source_type="agent")
         return {"id": item.id, "title": item.title, "summary": item.summary, "scope": item.scope}
 
     mcp.run()

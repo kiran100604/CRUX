@@ -15,9 +15,20 @@ import sqlite3
 from pathlib import Path
 
 from .embeddings import pack, unpack
-from .models import ContextItem
+from .models import ContextItem, Episode
 
 SCHEMA = """
+-- raw sources of truth; facts (items) are extracted from these and link back
+CREATE TABLE IF NOT EXISTS episodes (
+    id           TEXT PRIMARY KEY,
+    raw_content  TEXT NOT NULL,
+    source_type  TEXT NOT NULL,
+    source_ref   TEXT,
+    title        TEXT,
+    added_by     TEXT,
+    created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS items (
     id              TEXT PRIMARY KEY,
     raw_content     TEXT NOT NULL,
@@ -35,6 +46,8 @@ CREATE TABLE IF NOT EXISTS items (
     content_hash    TEXT NOT NULL DEFAULT '',
     version         INTEGER NOT NULL DEFAULT 1,
     promoted_at     TEXT,
+    source_episode_id TEXT,
+    locator         TEXT,
     captured_at     TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -88,23 +101,47 @@ class Database:
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a db was first created (local, in-place)."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(items)")}
+        for col in ("source_episode_id", "locator"):
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE items ADD COLUMN {col} TEXT")
 
     def close(self) -> None:
         self.conn.close()
 
     # --- writes --------------------------------------------------------------
 
+    def insert_episode(self, ep: Episode) -> Episode:
+        self.conn.execute(
+            """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
+                   added_by, created_at) VALUES (?,?,?,?,?,?,?)""",
+            (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
+             ep.added_by, ep.created_at),
+        )
+        self.conn.commit()
+        return ep
+
+    def get_episode(self, ep_id: str) -> Episode | None:
+        row = self.conn.execute("SELECT * FROM episodes WHERE id=?", (ep_id,)).fetchone()
+        return Episode.from_row(row) if row else None
+
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(
             """INSERT INTO items (id, raw_content, title, summary, type, tags, source,
                    scope, confidence, superseded_by, archived, embedding, embedding_model,
-                   content_hash, version, promoted_at, captured_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   content_hash, version, promoted_at, source_episode_id, locator,
+                   captured_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (item.id, item.raw_content, item.title, item.summary, item.type,
              json.dumps(item.tags), item.source, item.scope, item.confidence,
              item.superseded_by, int(item.archived), pack(embedding), item.embedding_model,
-             item.content_hash, item.version, item.promoted_at, item.captured_at, item.updated_at),
+             item.content_hash, item.version, item.promoted_at, item.source_episode_id,
+             item.locator, item.captured_at, item.updated_at),
         )
         self.conn.commit()
         return item
