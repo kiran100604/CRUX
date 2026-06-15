@@ -1,0 +1,17 @@
+{
+  "_comment": "Retrieval eval seed. Each case: a query and the title substrings of items that SHOULD rank in the top-k. Grow this as you dogfood — it's how retrieval changes get measured instead of vibe-checked.",
+  "corpus": [
+    {"text": "We decided to use Stripe over Razorpay because of better international SDK support.", "type": "decision"},
+    {"text": "All payment errors must be logged to Sentry. This is non-negotiable.", "type": "constraint"},
+    {"text": "Webhook events to handle: payment_intent.succeeded and payment_intent.failed.", "type": "reference"},
+    {"text": "Verify the Stripe signature using the STRIPE_WEBHOOK_SECRET env var.", "type": "constraint"},
+    {"text": "Considered Postgres vs SQLite for storage; leaning SQLite for local-first simplicity.", "type": "exploration"},
+    {"text": "Auth uses short-lived JWTs with refresh tokens stored httpOnly.", "type": "decision"},
+    {"text": "The frontend is a React SPA served as static files from the API.", "type": "architecture"}
+  ],
+  "cases": [
+    {"query": "building the payment webhook handler", "expect": ["Stripe", "payment", "webhook", "Sentry"]},
+    {"query": "how do we handle authentication", "expect": ["JWT", "auth"]},
+    {"query": "where should errors go", "expect": ["Sentry"]}
+  ]
+}
