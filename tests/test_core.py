@@ -47,11 +47,35 @@ def test_supersede_demotes(store):
         assert ranks[new.id] < ranks[old.id]
 
 
-def test_pin_and_archive(store):
+def test_archive_hides_from_search(store):
     item = store.capture("some reference note", type_hint="reference")
-    assert store.pin(item.id) and store.db.get(item.id).pinned
     assert store.archive(item.id) and store.db.get(item.id).archived
     assert all(r.item.id != item.id for r in store.search("reference note"))
+
+
+def test_promote_to_main(store):
+    item = store.capture("We will use Postgres for storage.", type_hint="decision")
+    assert item.scope == "individual"
+    assert store.promote(item.id, summary="Storage engine is Postgres.")
+    promoted = store.db.get(item.id)
+    assert promoted.scope == "main"
+    assert promoted.confidence >= 0.9
+    assert promoted.promoted_at is not None
+    assert promoted.summary == "Storage engine is Postgres."
+
+
+def test_scope_filter_and_main_ranks_higher(store):
+    work = store.capture("Exploring whether to cache auth tokens in redis.", type_hint="exploration")
+    truth = store.capture("Auth tokens are cached in Redis with a 5 minute TTL.", type_hint="decision")
+    store.promote(truth.id)
+    # main-only scope excludes the working item
+    main_only = store.search("how are auth tokens cached", scope="main")
+    assert all(r.item.scope == "main" for r in main_only)
+    # across both tiers, verified truth outranks the working note
+    both = store.search("how are auth tokens cached", scope=None)
+    ranks = {r.item.id: i for i, r in enumerate(both)}
+    if truth.id in ranks and work.id in ranks:
+        assert ranks[truth.id] < ranks[work.id]
 
 
 def test_hook_inject_is_crash_safe(monkeypatch, capsys):

@@ -35,7 +35,7 @@ The naive design ("expose an MCP `get_context` tool and hope the agent calls it"
 **Decision:** **Hybrid retrieval with Reciprocal Rank Fusion (RRF)** from day one — the same approach Hyper converged on (semantic + full-text, fused with RRF).
 - **Semantic**: embedding cosine similarity.
 - **Lexical**: SQLite FTS5 keyword search (free — we're already on SQLite).
-- **Fuse**: RRF combines the two ranked lists, then we apply **boosts**: `type` (a `decision`/`constraint` outranks a `reference`), `pinned`, and **recency**, and a **penalty** for superseded/archived items.
+- **Fuse**: RRF combines the two ranked lists, then we apply **boosts**: `scope` (verified `main` outranks working `individual`), `type` (a `decision`/`constraint` outranks a `reference`), and **recency** (working items decay), plus a **penalty** for superseded/archived items.
 - This is testable, and we will test it (see §6, eval harness). Retrieval tuning is a Week-2 deliverable, not "polish."
 
 ### P3 — Stale / contradictory knowledge must resolve, not pile up
@@ -52,7 +52,9 @@ If you can't see *where* a piece of injected context came from, you won't trust 
 ### P5 — Capture must capture *intent*, or the store rots
 The sharpest critique in the Hyper thread: memory systems "fail to capture intent" — throwaway architecture notes from a one-off spike leak into unrelated sessions forever. CRUX must distinguish "this is a locked decision" from "this was me thinking out loud."
 
-**Decision:** `type` is the intent signal and it drives ranking. `decision`/`constraint`/`architecture` rank high and don't decay; `reference`/`context`/`exploration` rank lower and **decay with age** unless `pinned`. Agent-written items (via `add_context`) default to low trust and are visible in the dashboard for one-click confirm/discard, so an over-eager agent can't quietly pollute the store.
+**Decision:** Two mechanisms work together:
+1. **Two-tier scope (the trust gate).** Every item has a `scope`: `individual` (the **working layer** — captured as you work, possibly unverified, fades with age) or `main` (the **verified graph** — only true things, entered explicitly by promotion). Capture always lands in `individual`; you **promote** the good bits to `main` after refining them. Agents prioritize `main`; the working layer is supporting "what I'm currently doing" context. This is how *only true things* end up in the trusted layer. (Same idea as Hyper's Episodes-vs-Facts split — and exactly the Individual/Main design from spec 0.1, kept.)
+2. **`type` is the intent signal within a tier.** `decision`/`constraint`/`architecture` rank high; `reference`/`context`/`exploration` rank lower. Working-layer items decay with age so throwaway spike notes fade. Agent-written items (via `add_context`) always land in `individual` at low confidence, so an over-eager agent can never pollute the verified graph.
 
 ---
 
@@ -63,7 +65,7 @@ The sharpest critique in the Hyper thread: memory systems "fail to capture inten
 | MCP `get_context` is the injection path | **Hook-first injection**, MCP is fallback | P1 — models forget to call tools |
 | "Semantic similarity, top 3-5" | **Hybrid (FTS5 + vector) + RRF + boosts** | P2 — vector-only surfaces noise |
 | `version++` on edit | + **`superseded_by`, never hard-delete, soft `archived`** | P3 — contradictions must resolve |
-| Individual vs Main + promote toggle | **Dropped for v1.** Replaced by `pinned` + `type`-based ranking | over-build; it's a *team* seam, no second user exists yet |
+| Individual vs Main + promote toggle | **Kept** — implemented as a `scope` field on one table (promotion flips it), NOT two stores with duplication | it's a *trust gate* (only verified truth enters `main`), not a team feature; one row avoids the edit-drift bug of duplicating items |
 | SQLite **+ ChromaDB** | **One SQLite file** (FTS5 + embeddings as BLOB, cosine in Python) | one file = no sync bugs, trivial backup, matches "zero ops"; brute-force cosine is fine <~50k items |
 | `embedding vector(1536)` hardcoded | **dimension-agnostic BLOB**; provider chosen in config | Anthropic has **no** embeddings API; 1536 is OpenAI-specific |
 | `claude-3-haiku` for embeddings | embeddings = pluggable (fake/OpenAI/Voyage); processing = **current Haiku** | factual correctness |
@@ -86,7 +88,7 @@ What we kept from 0.1 because it was right: tight scope, aggressive deferral of 
    ┌─────────────┴──┐  ┌────┴──────┐  ┌────┴───────┐  ┌┴────────────────┐
    │ Hook (inject)  │  │ MCP server│  │  CLI        │  │ FastAPI (dash)  │
    │ UserPromptSub. │  │ get/add   │  │ add/query/  │  │ list/search/    │
-   │ → additionalCtx│  │ _context  │  │ list/...    │  │ pin/archive     │
+   │ → additionalCtx│  │ _context  │  │ promote/... │  │ promote/archive │
    └────────────────┘  └───────────┘  └─────────────┘  └─────────────────┘
         (Claude Code)     (any MCP        (terminal)       (localhost web UI
                            agent)                            + React SPA served here)
@@ -110,7 +112,7 @@ Key property: **the inject path (hook) and the MCP path both go straight to the 
 
 ## 4. Data model
 
-One table, `items`. (No separate Individual/Main tables. No graph yet — v2 adds typed edges.)
+One table, `items`. Individual vs Main is the `scope` column, not separate tables — promotion flips the field so an item is never duplicated. (No graph yet — v2 turns the `main` set into a graph with typed edges.)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -121,10 +123,11 @@ One table, `items`. (No separate Individual/Main tables. No graph yet — v2 add
 | `type` | TEXT enum | `decision` / `constraint` / `architecture` / `design` / `reference` / `context` / `exploration` |
 | `tags` | TEXT (json array) | 2–4 tags |
 | `source` | TEXT? | URL or app name |
-| `pinned` | INT (0/1) | replaces "promote to main" — pinned = locked truth, ranks high, never decays |
-| `confidence` | REAL | 0–1. human capture = high; agent `add_context` = low until confirmed |
+| `scope` | TEXT enum | `individual` (working layer, decays) / `main` (verified graph, prioritized, never decays). Promotion flips this. |
+| `confidence` | REAL | 0–1. human capture = 0.7; promotion → ~0.95; agent `add_context` = 0.4 until promoted |
 | `superseded_by` | TEXT? | id of the item that replaces this one |
 | `archived` | INT (0/1) | soft delete |
+| `promoted_at` | TEXT? | when it entered the main graph |
 | `embedding` | BLOB | float32 vector, provider-dependent length |
 | `embedding_model` | TEXT | which model produced it (so we can re-embed on provider change) |
 | `content_hash` | TEXT | sha256 of normalized raw_content — for dedup |
@@ -165,26 +168,29 @@ Installed via:
 ```
 
 ### 5.2 MCP tools (fallback + explicit use)
-- `get_context(query, limit=5, include_archived=false)` → ranked items + how many were searched.
-- `add_context(content, type?, pin=false)` → stored item (id, title, summary). Defaults to **low confidence + staged** unless `pin=true`.
+- `get_context(query, limit=5, scope="all", include_archived=false)` → ranked items + how many were searched. `scope`: `all` (main prioritized + recent working) / `main` (verified only) / `individual`.
+- `add_context(content, type?)` → stored item. Always lands in the **working layer** at low confidence — agents log what they're doing; a human promotes the true bits later.
 
 ### 5.3 CLI
 ```
-crux add "text"            # capture from terminal
+crux add "text"            # capture into the working layer
+crux add "text" --main     # capture straight into the verified main graph
 crux add --file design.md  # ingest a doc (chunked — a whole file as one embedding retrieves badly)
-crux query "..."           # hybrid search, human-readable
-crux list [--type decision] [--pinned] [--archived]
-crux pin <id> / unpin <id>
+crux query "..." [--scope all|main|individual]   # hybrid search, human-readable
+crux list [--type decision] [--scope main] [--archived]
+crux promote <id> [--title ... --summary ... --type ...]   # working -> main, with refinement
+crux demote <id>           # main -> working (undo)
 crux supersede <old-id> <new-id>
-crux archive <id> / restore <id>
+crux archive <id> / archive <id> --restore
 crux serve                 # start FastAPI + dashboard on :7432
 crux mcp                   # run MCP server (also: python -m crux.mcp_server)
-crux install-hook / uninstall-hook / status
+crux install-hook / status
 crux hook-inject / hook-capture   # invoked by Claude Code, not by humans
 ```
+(IDs accept unambiguous short prefixes, as shown by `list`/`query`.)
 
 ### 5.4 HTTP (dashboard backend, FastAPI)
-`POST /capture`, `GET /search?q=`, `GET /items`, `POST /items/{id}/pin`, `POST /items/{id}/archive`, `POST /items/{id}/supersede`. Dashboard SPA served at `/`.
+`POST /capture`, `GET /search?q=&scope=`, `GET /items?scope=`, `POST /items/{id}/promote`, `POST /items/{id}/demote`, `POST /items/{id}/archive`, `POST /items/{id}/supersede`. Dashboard SPA served at `/`.
 
 ---
 
@@ -197,37 +203,41 @@ input: query string, limit
 3. lexical  = top 50 items from items_fts MATCH (query), excluding archived
 4. fuse with RRF:  score(item) = Σ 1/(k + rank_in_list)   for k=60      # per Hyper/standard RRF
 5. apply multipliers:
-      pinned                 ×1.5
+      scope == main          ×1.5                      # verified truth wins
+      scope == individual    ×recency_decay(age)        # working memory fades (30d half-life)
       type ∈ {decision,constraint,architecture}  ×1.3
-      type ∈ {reference,context,exploration}     ×0.9, and ×recency_decay(age)
-      superseded_by != null  ×0.15      # demote hard, don't drop
-6. return top `limit`, each with title, summary, type, source, captured_at, id
+      type ∈ {reference,context,exploration}     ×0.9
+      superseded_by != null  ×0.15                      # demote hard, don't drop
+      × (0.5 + 0.5*confidence)                          # low-trust writes rank lower
+   (a `scope` filter can restrict the candidate set to one tier before fusion)
+6. return top `limit`, each with title, summary, type, scope, source, captured_at, id
 ```
 
-**Eval harness (Week 2, mandatory).** `eval/queries.yaml` holds `query → expected_item_ids`. `crux-eval` reports recall@k / MRR so retrieval changes are measured, not vibes. Reference benchmarks for the technique: **LongMemEval** and **LoCoMo** (what serious memory systems report on). We don't need SOTA — we need *trustworthy*.
+**Eval harness (Week 2, mandatory).** `eval/queries.json` holds a corpus + `query → expected title substrings`. `python -m eval.run_eval` reports recall@k / MRR so retrieval changes are measured, not vibes. Reference benchmarks for the technique: **LongMemEval** and **LoCoMo** (what serious memory systems report on). We don't need SOTA — we need *trustworthy*.
 
 ---
 
 ## 7. Build plan (4 weeks)
 
-### Week 1 — Core loop, end to end in the terminal
-- [ ] `crux/` package skeleton, `uv` project, config (`~/.crux/`).
-- [ ] SQLite schema + FTS5 + triggers; `db.py` CRUD (insert, dedup-by-hash, supersede, archive, pin).
-- [ ] `EmbeddingProvider` (fake default + OpenAI) and `Processor` (Haiku + fake fallback).
-- [ ] Capture pipeline: text → enrich → embed → store.
-- [ ] Hybrid retrieval (`retrieval.py`) with RRF + boosts.
-- [ ] CLI: `add`, `query`, `list`, `pin`, `archive`, `supersede`.
-- [ ] **Exit criteria:** `crux add` then `crux query` returns sensible ranked results, fully offline (fake providers).
+### Week 1 — Core loop, end to end in the terminal  ✅ DONE
+- [x] `crux/` package skeleton, config (`~/.crux/`).
+- [x] SQLite schema + FTS5 + triggers; `db.py` CRUD (insert, dedup-by-hash, supersede, archive, promote/scope).
+- [x] `EmbeddingProvider` (fake default + OpenAI) and `Processor` (Haiku + fake fallback).
+- [x] Capture pipeline: text → enrich → embed → store (lands in working layer).
+- [x] Hybrid retrieval (`retrieval.py`) with RRF + scope/type/recency boosts.
+- [x] CLI: `add`, `query`, `list`, `promote`/`demote`, `archive`, `supersede`, `status`.
+- [x] **Exit criteria:** `crux add` then `crux query` returns sensible ranked results, fully offline. Two-tier promote flow works. 7 tests pass.
 
-### Week 2 — Automatic injection (the differentiator) + eval
-- [ ] `crux hook-inject` (stdin→retrieval→`additionalContext`, fast, crash-safe).
-- [ ] `crux install-hook` / `status` (explicit, prints diff, no silent install).
-- [ ] MCP server: `get_context`, `add_context` (talking straight to the DB).
-- [ ] Eval harness + seed `queries.yaml`; tune RRF/boosts against it.
-- [ ] **Exit criteria:** in a real Claude Code session, starting a task auto-injects relevant context with zero tool calls; recall@5 measured on the eval set.
+### Week 2 — Automatic injection (the differentiator) + eval  ~ MOSTLY DONE
+- [x] `crux hook-inject` (stdin→retrieval→`additionalContext`, fast, crash-safe; marks VERIFIED vs working).
+- [x] `crux install-hook` / `status` (explicit, prints what it writes, no silent install).
+- [x] MCP server: `get_context` (scope-aware), `add_context` (writes to working layer) — talks straight to the DB.
+- [x] Eval harness + seed `queries.json`.
+- [ ] Plug in a real embedding provider and **tune** RRF/boosts against the eval set (recall@5 ≥ 0.8).
+- [ ] **Exit criteria:** in a real Claude Code session, starting a task auto-injects relevant context with zero tool calls; recall@5 measured with real embeddings.
 
 ### Week 3 — Dashboard + ingestion + polish
-- [ ] FastAPI HTTP endpoints; minimal React SPA (list, search, pin, archive, supersede, manual add) served on one port.
+- [ ] FastAPI HTTP endpoints (done) + minimal React SPA (list, search, promote, archive, supersede, manual add) served on one port.
 - [ ] `crux add --file` with **chunking** (a whole doc as one vector retrieves badly).
 - [ ] `crux hook-capture` (Stop hook) → staged low-confidence items for one-click confirm.
 - [ ] Settings screen (API keys, provider choice, hook status).
@@ -255,4 +265,4 @@ The last two rows are the point. A memory system that's technically excellent bu
 ---
 
 ## 9. Explicitly NOT in v1
-Teams / multi-user, auth / access-control, the Individual→Main promotion hierarchy, knowledge-graph edges, auto-triggers (GitHub/Slack/Linear), EOD review / session recording, confidence-scoring pipeline beyond the simple human/agent split, notifications, mobile, freshness polling/webhooks. These are real (Hyper does them at company scale) — they're just not how a solo tool earns its first day of trust.
+Teams / multi-user, auth / access-control, **approval hierarchies** (individual→team-lead→main — note the *solo* individual→main promotion gate IS in v1), knowledge-graph edges, auto-triggers (GitHub/Slack/Linear), EOD review / session recording, confidence-scoring pipeline beyond the simple human/agent split, notifications, mobile, freshness polling/webhooks. These are real (Hyper does them at company scale) — they're just not how a solo tool earns its first day of trust.

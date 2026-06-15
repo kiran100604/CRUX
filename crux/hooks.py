@@ -21,9 +21,10 @@ def _format(results) -> str:
     lines = ["[CRUX CONTEXT] (retrieved automatically — verify before trusting)"]
     for r in results:
         i = r.item
-        tag = i.type.upper()
+        # mark which tier each item came from: verified truth vs working note
+        tier = "VERIFIED" if i.scope == "main" else "working"
         cite = i.source or i.id[:8]
-        lines.append(f"• ({tag}) {i.title} — {i.summary} [src: {cite}]")
+        lines.append(f"• [{tier}/{i.type}] {i.title} — {i.summary} [src: {cite}]")
     lines.append("[END CRUX CONTEXT]")
     return "\n".join(lines)
 

@@ -33,11 +33,11 @@ class Store:
     def close(self) -> None:
         self.db.close()
 
-    # --- capture -------------------------------------------------------------
+    # --- capture (always lands in the working/individual layer) ---------------
 
     def capture(self, content: str, *, source: str | None = None,
-                type_hint: str | None = None, pinned: bool = False,
-                confidence: float = 0.9) -> ContextItem:
+                type_hint: str | None = None, scope: str = "individual",
+                confidence: float = 0.7) -> ContextItem:
         content = content.strip()
         if not content:
             raise ValueError("cannot capture empty content")
@@ -56,8 +56,9 @@ class Store:
             type=type_hint or enr.type,
             tags=enr.tags,
             source=source or _extract_url(content),
-            pinned=pinned,
+            scope=scope,
             confidence=confidence,
+            promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model,
             content_hash=content_hash,
         )
@@ -66,22 +67,55 @@ class Store:
 
     # --- retrieval -----------------------------------------------------------
 
-    def search(self, query: str, limit: int = 5, include_archived: bool = False) -> list[Result]:
+    def search(self, query: str, limit: int = 5, include_archived: bool = False,
+               scope: str | None = None) -> list[Result]:
         qvec = self.embedder.embed(query)
-        return search(self.db, qvec, query, limit=limit, include_archived=include_archived)
+        return search(self.db, qvec, query, limit=limit,
+                      include_archived=include_archived, scope=scope)
 
-    # --- mutations -----------------------------------------------------------
+    # --- promotion: the refinement gate (individual -> main) -----------------
 
-    def pin(self, item_id: str, value: bool = True) -> bool:
-        return self.db.set_flag(item_id, "pinned", int(value), now_iso())
+    def promote(self, item_id: str, *, title: str | None = None,
+                summary: str | None = None, type: str | None = None,
+                confidence: float = 0.95) -> bool:
+        """Move a working item into the verified `main` graph, optionally refining
+        its fields. This is how only-true things enter the trusted layer."""
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return False
+        fields: dict = {"scope": "main", "confidence": confidence,
+                        "promoted_at": now_iso()}
+        if title is not None:
+            fields["title"] = title
+        if summary is not None:
+            fields["summary"] = summary
+        if type is not None:
+            fields["type"] = type
+        return self.db.update(full, fields, now_iso())
+
+    def demote(self, item_id: str) -> bool:
+        """Send a main item back to the working layer (undo a promotion)."""
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return False
+        return self.db.update(full, {"scope": "individual", "promoted_at": None}, now_iso())
+
+    # --- other mutations -----------------------------------------------------
 
     def archive(self, item_id: str, value: bool = True) -> bool:
-        return self.db.set_flag(item_id, "archived", int(value), now_iso())
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return False
+        return self.db.update(full, {"archived": int(value)}, now_iso())
 
     def supersede(self, old_id: str, new_id: str) -> bool:
-        if not self.db.get(new_id):
+        old_full = self.db.resolve_id(old_id)
+        new_full = self.db.resolve_id(new_id)
+        if not new_full:
             raise ValueError(f"replacement item {new_id} does not exist")
-        return self.db.set_flag(old_id, "superseded_by", new_id, now_iso())
+        if not old_full:
+            return False
+        return self.db.update(old_full, {"superseded_by": new_full}, now_iso())
 
 
 def _extract_url(text: str) -> str | None:

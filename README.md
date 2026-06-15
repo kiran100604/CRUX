@@ -8,6 +8,10 @@ stop re-explaining context and agents stop contradicting decisions you already m
 > [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md). Read that first.
 
 ## Why it's different
+- **Two-tier memory (a trust gate).** Captures land in a **working layer**
+  (what you're currently doing — transient, fades). You **promote** the true,
+  durable bits into the **main graph**, which agents prioritize. Only verified
+  things enter trusted context.
 - **Injection is hook-first, not tool-first.** A Claude Code `UserPromptSubmit`
   hook retrieves and injects context on *every* prompt — the model never has to
   remember to call a tool. (MCP tools remain as a fallback.)
@@ -22,9 +26,12 @@ stop re-explaining context and agents stop contradicting decisions you already m
 ## Quickstart (offline, zero keys)
 ```bash
 pip install -e .
-crux add "We decided to use Stripe over Razorpay for better international SDK support."
+crux add "Leaning toward Stripe but still comparing fees."   # -> working layer
 crux add "All payment errors must be logged to Sentry." --type constraint
-crux query "building the payment webhook handler"
+crux list --scope individual                                  # see working items + short ids
+crux promote <id> --summary "Payments via Stripe; errors to Sentry." --type decision
+crux query "building the payment webhook handler"             # both tiers; main ranks first
+crux query "payment provider" --scope main                   # verified truth only
 crux status
 ```
 

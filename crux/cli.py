@@ -15,10 +15,15 @@ def _store() -> Store:
     return Store(Config.load())
 
 
+def _scope_arg(value: str | None) -> str | None:
+    """'all' (or unset) -> None (both tiers); otherwise the chosen tier."""
+    return None if value in (None, "all") else value
+
+
 def _print_item(item, score=None):
     score_s = f"  ({score:.3f})" if score is not None else ""
-    pin = " 📌" if item.pinned else ""
-    print(f"[{item.type}] {item.title}{pin}{score_s}")
+    badge = " ★main" if item.scope == "main" else " ·working"
+    print(f"[{item.type}]{badge} {item.title}{score_s}")
     print(f"    {item.summary}")
     print(f"    id={item.id[:8]}  tags={','.join(item.tags)}  {item.captured_at[:10]}")
     if item.source:
@@ -32,14 +37,15 @@ def cmd_add(args):
         content = Path(args.file).read_text()
     if not content:
         content = sys.stdin.read()
-    item = store.capture(content, source=args.source, type_hint=args.type, pinned=args.pin)
-    print(f"✓ captured: {item.title}  (id={item.id[:8]}, type={item.type})")
+    scope = "main" if args.main else "individual"
+    item = store.capture(content, source=args.source, type_hint=args.type, scope=scope)
+    print(f"✓ captured: {item.title}  (id={item.id[:8]}, type={item.type}, scope={item.scope})")
     store.close()
 
 
 def cmd_query(args):
     store = _store()
-    results = store.search(args.query, limit=args.limit)
+    results = store.search(args.query, limit=args.limit, scope=_scope_arg(args.scope))
     if not results:
         print("no results")
     for r in results:
@@ -50,17 +56,23 @@ def cmd_query(args):
 
 def cmd_list(args):
     store = _store()
-    pinned = True if args.pinned else None
-    for item in store.db.list(type=args.type, pinned=pinned, archived=args.archived):
+    for item in store.db.list(type=args.type, scope=_scope_arg(args.scope), archived=args.archived):
         _print_item(item)
         print()
     store.close()
 
 
-def cmd_pin(args):
+def cmd_promote(args):
     store = _store()
-    ok = store.pin(args.id, value=not args.off)
-    print("✓ updated" if ok else "not found")
+    ok = store.promote(args.id, title=args.title, summary=args.summary, type=args.type)
+    print("✓ promoted to main graph" if ok else "not found")
+    store.close()
+
+
+def cmd_demote(args):
+    store = _store()
+    ok = store.demote(args.id)
+    print("✓ moved back to working layer" if ok else "not found")
     store.close()
 
 
@@ -84,9 +96,10 @@ def cmd_supersede(args):
 def cmd_status(args):
     cfg = Config.load()
     store = _store()
-    total = len(store.db.list(limit=100000))
+    main = len(store.db.list(scope="main", limit=100000))
+    working = len(store.db.list(scope="individual", limit=100000))
     print(f"db:         {cfg.db_path}")
-    print(f"items:      {total}")
+    print(f"items:      {main + working}  (main: {main}, working: {working})")
     print(f"embeddings: {cfg.embedding_provider} ({store.embedder.model})")
     print(f"processing: {cfg.processing_provider} ({cfg.processing_model})")
     print(f"hook:       {'installed' if _hook_installed() else 'not installed'} "
@@ -154,23 +167,30 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="crux", description="Local context layer for AI coding agents.")
     sub = p.add_subparsers(dest="command", required=True)
 
-    a = sub.add_parser("add", help="capture text into context")
+    a = sub.add_parser("add", help="capture text into the working layer")
     a.add_argument("text", nargs="?", default="")
     a.add_argument("--file"); a.add_argument("--source"); a.add_argument("--type")
-    a.add_argument("--pin", action="store_true")
+    a.add_argument("--main", action="store_true", help="capture straight into the verified main graph")
     a.set_defaults(func=cmd_add)
 
     q = sub.add_parser("query", help="hybrid search")
     q.add_argument("query"); q.add_argument("--limit", type=int, default=5)
+    q.add_argument("--scope", choices=["all", "main", "individual"], default="all")
     q.set_defaults(func=cmd_query)
 
     l = sub.add_parser("list", help="list items")
-    l.add_argument("--type"); l.add_argument("--pinned", action="store_true")
+    l.add_argument("--type")
+    l.add_argument("--scope", choices=["all", "main", "individual"], default="all")
     l.add_argument("--archived", action="store_true")
     l.set_defaults(func=cmd_list)
 
-    pin = sub.add_parser("pin"); pin.add_argument("id"); pin.add_argument("--off", action="store_true")
-    pin.set_defaults(func=cmd_pin)
+    pr = sub.add_parser("promote", help="promote a working item into the verified main graph")
+    pr.add_argument("id")
+    pr.add_argument("--title"); pr.add_argument("--summary"); pr.add_argument("--type")
+    pr.set_defaults(func=cmd_promote)
+
+    de = sub.add_parser("demote", help="move a main item back to the working layer")
+    de.add_argument("id"); de.set_defaults(func=cmd_demote)
 
     ar = sub.add_parser("archive"); ar.add_argument("id"); ar.add_argument("--restore", action="store_true")
     ar.set_defaults(func=cmd_archive)

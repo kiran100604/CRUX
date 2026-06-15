@@ -21,27 +21,36 @@ def run() -> None:
     mcp = FastMCP("crux")
 
     @mcp.tool()
-    def get_context(query: str, limit: int = 5, include_archived: bool = False) -> dict:
-        """Fetch relevant project context from CRUX for the current task."""
-        results = store.search(query, limit=limit, include_archived=include_archived)
+    def get_context(query: str, limit: int = 5, scope: str = "all",
+                    include_archived: bool = False) -> dict:
+        """Fetch relevant project context from CRUX for the current task.
+
+        scope: "all" (default — verified main graph prioritized, recent working
+        notes included), "main" (verified truth only), or "individual" (working
+        layer only).
+        """
+        s = None if scope == "all" else scope
+        results = store.search(query, limit=limit, scope=s, include_archived=include_archived)
         return {
             "items": [
                 {"id": r.item.id, "title": r.item.title, "summary": r.item.summary,
-                 "type": r.item.type, "source": r.item.source, "score": round(r.score, 4)}
+                 "type": r.item.type, "scope": r.item.scope, "source": r.item.source,
+                 "score": round(r.score, 4)}
                 for r in results
             ],
             "returned": len(results),
         }
 
     @mcp.tool()
-    def add_context(content: str, type: str | None = None, pin: bool = False) -> dict:
-        """Add a piece of context to CRUX from inside an agent session.
+    def add_context(content: str, type: str | None = None) -> dict:
+        """Log a piece of context from inside an agent session.
 
-        Agent-written items default to LOW confidence (staged for human review in
-        the dashboard) unless pinned, so an over-eager agent can't pollute the store.
+        Agent-written items always land in the WORKING (individual) layer at low
+        confidence — they are "what the agent is doing", not verified truth. A human
+        refines and promotes them to the main graph later, so an over-eager agent
+        can never pollute the trusted layer.
         """
-        item = store.capture(content, type_hint=type, pinned=pin,
-                             confidence=0.9 if pin else 0.4)
-        return {"id": item.id, "title": item.title, "summary": item.summary}
+        item = store.capture(content, type_hint=type, scope="individual", confidence=0.4)
+        return {"id": item.id, "title": item.title, "summary": item.summary, "scope": item.scope}
 
     mcp.run()

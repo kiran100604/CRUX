@@ -24,26 +24,40 @@ def create_app(cfg: Config):
         content: str
         type: str | None = None
         source: str | None = None
-        pin: bool = False
+        scope: str = "individual"
+
+    class PromoteIn(BaseModel):
+        title: str | None = None
+        summary: str | None = None
+        type: str | None = None
+
+    def _scope(s: str | None):
+        return None if s in (None, "all") else s
 
     @app.post("/capture")
     def capture(body: CaptureIn):
         item = store.capture(body.content, source=body.source,
-                             type_hint=body.type, pinned=body.pin)
+                             type_hint=body.type, scope=body.scope)
         return item.to_public_dict()
 
     @app.get("/search")
-    def search(q: str, limit: int = 5):
+    def search(q: str, limit: int = 5, scope: str | None = None):
         return {"items": [{"score": r.score, **r.item.to_public_dict()}
-                          for r in store.search(q, limit=limit)]}
+                          for r in store.search(q, limit=limit, scope=_scope(scope))]}
 
     @app.get("/items")
-    def items(type: str | None = None, archived: bool = False):
-        return {"items": [i.to_public_dict() for i in store.db.list(type=type, archived=archived)]}
+    def items(type: str | None = None, scope: str | None = None, archived: bool = False):
+        return {"items": [i.to_public_dict()
+                          for i in store.db.list(type=type, scope=_scope(scope), archived=archived)]}
 
-    @app.post("/items/{item_id}/pin")
-    def pin(item_id: str, off: bool = False):
-        return {"ok": store.pin(item_id, value=not off)}
+    @app.post("/items/{item_id}/promote")
+    def promote(item_id: str, body: PromoteIn):
+        return {"ok": store.promote(item_id, title=body.title,
+                                    summary=body.summary, type=body.type)}
+
+    @app.post("/items/{item_id}/demote")
+    def demote(item_id: str):
+        return {"ok": store.demote(item_id)}
 
     @app.post("/items/{item_id}/archive")
     def archive(item_id: str, restore: bool = False):

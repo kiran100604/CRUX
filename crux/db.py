@@ -3,6 +3,9 @@
 One file. Metadata + raw_content + embedding BLOBs in `items`; an FTS5 mirror in
 `items_fts` for lexical search, kept in sync by triggers. No second datastore,
 so there is nothing to keep in sync across processes and a backup is one file.
+
+Two-tier memory (individual vs main) is a `scope` column, NOT a second table —
+promotion flips the field, so an item is never duplicated and can't drift.
 """
 
 from __future__ import annotations
@@ -23,19 +26,21 @@ CREATE TABLE IF NOT EXISTS items (
     type            TEXT NOT NULL,
     tags            TEXT NOT NULL DEFAULT '[]',
     source          TEXT,
-    pinned          INTEGER NOT NULL DEFAULT 0,
-    confidence      REAL NOT NULL DEFAULT 0.9,
+    scope           TEXT NOT NULL DEFAULT 'individual',
+    confidence      REAL NOT NULL DEFAULT 0.7,
     superseded_by   TEXT,
     archived        INTEGER NOT NULL DEFAULT 0,
     embedding       BLOB,
     embedding_model TEXT,
     content_hash    TEXT NOT NULL DEFAULT '',
     version         INTEGER NOT NULL DEFAULT 1,
+    promoted_at     TEXT,
     captured_at     TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_hash ON items(content_hash);
 CREATE INDEX IF NOT EXISTS idx_items_archived ON items(archived);
+CREATE INDEX IF NOT EXISTS idx_items_scope ON items(scope);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
     title, summary, tags, raw_content,
@@ -59,6 +64,10 @@ CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
 END;
 """
 
+# columns a caller may update via `update()` — whitelist guards against injection
+_UPDATABLE = {"title", "summary", "type", "tags", "source", "scope",
+              "confidence", "superseded_by", "archived", "promoted_at"}
+
 
 class Database:
     def __init__(self, path: Path):
@@ -76,23 +85,28 @@ class Database:
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(
             """INSERT INTO items (id, raw_content, title, summary, type, tags, source,
-                   pinned, confidence, superseded_by, archived, embedding, embedding_model,
-                   content_hash, version, captured_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   scope, confidence, superseded_by, archived, embedding, embedding_model,
+                   content_hash, version, promoted_at, captured_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (item.id, item.raw_content, item.title, item.summary, item.type,
-             json.dumps(item.tags), item.source, int(item.pinned), item.confidence,
+             json.dumps(item.tags), item.source, item.scope, item.confidence,
              item.superseded_by, int(item.archived), pack(embedding), item.embedding_model,
-             item.content_hash, item.version, item.captured_at, item.updated_at),
+             item.content_hash, item.version, item.promoted_at, item.captured_at, item.updated_at),
         )
         self.conn.commit()
         return item
 
-    def set_flag(self, item_id: str, column: str, value, updated_at: str) -> bool:
-        if column not in {"pinned", "archived", "superseded_by"}:
-            raise ValueError(f"unsupported column: {column}")
+    def update(self, item_id: str, fields: dict, updated_at: str) -> bool:
+        """Update a whitelisted set of columns. `tags` may be passed as a list."""
+        cols = {}
+        for k, v in fields.items():
+            if k not in _UPDATABLE:
+                raise ValueError(f"unsupported column: {k}")
+            cols[k] = json.dumps(v) if k == "tags" else v
+        cols["updated_at"] = updated_at
+        assignment = ", ".join(f"{c}=?" for c in cols)
         cur = self.conn.execute(
-            f"UPDATE items SET {column}=?, updated_at=? WHERE id=?",
-            (value, updated_at, item_id),
+            f"UPDATE items SET {assignment} WHERE id=?", (*cols.values(), item_id)
         )
         self.conn.commit()
         return cur.rowcount > 0
@@ -102,6 +116,16 @@ class Database:
     def get(self, item_id: str) -> ContextItem | None:
         row = self.conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
         return ContextItem.from_row(row) if row else None
+
+    def resolve_id(self, ref: str) -> str | None:
+        """Accept a full id or a short prefix (as shown by `list`/`query`).
+        Returns the full id only if the prefix is unambiguous."""
+        if self.conn.execute("SELECT 1 FROM items WHERE id=?", (ref,)).fetchone():
+            return ref
+        rows = self.conn.execute(
+            "SELECT id FROM items WHERE id LIKE ? LIMIT 2", (ref + "%",)
+        ).fetchall()
+        return rows[0]["id"] if len(rows) == 1 else None
 
     def get_by_hash(self, content_hash: str) -> ContextItem | None:
         row = self.conn.execute(
@@ -113,35 +137,43 @@ class Database:
         row = self.conn.execute("SELECT embedding FROM items WHERE id=?", (item_id,)).fetchone()
         return unpack(row["embedding"]) if row else []
 
-    def all_embeddings(self, include_archived: bool = False):
+    def all_embeddings(self, include_archived: bool = False, scope: str | None = None):
         """Yield (id, embedding) for cosine scan. Fine via brute force for solo
         scale; swap to sqlite-vec only if item counts ever make this slow."""
-        q = "SELECT id, embedding FROM items"
+        clauses, params = [], []
         if not include_archived:
-            q += " WHERE archived=0"
-        for row in self.conn.execute(q):
+            clauses.append("archived=0")
+        if scope:
+            clauses.append("scope=?"); params.append(scope)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        for row in self.conn.execute(f"SELECT id, embedding FROM items{where}", params):
             yield row["id"], unpack(row["embedding"])
 
-    def fts_search(self, query: str, limit: int, include_archived: bool = False):
+    def fts_search(self, query: str, limit: int, include_archived: bool = False,
+                   scope: str | None = None):
         """Return ids ranked by FTS5 bm25 (best first)."""
         match = _fts_query(query)
         if not match:
             return []
+        clauses, params = ["items_fts MATCH ?"], [match]
+        if not include_archived:
+            clauses.append("i.archived=0")
+        if scope:
+            clauses.append("i.scope=?"); params.append(scope)
+        params.append(limit)
         sql = (
             "SELECT i.id FROM items_fts f JOIN items i ON i.rowid=f.rowid "
-            "WHERE items_fts MATCH ? "
-            + ("" if include_archived else "AND i.archived=0 ")
-            + "ORDER BY bm25(items_fts) LIMIT ?"
+            f"WHERE {' AND '.join(clauses)} ORDER BY bm25(items_fts) LIMIT ?"
         )
-        return [r["id"] for r in self.conn.execute(sql, (match, limit))]
+        return [r["id"] for r in self.conn.execute(sql, params)]
 
-    def list(self, type: str | None = None, pinned: bool | None = None,
+    def list(self, type: str | None = None, scope: str | None = None,
              archived: bool = False, limit: int = 100) -> list[ContextItem]:
         clauses, params = ["archived=?"], [int(archived)]
         if type:
             clauses.append("type=?"); params.append(type)
-        if pinned is not None:
-            clauses.append("pinned=?"); params.append(int(pinned))
+        if scope:
+            clauses.append("scope=?"); params.append(scope)
         sql = f"SELECT * FROM items WHERE {' AND '.join(clauses)} ORDER BY captured_at DESC LIMIT ?"
         params.append(limit)
         return [ContextItem.from_row(r) for r in self.conn.execute(sql, params)]
