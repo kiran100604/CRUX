@@ -35,6 +35,15 @@ crux query "payment provider" --scope main                   # verified truth on
 crux status
 ```
 
+## The app (simplest experience)
+```bash
+pip install -e ".[app]"
+crux setup     # one-time: keys + global hook + hotkey
+crux app       # runs in your tray; owns the global hotkey; opens the dashboard
+```
+With `crux app` running: **select text in any app → Cmd/Ctrl+Shift+Space → it's in CRUX.**
+No manual key binding. (macOS needs Accessibility permission for the global hotkey.)
+
 ## One-command setup
 ```bash
 crux setup     # guided: API keys (saved locally), global Claude Code hook, capture hotkey

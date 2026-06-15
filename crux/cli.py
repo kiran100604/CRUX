@@ -212,6 +212,11 @@ def cmd_mcp(args):
     run()
 
 
+def cmd_app(args):
+    from .app import run
+    run(open_dashboard=not args.no_open)
+
+
 def cmd_hotkey(args):
     from .hotkey import run
     run(install=args.install, out_dir=Config.load().home / "hotkey")
@@ -294,6 +299,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
+
+    ap = sub.add_parser("app", help="run the tray/menubar app (owns the global hotkey)")
+    ap.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
+    ap.set_defaults(func=cmd_app)
     return p
 
 

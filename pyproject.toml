@@ -12,6 +12,7 @@ anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27"]
 mcp = ["mcp>=1.0"]
+app = ["pystray>=0.19", "pynput>=1.7", "pillow>=10.0", "fastapi>=0.110", "uvicorn>=0.27"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
