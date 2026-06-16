@@ -183,6 +183,15 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_quickcapture_save(store):
+    # the popup's save path: short text -> a note; long/multiline -> ingested doc
+    from crux.config import Config
+    from crux.quickcapture import _save
+    cfg = Config.load()
+    assert _save(cfg, "Use Stripe for payments.").startswith("Captured:")
+    assert "fact" in _save(cfg, "Payments via Stripe.\nErrors go to Sentry.\nWebhooks signed.")
+
+
 def test_pynput_hotkey_format():
     from crux.hotkey import pynput_hotkey
     assert pynput_hotkey(["ctrl", "shift"], "space") == "<ctrl>+<shift>+<space>"

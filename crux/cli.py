@@ -247,6 +247,11 @@ def cmd_app(args):
     run(open_dashboard=not args.no_open)
 
 
+def cmd_popup(args):
+    from .quickcapture import run_standalone
+    print(run_standalone(Config.load()))
+
+
 def cmd_hotkey(args):
     from .hotkey import run
     run(install=args.install, out_dir=Config.load().home / "hotkey")
@@ -343,6 +348,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap = sub.add_parser("app", help="run the tray/menubar app (owns the global hotkey)")
     ap.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
     ap.set_defaults(func=cmd_app)
+
+    sub.add_parser("popup", help="open the visible quick-capture box once (test the capture UI)").set_defaults(func=cmd_popup)
     return p
 
 
