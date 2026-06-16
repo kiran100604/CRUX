@@ -82,7 +82,7 @@ function buildPresets(plat){
   const p = plat==="darwin" ? "cmd" : "ctrl";
   const cap = m => m==="cmd"?"Cmd":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
   const mk = (mods,key)=>({mods,key,label:[...mods.map(cap),key.toUpperCase()].join(" + ")});
-  return [ mk([p,"shift"],"space"), mk([p,"shift"],"k"), mk([p,"shift"],"j"), mk([p,"shift"],"period") ];
+  return [ mk([p,"shift"],"space"), mk([p,"shift"],"k"), mk([p,"shift"],"j"), mk([p,"shift"],"u") ];
 }
 
 function form(){

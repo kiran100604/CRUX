@@ -134,17 +134,27 @@ def run(open_dashboard: bool = True) -> None:
 
     def on_hotkey() -> None:
         # runs in the pynput thread.
+        print(f"[crux] hotkey fired ({chord})", flush=True)
         _disarm()  # a second press cancels an armed selection
         prev = (read_clipboard() or "")
         _copy_selection()
         cur = (read_clipboard() or "")
         if cur.strip() and cur != prev:
+            print(f"[crux] captured selection ({len(cur)} chars)", flush=True)
             _capture(cur)               # text was already selected → instant snap
         else:
+            print("[crux] no selection yet — waiting for you to select text", flush=True)
             root.after(0, lambda: _arm_selection(prev))  # nothing selected → wait for it
 
-    hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
-    hk.start()
+    try:
+        hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
+        hk.start()
+    except Exception as e:
+        raise SystemExit(
+            f"Could not register the hotkey '{chord}' ({hotkey}): {e}\n"
+            "Try a different chord with `crux setup` (e.g. Ctrl+Shift+K), or use the\n"
+            "tray menu's 'Capture now' / the dashboard capture box instead.")
+    print(f"[crux] listening for hotkey: {hotkey}", flush=True)
 
     # best-effort tray icon (works on Windows/Linux in a thread; mac needs main
     # thread, so we just skip it there and rely on the hotkey + dashboard).

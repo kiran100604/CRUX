@@ -27,13 +27,23 @@ def chord_label(mods, key) -> str:
 
 # pynput GlobalHotKeys uses "<ctrl>+<shift>+<space>" style strings.
 _PYNPUT_MOD = {"ctrl": "<ctrl>", "shift": "<shift>", "alt": "<alt>", "cmd": "<cmd>", "win": "<cmd>"}
+# named keys pynput understands inside <...>; punctuation must be a literal char.
+_PYNPUT_KEYNAMES = {"space", "enter", "tab", "esc", "up", "down", "left", "right",
+                    "home", "end", "page_up", "page_down", "delete", "insert", "backspace"}
+_KEY_CHAR = {"period": ".", "comma": ",", "slash": "/", "semicolon": ";",
+             "backslash": "\\", "minus": "-", "equal": "="}
 
 
 def pynput_hotkey(mods, key) -> str:
     mods = mods or DEFAULT_MODS
     key = key or DEFAULT_KEY
     parts = [_PYNPUT_MOD[m] for m in mods]
-    parts.append(f"<{key}>" if len(key) > 1 else key.lower())
+    if key in _PYNPUT_KEYNAMES:
+        parts.append(f"<{key}>")
+    elif len(key) == 1:
+        parts.append(key.lower())
+    else:
+        parts.append(_KEY_CHAR.get(key, key[0].lower()))  # punctuation → literal char
     return "+".join(parts)
 
 
@@ -81,9 +91,17 @@ def build_snippets(mods=None, key=None) -> dict[str, str]:
     key = key or DEFAULT_KEY
     label = chord_label(mods, key)
     hs_mods = ", ".join(f'"{_HS_MOD[m]}"' for m in mods)
-    ahk_chord = "".join(_AHK_MOD[m] for m in mods) + (key.capitalize() if len(key) > 1 else key)
+    # AHK: "Space" for space, literal char for punctuation, else the letter.
+    if key == "space":
+        ahk_key = "Space"
+    elif key in _KEY_CHAR:
+        ahk_key = _KEY_CHAR[key]
+    else:
+        ahk_key = key if len(key) == 1 else key.capitalize()
+    ahk_chord = "".join(_AHK_MOD[m] for m in mods) + ahk_key
+    hs_key = _KEY_CHAR.get(key, key)  # Hammerspoon takes "space"/"k"/"." literally
     return {
-        "hammerspoon.lua": _HAMMERSPOON_TMPL.format(label=label, mods=hs_mods, key=key),
+        "hammerspoon.lua": _HAMMERSPOON_TMPL.format(label=label, mods=hs_mods, key=hs_key),
         "raycast-capture.sh": RAYCAST,
         "crux-capture.ahk": _AUTOHOTKEY_TMPL.format(label=label, chord=ahk_chord),
         "linux-capture.sh": LINUX,
