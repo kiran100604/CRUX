@@ -23,10 +23,9 @@ import threading
 import time
 import webbrowser
 
-from .cli import read_clipboard
 from .config import Config
 from .hotkey import chord_label, pynput_hotkey
-from .quickcapture import _save, flash_toast, hint_toast
+from .quickcapture import _save, flash_toast
 
 
 def _icon_image():
@@ -84,67 +83,36 @@ def run(open_dashboard: bool = True) -> None:
     root = tk.Tk()
     root.withdraw()
 
-    arm = {"listener": None, "hint": None}
+    def _read_clip() -> str:
+        """Fast clipboard read via tkinter (no PowerShell subprocess). GUI thread only."""
+        try:
+            return root.clipboard_get()
+        except Exception:
+            return ""
 
-    def _capture(text: str) -> None:
-        """Save (in this worker thread) then flash the result on the GUI thread."""
-        text = (text or "").strip()
-        if not text:
-            root.after(0, lambda: flash_toast(root, "Nothing selected", ok=False))
-            return
+    def _save_and_flash(text: str) -> None:
+        # worker thread: DB write can be slow, keep it off the GUI/hook threads
         msg = _save(cfg, text)
+        print(f"[crux] {msg}", flush=True)
         root.after(0, lambda: flash_toast(root, msg, ok=True))
 
-    def _disarm() -> None:
-        if arm["listener"] is not None:
-            try:
-                arm["listener"].stop()
-            except Exception:
-                pass
-            arm["listener"] = None
-        if arm["hint"] is not None:
-            try:
-                arm["hint"].destroy()
-            except Exception:
-                pass
-            arm["hint"] = None
-
-    def _arm_selection(baseline: str) -> None:
-        """Press-then-select: wait for the next mouse selection, then capture it."""
-        from pynput import mouse
-
-        def on_click(x, y, button, pressed):
-            if pressed:
-                return
-            # mouse released → try to grab whatever is now selected
-            _copy_selection()
-            cur = (read_clipboard() or "")
-            if cur.strip() and cur != baseline:
-                root.after(0, _disarm)
-                _capture(cur)
-                return False  # stop listener
-            return None
-
-        listener = mouse.Listener(on_click=on_click)
-        arm["listener"] = listener
-        listener.start()
-        # show the hint and auto-cancel after 12s of no selection
-        arm["hint"] = hint_toast(root, "Select text to capture…")
-        root.after(12000, _disarm)
+    def _do_capture() -> None:
+        # GUI thread: copy the selection, read the clipboard, capture if it changed
+        prev = _read_clip()
+        _copy_selection()                 # send Ctrl/Cmd+C (+0.15s settle)
+        cur = _read_clip()
+        if cur.strip() and cur != prev:
+            print(f"[crux] capturing {len(cur)} chars", flush=True)
+            threading.Thread(target=lambda: _save_and_flash(cur), daemon=True).start()
+        else:
+            print("[crux] nothing selected", flush=True)
+            flash_toast(root, "Select text first, then press the hotkey", ok=False)
 
     def on_hotkey() -> None:
-        # runs in the pynput thread.
+        # runs in the pynput hook thread — must return INSTANTLY or the whole
+        # keyboard lags. Just hand the work to the GUI thread and get out.
         print(f"[crux] hotkey fired ({chord})", flush=True)
-        _disarm()  # a second press cancels an armed selection
-        prev = (read_clipboard() or "")
-        _copy_selection()
-        cur = (read_clipboard() or "")
-        if cur.strip() and cur != prev:
-            print(f"[crux] captured selection ({len(cur)} chars)", flush=True)
-            _capture(cur)               # text was already selected → instant snap
-        else:
-            print("[crux] no selection yet — waiting for you to select text", flush=True)
-            root.after(0, lambda: _arm_selection(prev))  # nothing selected → wait for it
+        root.after(0, _do_capture)
 
     try:
         hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
