@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 
 from .embeddings import pack, unpack
@@ -109,17 +110,34 @@ _UPDATABLE = {"title", "summary", "type", "tags", "source", "scope",
 class Database:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        # check_same_thread=False: uvicorn runs sync endpoints in a threadpool;
-        # single-user local access makes shared-connection use safe enough here.
-        self.conn = sqlite3.connect(str(path), check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        # WAL + a busy timeout let a background ingest worker (its own connection)
-        # write while request threads read the same file, without "database locked".
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA busy_timeout=5000")
-        self.conn.executescript(SCHEMA)
+        self._path = str(path)
+        # One SQLite connection PER THREAD. uvicorn runs sync endpoints in a
+        # threadpool, and a single shared connection raises "bad parameter / API
+        # misuse" when two threads use it concurrently. Thread-local connections
+        # + WAL give safe concurrent reads and a serialized writer instead.
+        self._local = threading.local()
+        conn = self._connect()              # main-thread connection
+        self._local.conn = conn
+        conn.executescript(SCHEMA)
         self._migrate()
-        self.conn.commit()
+        conn.commit()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self._path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        # WAL + busy timeout: concurrent readers + one writer across connections,
+        # without spurious "database locked".
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        c = getattr(self._local, "conn", None)
+        if c is None:
+            c = self._connect()
+            self._local.conn = c
+        return c
 
     def _migrate(self) -> None:
         """Add columns introduced after a db was first created (local, in-place)."""
@@ -129,7 +147,10 @@ class Database:
                 self.conn.execute(f"ALTER TABLE items ADD COLUMN {col} TEXT")
 
     def close(self) -> None:
-        self.conn.close()
+        c = getattr(self._local, "conn", None)
+        if c is not None:
+            c.close()
+            self._local.conn = None
 
     # --- writes --------------------------------------------------------------
 
