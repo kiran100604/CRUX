@@ -25,7 +25,7 @@ import webbrowser
 
 from .config import Config
 from .hotkey import chord_label, pynput_hotkey
-from .quickcapture import _save, build_popup, flash_toast
+from .quickcapture import _save, flash_toast
 
 
 def _icon_image():
@@ -124,32 +124,27 @@ def run(open_dashboard: bool = True) -> None:
         except Exception:
             import traceback; traceback.print_exc()
 
-    def _popup_fallback(prefill: str) -> None:
-        """When auto-copy yields nothing usable, ALWAYS show a window so the user
-        gets feedback (never 'nothing happens'). They can edit/paste, Enter saves."""
-        print(f"[crux] opening capture popup (prefill {len(prefill)} chars)", flush=True)
-        def on_submit(val):
-            val = (val or "").strip()
-            if val:
-                threading.Thread(target=lambda: _save_and_flash(val), daemon=True).start()
-            else:
-                print("[crux] popup cancelled (empty)", flush=True)
-        build_popup(root, prefill, on_submit, lambda: print("[crux] popup cancelled", flush=True))
+    last = {"clip": None}
 
     def _do_capture() -> None:
+        # Flow: try to auto-copy the selection (works where SendInput is allowed),
+        # then capture whatever is on the clipboard. On locked-down machines the
+        # synthetic copy is blocked, so the reliable flow is: user copies with
+        # their own Ctrl+C, then presses the hotkey to file it.
         try:
             print("[crux] --- capture start ---", flush=True)
-            prev = _read_clip("before")
-            _copy_selection()                 # release modifiers + send Ctrl/Cmd+C
-            cur = _read_clip("after")
-            if cur.strip() and cur != prev:
-                print(f"[crux] selection copied ({len(cur)} chars) → capturing", flush=True)
-                threading.Thread(target=lambda: _save_and_flash(cur), daemon=True).start()
-            else:
-                # auto-copy didn't grab a fresh selection → fall back to the popup
-                # (prefilled with whatever IS on the clipboard) so capture still works.
-                print("[crux] no fresh selection copied → popup fallback", flush=True)
-                _popup_fallback(cur if cur.strip() else "")
+            _copy_selection()                 # best-effort (no-op if injection blocked)
+            cur = _read_clip("clipboard").strip()
+            if not cur:
+                flash_toast(root, "Clipboard empty — copy text first, then press the hotkey", ok=False)
+                return
+            if cur == last["clip"]:
+                print("[crux] clipboard unchanged since last capture", flush=True)
+                flash_toast(root, "Already captured — copy new text first", ok=False)
+                return
+            last["clip"] = cur
+            print(f"[crux] capturing {len(cur)} chars", flush=True)
+            threading.Thread(target=lambda: _save_and_flash(cur), daemon=True).start()
         except Exception:
             import traceback; traceback.print_exc()
 
@@ -196,7 +191,7 @@ def run(open_dashboard: bool = True) -> None:
 
     if open_dashboard:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    print(f"CRUX is running. Hotkey: {chord}  →  select text anywhere and press it.")
+    print(f"CRUX is running. To capture: copy text (Ctrl+C), then press {chord}.")
     print(f"Dashboard: {base}   (Ctrl+C here to quit)")
     try:
         root.mainloop()
