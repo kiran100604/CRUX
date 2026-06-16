@@ -50,8 +50,15 @@ def cmd_add(args):
     store.close()
 
 
-def _desktop_notify(msg: str) -> None:
-    """Best-effort desktop toast so a bound-shortcut capture gives visible feedback."""
+def _feedback(msg: str, ok: bool = True) -> None:
+    """Visible confirmation for a bound-shortcut capture: prefer CRUX's own flash
+    toast (the dark bottom-center one), fall back to a system notification."""
+    try:
+        from .quickcapture import flash_standalone
+        if flash_standalone(msg, ok=ok):
+            return
+    except Exception:
+        pass
     import shutil
     import subprocess
     try:
@@ -70,18 +77,19 @@ def cmd_capture(args):
     store = _store()
     text = read_clipboard()
     if not text or not text.strip():
-        _desktop_notify("Clipboard empty — copy text first")
+        store.close()
         print("clipboard is empty — nothing to capture")
-        store.close(); return
+        _feedback("Clipboard empty — copy text first", ok=False)
+        return
     if len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines()):
         res = store.ingest(text, source_type="paste", source_ref="clipboard")
         msg = f"Captured → {len(res['facts'])} fact(s) for review"
     else:
         item = store.capture(text, source_type="hotkey")
         msg = f"Captured: {item.title[:60]}"
-    print("✓ " + msg)
-    _desktop_notify(msg)
     store.close()
+    print("✓ " + msg)
+    _feedback(msg, ok=True)  # blocks ~1.5s for the flash fade, then exits
 
 
 def read_clipboard() -> str:

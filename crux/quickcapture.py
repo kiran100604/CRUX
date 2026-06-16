@@ -146,6 +146,32 @@ def flash_toast(root, text: str, ok: bool = True):
     return win
 
 
+def flash_standalone(message: str, ok: bool = True, ms: int = 1500) -> bool:
+    """Show the dark flash toast from a one-shot process (e.g. the bound
+    `crux capture`). Creates its own short-lived root, plays the fade, exits.
+    Returns False if there's no tkinter/display so the caller can fall back."""
+    try:
+        import tkinter as tk
+    except Exception:
+        return False
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception:
+        return False  # no display
+    flash_toast(root, message, ok=ok)
+    root.after(ms, root.quit)
+    try:
+        root.mainloop()
+    except Exception:
+        pass
+    try:
+        root.destroy()
+    except Exception:
+        pass
+    return True
+
+
 def hint_toast(root, text: str):
     """A small top-center hint shown while we wait for the user to select text.
     Returns the window so the caller can dismiss it once capture happens."""
