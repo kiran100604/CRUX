@@ -141,6 +141,33 @@ def cmd_supersede(args):
     store.close()
 
 
+def cmd_conflicts(args):
+    store = _store()
+    conflicts = store.open_conflicts()
+    if not conflicts:
+        print("no open conflicts — your verified knowledge is consistent ✓")
+        store.close(); return
+    print(f"{len(conflicts)} possible contradiction(s):\n")
+    for c in conflicts:
+        a, b = c["a"], c["b"]
+        reason = c.get("reason") or ""
+        extra = f" · {reason}" if reason and "similar" not in reason else ""
+        print(f"  #{c['id']}  ({int(c['similarity']*100)}% similar{extra})")
+        print(f"    A [{a['id'][:8]}] {a['title']}")
+        print(f"    B [{b['id'][:8]}] {b['title']}")
+        print(f"    resolve:  crux supersede {b['id'][:8]} {a['id'][:8]}   (keep A)")
+        print(f"              crux supersede {a['id'][:8]} {b['id'][:8]}   (keep B)")
+        print(f"              crux dismiss {c['id']}                      (not a conflict)\n")
+    store.close()
+
+
+def cmd_dismiss(args):
+    store = _store()
+    store.dismiss_conflict(args.id)
+    print("✓ dismissed — won't resurface")
+    store.close()
+
+
 def cmd_status(args):
     cfg = Config.load()
     store = _store()
@@ -275,6 +302,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     su = sub.add_parser("supersede"); su.add_argument("old"); su.add_argument("new")
     su.set_defaults(func=cmd_supersede)
+
+    sub.add_parser("conflicts", help="list open contradiction candidates + how to resolve them").set_defaults(func=cmd_conflicts)
+
+    di = sub.add_parser("dismiss", help="dismiss a conflict by id (won't resurface)")
+    di.add_argument("id", type=int); di.set_defaults(func=cmd_dismiss)
 
     sub.add_parser("status").set_defaults(func=cmd_status)
 
