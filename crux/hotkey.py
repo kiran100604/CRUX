@@ -105,7 +105,7 @@ def run(install: bool, out_dir: Path) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         for name, body in SNIPPETS.items():
             p = out_dir / name
-            p.write_text(body)
+            p.write_text(body, encoding="utf-8")
             if name.endswith(".sh"):
                 p.chmod(0o755)
         print(f"✓ wrote hotkey snippets to {out_dir}\n")

@@ -138,7 +138,7 @@ class Store:
 
     def ingest_file(self, path: str, *, scope: str = "individual") -> dict:
         p = Path(path)
-        text = p.read_text(errors="ignore")
+        text = p.read_text(encoding="utf-8", errors="ignore")
         return self.ingest(text, source_type="file", source_ref=p.name,
                            title=p.stem, scope=scope)
 

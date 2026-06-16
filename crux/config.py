@@ -21,7 +21,7 @@ def _load_env_file(home: Path) -> dict:
     out: dict[str, str] = {}
     f = home / "config.env"
     if f.exists():
-        for line in f.read_text().splitlines():
+        for line in f.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
@@ -35,7 +35,7 @@ def save_env_file(home: Path, values: dict) -> Path:
     current = _load_env_file(home)
     current.update({k: v for k, v in values.items() if v})
     f = home / "config.env"
-    f.write_text("\n".join(f"{k}={v}" for k, v in current.items()) + "\n")
+    f.write_text("\n".join(f"{k}={v}" for k, v in current.items()) + "\n", encoding="utf-8")
     return f
 
 

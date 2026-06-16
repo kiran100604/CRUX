@@ -174,6 +174,16 @@ def test_hook_inject_is_crash_safe(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "{}"
 
 
+def test_hotkey_snippets_written_as_utf8(tmp_path):
+    # Regression: on Windows (cp1252) writing the '✓'-containing snippets crashed.
+    from crux import hotkey
+    hotkey.run(install=True, out_dir=tmp_path)
+    files = list(tmp_path.iterdir())
+    assert files, "expected hotkey snippets to be written"
+    for f in files:
+        f.read_text(encoding="utf-8")  # must decode cleanly
+
+
 class _FakeStdin:
     def __init__(self, data):
         self._data = data

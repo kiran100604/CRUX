@@ -197,7 +197,7 @@ def cmd_install_hook(args):
     from .install import HOOK_BLOCK, claude_settings_path, hook_present, install_claude_hook
     settings = Path(args.settings).expanduser() if args.settings \
         else claude_settings_path(globally=args.globally)
-    data = json.loads(settings.read_text()) if settings.exists() else {}
+    data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
     if hook_present(data):
         print("hook already installed in", settings)
         return
@@ -254,7 +254,7 @@ def _hook_installed(settings: str = ".claude/settings.json") -> bool:
     if not p.exists():
         return False
     try:
-        data = json.loads(p.read_text())
+        data = json.loads(p.read_text(encoding="utf-8"))
         return "crux hook-inject" in json.dumps(data)
     except Exception:
         return False
