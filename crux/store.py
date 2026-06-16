@@ -247,10 +247,12 @@ class Store:
             d = it.to_public_dict()
             status, relation, related = "clean", "new", None
 
+            reason = ""
             if it.id in conflict_of:
                 cf = conflict_of[it.id]
-                status, relation = "conflict", "conflict"
+                status, relation = "conflict", "update"   # a contradiction = an update
                 related = dict(cf["other"], similarity=cf["similarity"])
+                reason = cf.get("reason") or ""
                 d["conflict_id"] = cf["conflict_id"]
             else:
                 vec = self.db.embedding_of(it.id)
@@ -271,15 +273,19 @@ class Store:
                 if best and best[0] >= self.REFINE_SIM:
                     s, other = best
                     related = dict(other.to_public_dict(), similarity=round(s, 3))
-                    if s >= self.DUP_SIM:
-                        status, relation = "attention", "duplicate"
-                    elif other.type == it.type:
-                        status, relation = "attention", "refines"
-                    else:
-                        relation = "relates"  # informational; still clean
+                    # LLM classifies the edge; offline → similarity heuristic
+                    rel, why = self.processor.classify_relation(it.summary, other.summary)
+                    if rel is None:
+                        rel = "duplicate" if s >= self.DUP_SIM else "extends"
+                    reason = why
+                    relation = {"updates": "update", "extends": "extend",
+                                "duplicate": "duplicate", "unrelated": "new"}.get(rel, "extend")
+                    status = "clean" if relation == "new" else "attention"
+                    if relation == "new":
+                        related = None
 
             d["status"] = status
-            d["fit"] = {"relation": relation, "related": related}
+            d["fit"] = {"relation": relation, "related": related, "reason": reason}
             d["implication"] = self._implication(relation, it, related)
             out.append(d)
 
@@ -294,14 +300,12 @@ class Store:
             return s if len(s) <= n else s[:n - 1] + "…"
         pct = (f"{int(related['similarity'] * 100)}%"
                if related and related.get("similarity") else "")
-        if relation == "conflict":
-            return f"Contradicts '{short(related and related.get('title'))}'. Resolve before promoting."
+        if relation == "update":
+            return f"Updates '{short(related and related.get('title'))}' — promoting should supersede the old version."
         if relation == "duplicate":
             return f"Near-duplicate of '{short(related['title'])}' ({pct}). You may already have this."
-        if relation == "refines":
-            return f"Newer version of '{short(related['title'])}' ({pct} similar)? Consider superseding it."
-        if relation == "relates":
-            return f"Relates to '{short(related['title'])}'."
+        if relation == "extend":
+            return f"Extends '{short(related['title'])}' — adds detail; both kept and linked."
         return f"New {it.type or 'note'}. Nothing similar yet."
 
     # --- promotion: the refinement gate (individual -> main) -----------------
@@ -350,6 +354,7 @@ class Store:
         ok = self.db.update(full, {"archived": int(value)}, now_iso())
         if ok and value:
             self.db.resolve_conflicts_for(full)
+            self.db.delete_relations_for(full)
         return ok
 
     def supersede(self, old_id: str, new_id: str) -> bool:
@@ -364,6 +369,39 @@ class Store:
             self.db.resolve_conflicts_for(old_full)
             self.db.resolve_conflicts_for(new_full)
         return ok
+
+    # --- graph: extend edges -------------------------------------------------
+
+    def extend(self, new_id: str, target_id: str, *, reason: str = "",
+               promote: bool = True) -> bool:
+        """Record that `new_id` EXTENDS `target_id` (both kept, linked). The edge
+        is created here, on approval — never automatically. Optionally promote the
+        new fact into the main graph in the same step."""
+        new_full = self.db.resolve_id(new_id)
+        target_full = self.db.resolve_id(target_id)
+        if not new_full or not target_full or new_full == target_full:
+            return False
+        self.db.add_relation(new_full, target_full, "extends", reason, now_iso())
+        if promote:
+            self.promote(new_full)
+        return True
+
+    def relations_of(self, item_id: str) -> dict:
+        """Edges for an item, split into what it extends vs what extends it —
+        each enriched with the other item's title/scope for display."""
+        full = self.db.resolve_id(item_id) or item_id
+        extends, extended_by = [], []
+        for r in self.db.relations_for(full):
+            if r["kind"] != "extends":
+                continue
+            other_id = r["to_id"] if r["from_id"] == full else r["from_id"]
+            other = self.db.get(other_id)
+            if not other or other.archived:
+                continue
+            entry = {"id": other.id, "title": other.title, "scope": other.scope,
+                     "tier": other.tier, "reason": r["reason"]}
+            (extends if r["from_id"] == full else extended_by).append(entry)
+        return {"extends": extends, "extended_by": extended_by}
 
 
 def _extract_url(text: str) -> str | None:

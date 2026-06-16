@@ -182,6 +182,12 @@
   .meta{font-family:var(--mono); font-size:12px; color:var(--muted); line-height:2; margin-bottom:18px}
   .meta b{color:var(--muted2); font-weight:400}
   .tags{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:22px}
+  .edges{margin-bottom:18px; display:flex; flex-direction:column; gap:8px}
+  .edges .edge{font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .edges .el{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2)}
+  .edges .ep{background:var(--teal-bg); color:var(--teal); border:1px solid var(--teal-line); border-radius:var(--pill);
+    padding:3px 10px; cursor:pointer; font-size:12.5px}
+  .edges .ep:hover{filter:brightness(.97)}
   .acts{display:flex; flex-direction:column; gap:9px}
   .acts .btn{justify-content:center; width:100%}
 
@@ -230,6 +236,8 @@
   .fitbox .pl{color:var(--peach)} .fitbox .pt{font-size:14px; color:var(--ink); line-height:1.5}
   .fitbox .exist{font-size:14px; color:var(--ink); line-height:1.5}
   .fitbox .exist .es{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5}
+  .fitbox.fb-coral{background:var(--coral-bg); border-color:var(--coral-line)}
+  .fitbox.fb-coral .pl{color:var(--coral)}
   .ideep .reason{font-size:13.5px; color:var(--muted); line-height:1.6; margin:8px 0}
   .ideep .reason b{color:var(--ink); font-weight:600}
   .ipill.tier-core{background:var(--teal-bg); color:var(--teal)}
@@ -449,38 +457,35 @@ function inboxRow(it){
 }
 function inboxDeep(it){
   const r=it.fit&&it.fit.related, rel=it.fit?it.fit.relation:'new';
-  const sim=r&&r.similarity?Math.round(r.similarity*100)+'% similar':'';
-  const where=r?(r.scope==='main'?'verified knowledge':'a working note'):'';
-  let fit='';
-  if(r&&rel==='conflict'){
-    fit=`
-      <div class="kv"><div class="pl">⚠ CONFLICTS WITH ${r.scope==='main'?'VERIFIED KNOWLEDGE':'A WORKING NOTE'} · ${sim}</div></div>
-      <div class="compare" style="margin:8px 0 14px">
-        <div class="pane a"><div class="pl">YOUR CAPTURE · ${esc(it.type)}</div><div class="pt">${esc(it.summary||it.title)}</div></div>
-        <div class="arrow">⇄</div>
-        <div class="pane b"><div class="pl">EXISTING · ${esc(r.type||'')}</div><div class="pt">${esc(r.summary||r.title)}</div></div>
-      </div>
-      <div class="reason"><b>Why flagged —</b> these say different things about the same topic. Promoting both would hand your agents contradictory truth.</div>
-      <div class="reason"><b>If you act —</b> “Replace existing” supersedes the old fact (kept in history, never deleted). Or Discard this capture if it's wrong.</div>`;
-  } else if(r){
-    const verb=rel==='duplicate'?'NEAR-DUPLICATE OF':rel==='refines'?'LIKELY UPDATES':'RELATES TO';
-    const why=rel==='duplicate'?'almost identical to something you already have — you may be capturing it twice.'
-             :rel==='refines'?'same topic and type as an existing item — likely a newer version of it.'
-             :'on the same topic as an existing item.';
-    const outcome=rel==='relates'?'both are kept and will surface together for related queries.'
-             :'use “Replace existing” to supersede the old one (moved to history), or keep both.';
-    fit=`
-      <div class="fitbox">
-        <div class="pl">${verb} ${where.toUpperCase()} · ${sim}</div>
-        <div class="exist"><b>${esc(r.title||'')}</b>${r.summary&&r.summary!==r.title?'<div class="es">'+esc(r.summary)+'</div>':''}</div>
-      </div>
-      <div class="reason"><b>Why flagged —</b> ${why}</div>
-      <div class="reason"><b>If you promote —</b> ${outcome}</div>`;
+  const sim=r&&r.similarity?Math.round(r.similarity*100)+'%':'';
+  const reason=it.fit&&it.fit.reason?esc(it.fit.reason):'';
+  const where=r?(r.scope==='main'?'VERIFIED':'WORKING'):'';
+  const existBox=(label,cls)=>`<div class="fitbox ${cls||''}">
+      <div class="pl">${label}</div>
+      <div class="exist"><b>${esc(r.title||'')}</b>${r.summary&&r.summary!==r.title?'<div class="es">'+esc(r.summary)+'</div>':''}</div></div>`;
+  let fit='', acts='';
+  if(rel==='update'&&r){
+    fit=existBox(`UPDATES ${where} · ${sim}`,'fb-coral')
+      +`<div class="reason"><b>Why —</b> ${reason||'this changes or contradicts the existing fact.'}</div>
+        <div class="reason"><b>If you replace —</b> the old version is superseded (kept in history).</div>`;
+    acts=`<button class="btn sm out" onclick="extendItem('${it.id}','${r.id}')">No, it extends</button>
+      <button class="btn sm teal" onclick="supersede('${r.id}','${it.id}')">✓ Replace existing</button>`;
+  } else if(rel==='extend'&&r){
+    fit=existBox(`EXTENDS ${where} · ${sim}`)
+      +`<div class="reason"><b>Why —</b> ${reason||'adds detail to the existing fact; both stay true.'}</div>
+        <div class="reason"><b>If you extend —</b> the two are linked; both kept, your knowledge gets richer.</div>`;
+    acts=`<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">No, it's an update</button>
+      <button class="btn sm out" onclick="promoteRefined('${it.id}')">Keep separate</button>
+      <button class="btn sm teal" onclick="extendItem('${it.id}','${r.id}')">✓ Extend &amp; promote</button>`;
+  } else if(rel==='duplicate'&&r){
+    fit=existBox(`NEAR-DUPLICATE OF ${where} · ${sim}`)
+      +`<div class="reason"><b>Why —</b> ${reason||'almost identical to an existing fact — you may have it already.'}</div>`;
+    acts=`<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>
+      <button class="btn sm teal" onclick="promoteRefined('${it.id}')">Keep anyway</button>`;
   } else {
-    fit=`<div class="reason"><b>New —</b> nothing similar in your knowledge yet. Promoting adds a fresh ${esc(it.type||'note')} to your Knowledge Base.</div>`;
+    fit=`<div class="reason"><b>New —</b> nothing similar yet. Promoting adds a fresh ${esc(it.type||'note')} to your Knowledge Base.</div>`;
+    acts=`<button class="btn sm teal" onclick="promoteRefined('${it.id}')">✓ Verify &amp; promote</button>`;
   }
-  const sup=(r&&(rel==='conflict'||rel==='refines'||rel==='duplicate'))
-    ?`<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>`:'';
   const tier=it.tier||'leaf';
   const opt=(t)=>`<option value="${t}" ${t===tier?'selected':''}>${TIER_LABEL[t]} — ${TIER_DESC[t]}</option>`;
   return `<div class="ideep">
@@ -499,14 +504,15 @@ function inboxDeep(it){
     <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${it.id.slice(0,8)}${it.source?' · '+esc(it.source):''}</span>
       <div class="dactions">
         <button class="btn sm danger" onclick="archive('${it.id}')">Discard</button>
-        ${sup}
-        <button class="btn sm teal" onclick="promoteRefined('${it.id}')">✓ Verify &amp; promote</button>
+        ${acts}
       </div></div>
   </div>`;
 }
 function toggleRow(id){state.expanded[id]=!state.expanded[id]; render();}
 async function promoteClean(){const r=await post("/promote-clean",{}); toast(`✓ Promoted ${r.promoted} clean item${r.promoted===1?'':'s'}`); await load();}
-window.toggleRow=toggleRow; window.promoteClean=promoteClean;
+async function extendItem(newId,targetId){await post(`/items/${newId}/extend`,{target_id:targetId,promote:true});
+  toast("✓ Linked & promoted — both kept"); await load();}
+window.toggleRow=toggleRow; window.promoteClean=promoteClean; window.extendItem=extendItem;
 
 /* ---------------- ACTIVITY ---------------- */
 function vActivity(){
@@ -566,6 +572,11 @@ async function supersede(oldId,newId){await fetch(`/items/${oldId}/supersede?new
   toast("Resolved — older version kept in history"); await load();}
 
 /* ---------------- drawer ---------------- */
+function edgesHTML(e){
+  if(!e||(!e.extends.length&&!e.extended_by.length)) return "";
+  const line=(label,arr)=>arr.length?`<div class="edge"><span class="el">${label}</span>${arr.map(x=>`<span class="ep" onclick="openItem('${x.id}')">${esc(x.title)}</span>`).join("")}</div>`:"";
+  return `<div class="edges">${line('extends →',e.extends)}${line('extended by ←',e.extended_by)}</div>`;
+}
 function openItem(id){const it=state.items.find(x=>x.id===id)||state.working.find(x=>x.id===id);if(!it)return;
   const isM=it.scope==="main";
   document.getElementById("drawer").innerHTML=`
@@ -574,10 +585,12 @@ function openItem(id){const it=state.items.find(x=>x.id===id)||state.working.fin
     ${it.usage_count?`<div class="usedb">⚡ used ${it.usage_count}× by agents${it.last_used?` · last ${rel(it.last_used)}`:''}</div>`:''}
     <div class="meta">
       <div><b>id</b> ${it.id.slice(0,8)}</div>
+      <div><b>tier</b> ${TIER_LABEL[it.tier||'leaf']}</div>
       <div><b>captured</b> ${(it.captured_at||'').slice(0,10)}</div>
       ${it.promoted_at?`<div><b>verified</b> ${it.promoted_at.slice(0,10)}</div>`:''}
       ${it.source?`<div><b>source</b> ${esc(it.source)}</div>`:''}
       <div><b>confidence</b> ${Math.round((it.confidence||0)*100)}%</div></div>
+    ${edgesHTML(it.edges)}
     <div class="tags">${(it.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div>
     <div class="refine" id="edit-${it.id}" style="display:none;margin-bottom:14px">
       <input id="et" value="${esc(it.title)}" placeholder="Title…"/>

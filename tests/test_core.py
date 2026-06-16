@@ -183,6 +183,23 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_extend_creates_linked_edge_and_promotes(store):
+    a = store.capture("Alex is a PM at Stripe.")
+    store.promote(a.id)
+    b = store.capture("Alex leads payments infra and a team of 5.")
+    # extend b -> a: edge recorded, b promoted, both kept (a not superseded)
+    assert store.extend(b.id, a.id, reason="adds detail", promote=True)
+    assert store.db.get(b.id).scope == "main"
+    assert store.db.get(a.id).superseded_by is None  # both still valid
+    be = store.relations_of(b.id)
+    ae = store.relations_of(a.id)
+    assert [x["id"] for x in be["extends"]] == [a.id]
+    assert [x["id"] for x in ae["extended_by"]] == [b.id]
+    # archiving an endpoint clears its edges
+    store.archive(b.id)
+    assert store.relations_of(a.id)["extended_by"] == []
+
+
 def test_tier_classification_and_override(store):
     # enrichment assigns an altitude tier (heuristic offline, LLM when keyed)
     core = store.capture("Our mission is to give AI agents perfect long-term memory.")

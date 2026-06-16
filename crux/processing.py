@@ -57,6 +57,17 @@ Return ONLY JSON: {{"contradicts": true|false, "reason": "<= 12 words"}}.
 A: {a}
 B: {b}"""
 
+_RELATE_PROMPT = """You maintain a knowledge graph. A NEW fact arrived; classify
+its relationship to an EXISTING fact. Pick exactly one:
+- "updates": NEW contradicts or replaces EXISTING (they can't both be current).
+- "extends": NEW adds detail to EXISTING; both stay true together (enrichment).
+- "duplicate": NEW says essentially the same thing as EXISTING.
+- "unrelated": different topics; no real link.
+Return ONLY JSON: {{"relation": "...", "reason": "<= 12 words"}}.
+
+NEW: {a}
+EXISTING: {b}"""
+
 
 @dataclass
 class Enrichment:
@@ -88,6 +99,10 @@ class FakeProcessor:
 
     def judge_contradiction(self, a: str, b: str):
         # Offline can't reason — signal "no judgment", caller falls back to similarity.
+        return None, ""
+
+    def classify_relation(self, a: str, b: str):
+        # Offline can't reason — signal "no judgment", caller falls back to heuristic.
         return None, ""
 
 
@@ -124,6 +139,20 @@ class AnthropicProcessor:
             m = re.search(r"\{.*\}", text, re.DOTALL)
             d = json.loads(m.group(0) if m else text)
             return bool(d.get("contradicts")), str(d.get("reason", ""))[:120]
+        except Exception:
+            return None, ""
+
+    def classify_relation(self, a: str, b: str):
+        """Return (relation, reason) where relation ∈
+        updates | extends | duplicate | unrelated, or (None, '') if unparseable."""
+        text = self._call(_RELATE_PROMPT.format(a=a[:600], b=b[:600]), 120)
+        try:
+            m = re.search(r"\{.*\}", text, re.DOTALL)
+            d = json.loads(m.group(0) if m else text)
+            rel = str(d.get("relation", "")).lower().strip()
+            if rel not in ("updates", "extends", "duplicate", "unrelated"):
+                return None, ""
+            return rel, str(d.get("reason", ""))[:120]
         except Exception:
             return None, ""
 

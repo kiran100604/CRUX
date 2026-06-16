@@ -177,8 +177,11 @@ def create_app(cfg: Config):
 
     @app.get("/items")
     def items(type: str | None = None, scope: str | None = None, archived: bool = False):
-        return {"items": _enrich(store.db.list(type=type, scope=_scope(scope),
-                                               archived=archived, limit=1000))}
+        out = _enrich(store.db.list(type=type, scope=_scope(scope),
+                                    archived=archived, limit=1000))
+        for d in out:                       # attach graph edges for display
+            d["edges"] = store.relations_of(d["id"])
+        return {"items": out}
 
     @app.get("/stats")
     def stats():
@@ -210,6 +213,16 @@ def create_app(cfg: Config):
     def promote(item_id: str, body: PromoteIn):
         return {"ok": store.promote(item_id, title=body.title, summary=body.summary,
                                     type=body.type, tier=body.tier)}
+
+    class ExtendIn(BaseModel):
+        target_id: str
+        reason: str | None = None
+        promote: bool = True
+
+    @app.post("/items/{item_id}/extend")
+    def extend(item_id: str, body: ExtendIn):
+        return {"ok": store.extend(item_id, body.target_id,
+                                   reason=body.reason or "", promote=body.promote)}
 
     @app.post("/items/{item_id}/demote")
     def demote(item_id: str):

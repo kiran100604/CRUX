@@ -101,6 +101,19 @@ CREATE TABLE IF NOT EXISTS conflicts (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
+
+-- graph edges between facts. 'extends' = B adds detail to A (both stay valid).
+-- ('updates' stays on items.superseded_by; 'derives' is reserved for later.)
+CREATE TABLE IF NOT EXISTS relations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_id    TEXT NOT NULL,   -- the new/extending fact
+    to_id      TEXT NOT NULL,   -- the existing fact it enriches
+    kind       TEXT NOT NULL DEFAULT 'extends',
+    reason     TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_id);
+CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_id);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
@@ -326,6 +339,29 @@ class Database:
         self.conn.execute(
             "UPDATE conflicts SET status='resolved' WHERE status='open' AND (new_id=? OR existing_id=?)",
             (item_id, item_id))
+        self.conn.commit()
+
+    # --- graph edges (extends) -----------------------------------------------
+
+    def add_relation(self, from_id: str, to_id: str, kind: str, reason: str,
+                     created_at: str) -> None:
+        dup = self.conn.execute(
+            "SELECT 1 FROM relations WHERE from_id=? AND to_id=? AND kind=?",
+            (from_id, to_id, kind)).fetchone()
+        if dup:
+            return
+        self.conn.execute(
+            "INSERT INTO relations (from_id, to_id, kind, reason, created_at) VALUES (?,?,?,?,?)",
+            (from_id, to_id, kind, reason, created_at))
+        self.conn.commit()
+
+    def relations_for(self, item_id: str) -> list[dict]:
+        """All edges touching this item, in either direction."""
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM relations WHERE from_id=? OR to_id=?", (item_id, item_id))]
+
+    def delete_relations_for(self, item_id: str) -> None:
+        self.conn.execute("DELETE FROM relations WHERE from_id=? OR to_id=?", (item_id, item_id))
         self.conn.commit()
 
 
