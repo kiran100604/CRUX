@@ -87,13 +87,69 @@ def _copy_selection() -> None:
         pass  # fall back to whatever is already on the clipboard
 
 
-def run(open_dashboard: bool = True) -> None:
+def _notify(msg: str) -> None:
+    """Desktop toast on Linux (native, avoids tkinter); print elsewhere/fallback."""
+    import shutil
+    import subprocess
+    if shutil.which("notify-send"):
+        try:
+            subprocess.run(["notify-send", "-t", "2500", "CRUX", msg], timeout=3)
+            return
+        except Exception:
+            pass
+    print("[crux]", msg, flush=True)
+
+
+def _run_linux(cfg, hotkey, chord, base, url, open_dashboard) -> None:
+    """Linux path: NO tkinter. pynput's X listener conflicts with a tkinter mainloop
+    in the same process (the hotkey silently stops firing), so we drive capture with
+    pynput only and confirm via notify-send. Reliable flow: copy (Ctrl+C) → hotkey."""
+    from pynput import keyboard
+
+    from .cli import read_clipboard
+    last = {"clip": None}
+
+    def _capture():
+        cur = (read_clipboard() or "").strip()
+        if not cur:
+            _notify("Clipboard empty — copy text (Ctrl+C) first, then press the hotkey")
+            return
+        if cur == last["clip"]:
+            _notify("Already captured — copy new text first")
+            return
+        last["clip"] = cur
+        print(f"[crux] capturing {len(cur)} chars", flush=True)
+        msg = _save(cfg, cur)
+        print(f"[crux] saved → {msg}", flush=True)
+        _notify(msg)
+
+    def on_hotkey():
+        print(f"[crux] hotkey fired ({chord})", flush=True)
+        threading.Thread(target=_capture, daemon=True).start()
+
     try:
-        import tkinter as tk
-    except Exception as e:  # pragma: no cover
-        raise SystemExit(
-            f"The app needs tkinter ({e}). It ships with Python on Windows/macOS; "
-            "on Linux run: sudo apt install python3-tk")
+        hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
+        hk.start()
+    except Exception as e:
+        raise SystemExit(f"Could not register the hotkey '{chord}' ({hotkey}): {e}")
+    print(f"[crux] listening for hotkey: {hotkey}", flush=True)
+    _warn_wayland(chord)
+    if open_dashboard:
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    print(f"CRUX is running. Copy text (Ctrl+C), then press {chord}. Dashboard: {base}")
+    print("(Ctrl+C here to quit)")
+    try:
+        hk.join()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            hk.stop()
+        except Exception:
+            pass
+
+
+def run(open_dashboard: bool = True) -> None:
     try:
         from pynput import keyboard
     except Exception as e:  # missing native deps
@@ -107,14 +163,24 @@ def run(open_dashboard: bool = True) -> None:
     hotkey = pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key)
     chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
 
-    # dashboard server in the background so "Open dashboard" always works
-    def _serve():
+    # dashboard server in the background (shared by all platforms)
+    def _serve_bg():
         try:
             from .server import run as serve_run
             serve_run(cfg)
         except Exception as e:  # pragma: no cover
             print("[crux] dashboard server not started:", e, file=sys.stderr)
-    threading.Thread(target=_serve, daemon=True).start()
+    threading.Thread(target=_serve_bg, daemon=True).start()
+
+    if sys.platform == "linux":
+        _run_linux(cfg, hotkey, chord, base, url, open_dashboard)
+        return
+
+    try:
+        import tkinter as tk
+    except Exception as e:  # pragma: no cover
+        raise SystemExit(
+            f"The app needs tkinter ({e}). It ships with Python on Windows/macOS.")
 
     # hidden root owns the GUI thread; overlays are Toplevels off it
     root = tk.Tk()
