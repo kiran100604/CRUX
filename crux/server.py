@@ -192,8 +192,18 @@ def create_app(cfg: Config):
 
     @app.get("/review")
     def review():
-        r = store.review()
-        return {"working": _enrich(r["working"]), "conflicts": r["conflicts"]}
+        items = store.triage()
+        counts = {"clean": sum(1 for i in items if i["status"] == "clean"),
+                  "attention": sum(1 for i in items if i["status"] == "attention"),
+                  "conflict": sum(1 for i in items if i["status"] == "conflict")}
+        return {"inbox": items, "conflicts": store.open_conflicts(), "counts": counts}
+
+    @app.post("/promote-clean")
+    def promote_clean():
+        ids = [i["id"] for i in store.triage() if i["status"] == "clean"]
+        for i in ids:
+            store.promote(i)
+        return {"promoted": len(ids)}
 
     @app.post("/items/{item_id}/promote")
     def promote(item_id: str, body: PromoteIn):

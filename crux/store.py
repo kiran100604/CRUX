@@ -216,6 +216,93 @@ class Store:
         return {"working": self.db.list(scope="individual", archived=False, limit=200),
                 "conflicts": self.open_conflicts()}
 
+    # similarity bands for the inbox triage (offline = pure embedding math)
+    DUP_SIM = 0.93      # near-identical → likely already captured
+    REFINE_SIM = 0.80   # close + same type → likely a newer version of an existing item
+
+    def triage(self) -> list[dict]:
+        """Classify each working item against everything you already know, so the
+        inbox can show a status dot (clean / attention / conflict) and *why*. The
+        clean ones are bulk-promotable; flagged ones force a conscious choice."""
+        from .embeddings import cosine
+
+        working = [i for i in self.db.list(scope="individual", archived=False, limit=200)
+                   if not i.superseded_by]
+        # prefetch all live items once (avoid per-candidate DB hits)
+        live = {i.id: i for i in self.db.list(archived=False, limit=100000)
+                if not i.superseded_by}
+
+        # which working items are in an open conflict, and against what
+        conflict_of: dict[str, dict] = {}
+        for c in self.open_conflicts(limit=50):
+            for me, other in ((c["a"], c["b"]), (c["b"], c["a"])):
+                conflict_of.setdefault(me["id"], {
+                    "conflict_id": c["id"], "other": other,
+                    "reason": c["reason"], "similarity": c["similarity"]})
+
+        embeds = [(oid, v) for oid, v in self.db.all_embeddings() if v]
+        out = []
+        for it in working:
+            d = it.to_public_dict()
+            status, relation, related = "clean", "new", None
+
+            if it.id in conflict_of:
+                cf = conflict_of[it.id]
+                status, relation = "conflict", "conflict"
+                related = dict(cf["other"], similarity=cf["similarity"])
+                d["conflict_id"] = cf["conflict_id"]
+            else:
+                vec = self.db.embedding_of(it.id)
+                best = None
+                if vec:
+                    for oid, ovec in embeds:
+                        if oid == it.id:
+                            continue
+                        other = live.get(oid)
+                        if not other:
+                            continue
+                        if (other.source_episode_id
+                                and other.source_episode_id == it.source_episode_id):
+                            continue
+                        s = cosine(vec, ovec)
+                        if best is None or s > best[0]:
+                            best = (s, other)
+                if best and best[0] >= self.REFINE_SIM:
+                    s, other = best
+                    related = dict(other.to_public_dict(), similarity=round(s, 3))
+                    if s >= self.DUP_SIM:
+                        status, relation = "attention", "duplicate"
+                    elif other.type == it.type:
+                        status, relation = "attention", "refines"
+                    else:
+                        relation = "relates"  # informational; still clean
+
+            d["status"] = status
+            d["fit"] = {"relation": relation, "related": related}
+            d["implication"] = self._implication(relation, it, related)
+            out.append(d)
+
+        rank = {"conflict": 0, "attention": 1, "clean": 2}
+        out.sort(key=lambda d: rank[d["status"]])
+        return out
+
+    @staticmethod
+    def _implication(relation: str, it, related) -> str:
+        def short(s, n=46):
+            s = (s or "").strip()
+            return s if len(s) <= n else s[:n - 1] + "…"
+        pct = (f"{int(related['similarity'] * 100)}%"
+               if related and related.get("similarity") else "")
+        if relation == "conflict":
+            return f"Contradicts '{short(related and related.get('title'))}'. Resolve before promoting."
+        if relation == "duplicate":
+            return f"Near-duplicate of '{short(related['title'])}' ({pct}). You may already have this."
+        if relation == "refines":
+            return f"Newer version of '{short(related['title'])}' ({pct} similar)? Consider superseding it."
+        if relation == "relates":
+            return f"Relates to '{short(related['title'])}'."
+        return f"New {it.type or 'note'}. Nothing similar yet."
+
     # --- promotion: the refinement gate (individual -> main) -----------------
 
     def promote(self, item_id: str, *, title: str | None = None,

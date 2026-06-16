@@ -183,6 +183,26 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_triage_flags_conflicts_and_bulk_promotes_clean(store):
+    store.capture("We will use PostgreSQL as our primary database.", type_hint="decision")
+    store.capture("Plan price is 3000 rupees per seat per month.", type_hint="decision")
+    store.capture("Plan price is 7000 rupees per seat per month.", type_hint="decision")
+    items = store.triage()
+    by_status = {}
+    for it in items:
+        by_status.setdefault(it["status"], []).append(it)
+    assert len(by_status.get("conflict", [])) == 2   # the two prices contradict
+    assert len(by_status.get("clean", [])) == 1       # postgres is new/clean
+    # each item carries a human-readable implication
+    assert all(it["implication"] for it in items)
+    # bulk promote only touches clean items; conflicts stay behind
+    clean_ids = [it["id"] for it in items if it["status"] == "clean"]
+    for cid in clean_ids:
+        store.promote(cid)
+    assert len(store.db.list(scope="main", limit=100)) == 1
+    assert len([i for i in store.triage() if i["status"] == "conflict"]) == 2
+
+
 def test_quickcapture_save(store):
     # the popup's save path: short text -> a note; long/multiline -> ingested doc
     from crux.config import Config

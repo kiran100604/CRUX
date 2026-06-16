@@ -204,6 +204,31 @@
   .toast.on{opacity:1; transform:translateX(-50%)}
   footer{background:var(--soft); border-top:1px solid var(--hair); padding:34px 28px; text-align:center;
     font-family:var(--mono); font-size:11px; color:var(--muted2); letter-spacing:.08em}
+  /* review inbox */
+  .inboxbar{display:flex; align-items:center; justify-content:space-between; gap:14px; margin:6px 0 16px}
+  .inboxbar .counts{display:flex; align-items:center; gap:16px; font-size:13px; color:var(--muted)}
+  .inboxbar .counts span{display:inline-flex; align-items:center}
+  .cdot{width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:7px; flex:none}
+  .c-clean{background:var(--green)} .c-attention{background:var(--peach)} .c-conflict{background:var(--coral)}
+  .irow{border:1px solid var(--hair); border-radius:var(--r-md); background:var(--canvas); margin-bottom:10px; overflow:hidden}
+  .irow.s-conflict{border-color:var(--coral-line)} .irow.s-attention{border-color:var(--peach-line)}
+  .irow.open{box-shadow:0 8px 30px rgba(40,30,10,.08)}
+  .ihead{display:flex; align-items:center; gap:14px; padding:15px 18px; cursor:pointer}
+  .ihead:hover{background:var(--soft)}
+  .ihead .cdot{margin:0}
+  .imain{flex:1; min-width:0}
+  .ititle{font-size:15px; color:var(--ink); font-weight:600; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .imeta{font-size:12.5px; color:var(--muted); margin-top:4px; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ipill{font-family:var(--mono); font-size:10px; letter-spacing:.04em; text-transform:uppercase; background:var(--card); color:var(--muted); padding:2px 7px; border-radius:var(--pill); flex:none}
+  .iwhen{font-size:11px; color:var(--muted2); flex:none}
+  .chev{color:var(--muted2); font-size:12px; flex:none; width:14px; text-align:center}
+  .ideep{padding:4px 18px 18px; border-top:1px solid var(--hair)}
+  .ideep .kv{margin:14px 0 6px}
+  .ideep .pl{font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted2); margin-bottom:6px}
+  .ideep .raw{font-size:14px; color:var(--body); line-height:1.55; background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-sm); padding:12px 14px; white-space:pre-wrap; word-break:break-word}
+  .fitbox{background:var(--peach-bg); border:1px solid var(--peach-line); border-radius:var(--r-md); padding:12px 14px; margin:12px 0}
+  .fitbox .pl{color:var(--peach)} .fitbox .pt{font-size:14px; color:var(--ink); line-height:1.5}
+
   ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--strong); border-radius:8px}
 </style>
 </head>
@@ -241,17 +266,18 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
   if(d<86400)return Math.floor(d/3600)+"h ago";return Math.floor(d/86400)+"d ago";};
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
-let state={view:"overview", items:[], working:[], conflicts:[], stats:{}, feed:[]};
+let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{}};
 
 async function load(){
   const [it,rv,st,fd]=await Promise.all([
     api("/items"), api("/review"), api("/stats"), api("/feed?limit=20")]);
-  state.items=it.items; state.working=rv.working; state.conflicts=rv.conflicts;
+  state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
+  state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
   state.stats=st; state.feed=fd.usages;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
-  const need=state.working.length+state.conflicts.length;
+  const need=state.inbox.length;
   const td=document.getElementById("t-dec"); td.textContent=need;
-  document.querySelector('[data-v="decisions"]').classList.toggle("alert", state.conflicts.length>0);
+  document.querySelector('[data-v="decisions"]').classList.toggle("alert", (state.counts.conflict||0)>0);
   render();
 }
 function setView(v){state.view=v;
@@ -263,15 +289,13 @@ function render(){({overview:vOverview,kb:vKB,decisions:vDecisions,activity:vAct
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){
-  const need=state.working.length+state.conflicts.length;
+  const need=state.inbox.length;
+  const flagged=(state.counts.conflict||0)+(state.counts.attention||0);
   const date=new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"}).toUpperCase();
-  const attn=[
-    ...state.conflicts.map(c=>({kind:"conflict",c})),
-    ...state.working.map(w=>({kind:"working",w}))
-  ].slice(0,2);
+  const attn=state.inbox.slice(0,2);
   const hero = need
-    ? `<h1 class="display">${need} thing${need>1?'s':''} need your attention.</h1>
-       <p>You have ${state.working.length} working note${state.working.length!==1?'s':''} to verify${state.conflicts.length?` and ${state.conflicts.length} possible contradiction${state.conflicts.length>1?'s':''} to resolve`:''}. A quick review keeps your agents pulling only what's true.</p>
+    ? `<h1 class="display">${need} thing${need>1?'s':''} in your inbox.</h1>
+       <p>${flagged?`${flagged} need${flagged>1?'':'s'} a closer look; the rest are clean and promote in one click.`:`All clean — promote them in one click.`} A quick review keeps your agents pulling only what's true.</p>
        <div class="row"><button class="btn primary" onclick="setView('decisions')">Review now →</button>
        <button class="btn ghost" onclick="setView('kb')">or browse everything</button></div>`
     : `<h1 class="display">You're all clear.</h1>
@@ -301,16 +325,14 @@ function vOverview(){
     </div>`);
   wireCapture();
 }
-function renderAttn(a){
-  if(a.kind==="conflict"){const c=a.c;
-    return `<div class="card accent-coral"><div class="tagline coral">⚠ POSSIBLE CONTRADICTION</div>
-      <h3>${esc(c.a.title)}</h3>
-      <div class="desc">This looks like it may conflict with “${esc(c.b.title)}”. Pick which one is true.</div>
-      <div class="foot"><button class="btn sm primary" onclick="setView('decisions')">Resolve →</button></div></div>`;}
-  const w=a.w;
-  return `<div class="card accent-peach"><div class="tagline peach">● WORKING · ${esc(w.type)}</div>
-    <h3>${esc(w.title)}</h3><div class="desc">${esc(w.summary||'')}</div>
-    <div class="foot"><button class="btn sm teal" onclick="promote('${w.id}')">Verify →</button>
+function renderAttn(it){
+  const accent=it.status==='conflict'?'accent-coral':it.status==='attention'?'accent-peach':'accent-teal';
+  const tagcls=it.status==='conflict'?'coral':it.status==='attention'?'peach':'teal';
+  const tag=it.status==='conflict'?'⚠ CONFLICT':it.status==='attention'?'● NEEDS A LOOK':'● WORKING · '+esc(it.type);
+  const clean=it.status==='clean';
+  return `<div class="card ${accent}"><div class="tagline ${tagcls}">${tag}</div>
+    <h3>${esc(it.title)}</h3><div class="desc">${esc(it.implication||it.summary||'')}</div>
+    <div class="foot"><button class="btn sm ${clean?'teal':'primary'}" onclick="${clean?`promote('${it.id}')`:`setView('decisions')`}">${clean?'Verify →':'Review →'}</button>
     <button class="btn sm ghost" onclick="openItem('${w.id}')">Open</button></div></div>`;
 }
 
@@ -344,15 +366,25 @@ function itemRow(i){
 
 /* ---------------- REVIEW / DECISIONS ---------------- */
 function vDecisions(){
-  const total=state.conflicts.length+state.working.length;
+  const inbox=state.inbox, n=inbox.length;
+  const clean=state.counts.clean||0, attn=state.counts.attention||0, conf=state.counts.conflict||0;
+  const inboxIds=new Set(inbox.map(i=>i.id));
+  const extra=state.conflicts.filter(c=>!inboxIds.has(c.a.id)&&!inboxIds.has(c.b.id));
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> REVIEW</div>
-    <h1 class="head display">Alignment center</h1>
-    <p class="sub">Promote working notes into verified knowledge, and resolve anything that looks contradictory. This gate is how only-true things reach your agents.</p>
-    ${!total?`<div class="empty"><div class="big">Inbox zero ✦</div>Nothing waiting. Capture more as you work.</div>`:''}
-    ${state.conflicts.map(conflictCard).join("")}
-    ${state.working.length?`<div class="sectlabel">PENDING VERIFICATION · ${state.working.length}</div>`:''}
-    ${state.working.map(workingCard).join("")}`);
+    <h1 class="head display">Review inbox</h1>
+    <p class="sub">Captured notes wait here. Clean ones promote in one click; anything that conflicts with or duplicates what you already know is flagged. Nothing reaches your agents until you verify it.</p>
+    ${!n&&!extra.length?`<div class="empty"><div class="big">Inbox zero ✦</div>Nothing waiting. Capture as you work.</div>`:''}
+    ${n?`<div class="inboxbar">
+      <div class="counts">
+        ${conf?`<span class="cdot c-conflict"></span><span>${conf} conflict${conf>1?'s':''}</span>`:''}
+        ${attn?`<span class="cdot c-attention"></span><span>${attn} to check</span>`:''}
+        ${clean?`<span class="cdot c-clean"></span><span>${clean} clean</span>`:''}
+      </div>
+      ${clean?`<button class="btn teal sm" onclick="promoteClean()">✓ Promote all ${clean} clean</button>`:''}
+    </div>
+    ${inbox.map(inboxRow).join("")}`:''}
+    ${extra.length?`<div class="sectlabel">CONTRADICTIONS IN VERIFIED KNOWLEDGE · ${extra.length}</div>${extra.map(conflictCard).join("")}`:''}`);
 }
 function conflictCard(c){
   const reason = c.reason ? ` · ${esc(c.reason)}` : "";
@@ -376,22 +408,54 @@ async function saveEdit(id){
   await post(`/items/${id}/edit`,{title:t||null,summary:s||null});
   toast("✓ Edited & re-embedded"); closeDrawer(); await load();}
 window.dismissConflict=dismissConflict; window.saveEdit=saveEdit;
-function workingCard(w){
-  return `<div class="dcard">
-    <div class="top"><span class="chip peach">● WORKING · ${esc(w.type)}</span>
-      <span class="mono" style="font-size:11px;color:var(--muted2)">captured ${rel(w.captured_at)}</span></div>
-    <h3>${esc(w.title)}</h3>
-    <div class="refine">
-      <input id="rt-${w.id}" value="${esc(w.title)}" placeholder="Refine title…"/>
-      <input id="rs-${w.id}" value="${esc(w.summary||'')}" placeholder="Refine summary…"/>
+function inboxRow(it){
+  const open=!!state.expanded[it.id];
+  return `<div class="irow s-${it.status} ${open?'open':''}">
+    <div class="ihead" onclick="toggleRow('${it.id}')">
+      <span class="cdot c-${it.status}"></span>
+      <div class="imain">
+        <div class="ititle">${esc(it.title||it.summary||'')}</div>
+        <div class="imeta"><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
+      </div>
+      <span class="iwhen mono">${rel(it.captured_at)}</span>
+      ${it.status==='clean'?`<button class="btn sm teal" onclick="event.stopPropagation();promote('${it.id}')">Promote</button>`:''}
+      <span class="chev">${open?'▴':'▾'}</span>
     </div>
-    <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${w.id.slice(0,8)}${w.source?' · '+esc(w.source):''}</span>
-      <div class="dactions">
-        <button class="btn sm danger" onclick="archive('${w.id}')">Discard</button>
-        <button class="btn sm ghost" onclick="openItem('${w.id}')">Details</button>
-        <button class="btn sm teal" onclick="promoteRefined('${w.id}')">✓ Verify &amp; promote</button>
-      </div></div></div>`;
+    ${open?inboxDeep(it):''}
+  </div>`;
 }
+function inboxDeep(it){
+  const r=it.fit&&it.fit.related;
+  const cmp = (it.status==='conflict'&&r) ? `
+    <div class="compare" style="margin:14px 0">
+      <div class="pane a"><div class="pl">New · ${esc(it.type)}</div><div class="pt">${esc(it.summary||it.title)}</div></div>
+      <div class="arrow">⇄</div>
+      <div class="pane b"><div class="pl">Existing${r.scope==='main'?' · verified':''} · ${esc(r.type||'')}</div><div class="pt">${esc(r.summary||r.title)}</div></div>
+    </div>` : '';
+  const rel2 = (r&&it.status!=='conflict') ? `
+    <div class="fitbox"><div class="pl">${it.fit.relation==='duplicate'?'NEAR-DUPLICATE OF':it.fit.relation==='refines'?'MAY UPDATE':'RELATES TO'}${r.similarity?' · '+Math.round(r.similarity*100)+'%':''}</div>
+      <div class="pt">${esc(r.summary||r.title)}</div></div>`:'';
+  const sup = (r&&(it.status==='conflict'||it.fit.relation==='refines'))
+    ? `<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>` : '';
+  return `<div class="ideep">
+    <div class="kv"><div class="pl">WHAT YOU CAPTURED</div><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
+    ${cmp}${rel2}
+    <div class="kv"><div class="pl">REFINE BEFORE PROMOTING</div></div>
+    <div class="refine">
+      <input id="rt-${it.id}" value="${esc(it.title||'')}" placeholder="Title…"/>
+      <input id="rs-${it.id}" value="${esc(it.summary||'')}" placeholder="Summary…"/>
+    </div>
+    <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${it.id.slice(0,8)}${it.source?' · '+esc(it.source):''}</span>
+      <div class="dactions">
+        <button class="btn sm danger" onclick="archive('${it.id}')">Discard</button>
+        ${sup}
+        <button class="btn sm teal" onclick="promoteRefined('${it.id}')">✓ Verify &amp; promote</button>
+      </div></div>
+  </div>`;
+}
+function toggleRow(id){state.expanded[id]=!state.expanded[id]; render();}
+async function promoteClean(){const r=await post("/promote-clean",{}); toast(`✓ Promoted ${r.promoted} clean item${r.promoted===1?'':'s'}`); await load();}
+window.toggleRow=toggleRow; window.promoteClean=promoteClean;
 
 /* ---------------- ACTIVITY ---------------- */
 function vActivity(){
