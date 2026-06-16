@@ -99,6 +99,75 @@ def _save(cfg, text: str) -> str:
         store.close()
 
 
+def _safe_destroy(win) -> None:
+    try:
+        win.destroy()
+    except Exception:
+        pass
+
+
+def flash_toast(root, text: str, ok: bool = True):
+    """A brief, borderless 'snap' overlay that fades in/out — the visual
+    confirmation that a capture landed (no buttons, auto-dismisses)."""
+    import tkinter as tk
+    win = tk.Toplevel(root)
+    win.overrideredirect(True)          # no title bar / borders
+    try:
+        win.attributes("-topmost", True)
+    except Exception:
+        pass
+    bg = "#143030" if ok else "#bf3422"
+    mark = "✓" if ok else "✕"
+    frame = tk.Frame(win, bg=bg, highlightthickness=0)
+    frame.pack(fill="both", expand=True)
+    tk.Label(frame, text=f"{mark}  {text}", bg=bg, fg="#ffffff",
+             font=("Segoe UI", 13, "bold"), padx=26, pady=16).pack()
+    win.update_idletasks()
+    w, h = win.winfo_width(), win.winfo_height()
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    win.geometry(f"+{(sw - w) // 2}+{sh - h - 90}")   # bottom-center, like a snip toast
+
+    def fade(alpha, step, done):
+        nxt = alpha + step
+        try:
+            win.attributes("-alpha", max(0.0, min(0.96, nxt)))
+        except Exception:
+            pass
+        if (step > 0 and nxt < 0.96) or (step < 0 and nxt > 0.0):
+            win.after(16, lambda: fade(nxt, step, done))
+        else:
+            done()
+
+    try:
+        win.attributes("-alpha", 0.0)
+    except Exception:
+        pass
+    fade(0.0, 0.14, lambda: win.after(950, lambda: fade(0.96, -0.10, lambda: _safe_destroy(win))))
+    return win
+
+
+def hint_toast(root, text: str):
+    """A small top-center hint shown while we wait for the user to select text.
+    Returns the window so the caller can dismiss it once capture happens."""
+    import tkinter as tk
+    win = tk.Toplevel(root)
+    win.overrideredirect(True)
+    try:
+        win.attributes("-topmost", True)
+        win.attributes("-alpha", 0.94)
+    except Exception:
+        pass
+    frame = tk.Frame(win, bg="#fdf8ec", highlightthickness=1, highlightbackground="#d6ccb2")
+    frame.pack(fill="both", expand=True)
+    tk.Label(frame, text=f"✂  {text}", bg="#fdf8ec", fg="#2a251e",
+             font=("Segoe UI", 11), padx=20, pady=11).pack()
+    win.update_idletasks()
+    w = win.winfo_width()
+    sw = win.winfo_screenwidth()
+    win.geometry(f"+{(sw - w) // 2}+40")
+    return win
+
+
 def run_standalone(cfg, initial: str | None = None) -> str:
     """`crux popup`: open the capture box once, save on Enter, return a status."""
     try:

@@ -26,7 +26,7 @@ import webbrowser
 from .cli import read_clipboard
 from .config import Config
 from .hotkey import chord_label, pynput_hotkey
-from .quickcapture import _save, build_popup
+from .quickcapture import _save, flash_toast, hint_toast
 
 
 def _icon_image():
@@ -80,24 +80,68 @@ def run(open_dashboard: bool = True) -> None:
             print("[crux] dashboard server not started:", e, file=sys.stderr)
     threading.Thread(target=_serve, daemon=True).start()
 
-    # hidden root owns the GUI thread; popups are Toplevels off it
+    # hidden root owns the GUI thread; overlays are Toplevels off it
     root = tk.Tk()
     root.withdraw()
 
-    def _toast(msg: str) -> None:
-        print("[crux]", msg)
+    arm = {"listener": None, "hint": None}
 
-    def _show_popup(initial: str) -> None:
-        def on_submit(val: str):
-            val = (val or "").strip()
-            _toast(_save(cfg, val) if val else "Cancelled — nothing captured.")
-        build_popup(root, initial, on_submit, lambda: None)
+    def _capture(text: str) -> None:
+        """Save (in this worker thread) then flash the result on the GUI thread."""
+        text = (text or "").strip()
+        if not text:
+            root.after(0, lambda: flash_toast(root, "Nothing selected", ok=False))
+            return
+        msg = _save(cfg, text)
+        root.after(0, lambda: flash_toast(root, msg, ok=True))
+
+    def _disarm() -> None:
+        if arm["listener"] is not None:
+            try:
+                arm["listener"].stop()
+            except Exception:
+                pass
+            arm["listener"] = None
+        if arm["hint"] is not None:
+            try:
+                arm["hint"].destroy()
+            except Exception:
+                pass
+            arm["hint"] = None
+
+    def _arm_selection(baseline: str) -> None:
+        """Press-then-select: wait for the next mouse selection, then capture it."""
+        from pynput import mouse
+
+        def on_click(x, y, button, pressed):
+            if pressed:
+                return
+            # mouse released → try to grab whatever is now selected
+            _copy_selection()
+            cur = (read_clipboard() or "")
+            if cur.strip() and cur != baseline:
+                root.after(0, _disarm)
+                _capture(cur)
+                return False  # stop listener
+            return None
+
+        listener = mouse.Listener(on_click=on_click)
+        arm["listener"] = listener
+        listener.start()
+        # show the hint and auto-cancel after 12s of no selection
+        arm["hint"] = hint_toast(root, "Select text to capture…")
+        root.after(12000, _disarm)
 
     def on_hotkey() -> None:
-        # runs in the pynput thread: copy selection, then hand off to the GUI thread
+        # runs in the pynput thread.
+        _disarm()  # a second press cancels an armed selection
+        prev = (read_clipboard() or "")
         _copy_selection()
-        text = (read_clipboard() or "").strip()
-        root.after(0, lambda: _show_popup(text))
+        cur = (read_clipboard() or "")
+        if cur.strip() and cur != prev:
+            _capture(cur)               # text was already selected → instant snap
+        else:
+            root.after(0, lambda: _arm_selection(prev))  # nothing selected → wait for it
 
     hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
     hk.start()
@@ -110,7 +154,7 @@ def run(open_dashboard: bool = True) -> None:
             import pystray
 
             def open_dash(*_): webbrowser.open(base)
-            def capture_now(*_): root.after(0, lambda: _show_popup((read_clipboard() or "").strip()))
+            def capture_now(*_): on_hotkey()
             def quit_app(*_):
                 hk.stop()
                 if icon:
