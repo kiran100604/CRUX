@@ -183,6 +183,10 @@ def create_app(cfg: Config):
             d["edges"] = store.relations_of(d["id"])
         return {"items": out}
 
+    @app.get("/related")
+    def related(id: str, limit: int = 6):
+        return {"items": store.related(id, limit)}
+
     @app.get("/stats")
     def stats():
         main = len(store.db.list(scope="main", limit=100000))

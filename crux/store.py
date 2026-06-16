@@ -403,6 +403,31 @@ class Store:
             (extends if r["from_id"] == full else extended_by).append(entry)
         return {"extends": extends, "extended_by": extended_by}
 
+    def related(self, item_id: str, limit: int = 6) -> list[dict]:
+        """Semantic neighbors in the verified graph — facts related by meaning
+        even without an explicit edge ('See also'). Excludes self + hard-linked."""
+        from .embeddings import cosine
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return []
+        vec = self.db.embedding_of(full)
+        if not vec:
+            return []
+        linked = {(r["to_id"] if r["from_id"] == full else r["from_id"])
+                  for r in self.db.relations_for(full)}
+        linked.add(full)
+        scored = []
+        for oid, ovec in self.db.all_embeddings():
+            if not ovec or oid in linked:
+                continue
+            o = self.db.get(oid)
+            if not o or o.archived or o.superseded_by or o.scope != "main":
+                continue
+            scored.append((cosine(vec, ovec), o))
+        scored.sort(key=lambda x: -x[0])
+        return [{"id": o.id, "title": o.title, "tier": o.tier, "scope": o.scope,
+                 "score": round(s, 3)} for s, o in scored[:limit] if s >= 0.4]
+
 
 def _extract_url(text: str) -> str | None:
     m = re.search(r"https?://\S+", text)
