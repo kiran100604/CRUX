@@ -11,13 +11,19 @@ import json
 import re
 from dataclasses import dataclass
 
-from .models import ITEM_TYPES
+from .models import ITEM_TYPES, TIERS
 
-_PROMPT = """You process captured snippets for a developer's context store.
-Return ONLY minified JSON with keys: title, summary, type, tags.
+_TIER_GUIDE = """- tier: one of core | mid | leaf — the ALTITUDE of the fact (independent of type)
+    core = company mission, vision, philosophy, the core problem & overall strategy
+    mid  = product decisions, roadmap, planning, architecture choices
+    leaf = granular operational facts, tasks, references, day-to-day work"""
+
+_PROMPT = """You process captured snippets for a developer/company context store.
+Return ONLY minified JSON with keys: title, summary, type, tier, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
 - type: one of {types}
+{tier_guide}
 - tags: 2-4 short lowercase tags
 
 Snippet:
@@ -31,10 +37,11 @@ constraint, architectural choice, or important reference — one fact each. Igno
 filler, TODOs, and prose with no lasting signal. If the section holds nothing
 durable, return [].
 
-Return ONLY a minified JSON array; each element has keys: title, summary, type, tags.
+Return ONLY a minified JSON array; each element has keys: title, summary, type, tier, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
 - type: one of {types}
+{tier_guide}
 - tags: 2-4 short lowercase tags
 
 Section:
@@ -57,6 +64,7 @@ class Enrichment:
     summary: str
     type: str
     tags: list[str]
+    tier: str = "leaf"
 
 
 class FakeProcessor:
@@ -70,6 +78,7 @@ class FakeProcessor:
             summary=first_sentence[:200] or "No content.",
             type=_guess_type(clean),
             tags=_guess_tags(clean),
+            tier=_guess_tier(clean),
         )
 
     def extract_facts(self, content: str) -> list[Enrichment]:
@@ -97,11 +106,13 @@ class AnthropicProcessor:
         return "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
 
     def enrich(self, content: str) -> Enrichment:
-        text = self._call(_PROMPT.format(types=", ".join(ITEM_TYPES), content=content[:6000]), 300)
+        text = self._call(_PROMPT.format(types=", ".join(ITEM_TYPES),
+                                         tier_guide=_TIER_GUIDE, content=content[:6000]), 320)
         return _parse(text, content)
 
     def extract_facts(self, content: str) -> list[Enrichment]:
-        text = self._call(_MULTI_PROMPT.format(types=", ".join(ITEM_TYPES), content=content[:8000]), 1200)
+        text = self._call(_MULTI_PROMPT.format(types=", ".join(ITEM_TYPES),
+                                               tier_guide=_TIER_GUIDE, content=content[:8000]), 1300)
         facts = _parse_many(text)
         return facts if facts else [self.enrich(content)]
 
@@ -130,6 +141,7 @@ def _parse(text: str, content: str) -> Enrichment:
             summary=str(data.get("summary", "")) or content[:160],
             type=t,
             tags=[str(x).lower() for x in tags],
+            tier=_norm_tier(data.get("tier"), content),
         )
     except Exception:
         return FakeProcessor().enrich(content)
@@ -150,6 +162,7 @@ def _parse_many(text: str) -> list[Enrichment]:
                 summary=str(d.get("summary", "")),
                 type=t,
                 tags=[str(x).lower() for x in d.get("tags", [])[:4]],
+                tier=_norm_tier(d.get("tier"), str(d.get("summary", ""))),
             ))
         return [e for e in out if e.title and e.title != "Untitled"]
     except Exception:
@@ -165,6 +178,28 @@ _TYPE_HINTS = {
     "design": ("design", "ui", "ux", "layout", "flow", "wireframe"),
     "reference": ("http://", "https://", "see ", "docs", "reference"),
 }
+
+
+# Altitude hints for the offline stand-in. The real model judges this far better.
+_TIER_HINTS = {
+    "core": ("mission", "vision", "philosophy", "our goal", "we believe", "strategy",
+             "north star", "the problem we", "company", "market", "long-term", "principle"),
+    "mid": ("roadmap", "quarter", "milestone", "plan", "decided to", "we'll build",
+            "architecture", "feature", "release", "design", "approach"),
+}
+
+
+def _guess_tier(text: str) -> str:
+    low = text.lower()
+    for tier, hints in _TIER_HINTS.items():
+        if any(h in low for h in hints):
+            return tier
+    return "leaf"  # default: granular/operational
+
+
+def _norm_tier(value, content: str) -> str:
+    v = str(value or "").strip().lower()
+    return v if v in TIERS else _guess_tier(content)
 
 
 def _guess_type(text: str) -> str:

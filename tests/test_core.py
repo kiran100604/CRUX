@@ -183,6 +183,19 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_tier_classification_and_override(store):
+    # enrichment assigns an altitude tier (heuristic offline, LLM when keyed)
+    core = store.capture("Our mission is to give AI agents perfect long-term memory.")
+    mid = store.capture("Our roadmap this quarter is the Review inbox redesign.")
+    leaf = store.capture("Use tabs not spaces in the parser module.")
+    assert core.tier == "core"
+    assert mid.tier == "mid"
+    assert leaf.tier == "leaf"
+    # promoting can override the tier, and it persists
+    assert store.promote(leaf.id, tier="core")
+    assert store.db.get(leaf.id).tier == "core"
+
+
 def test_triage_flags_conflicts_and_bulk_promotes_clean(store):
     store.capture("We will use PostgreSQL as our primary database.", type_hint="decision")
     store.capture("Plan price is 3000 rupees per seat per month.", type_hint="decision")

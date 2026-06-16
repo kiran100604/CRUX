@@ -50,6 +50,7 @@ def create_app(cfg: Config):
         title: str | None = None
         summary: str | None = None
         type: str | None = None
+        tier: str | None = None
 
     def _scope(s: str | None):
         return None if s in (None, "all") else s
@@ -207,8 +208,8 @@ def create_app(cfg: Config):
 
     @app.post("/items/{item_id}/promote")
     def promote(item_id: str, body: PromoteIn):
-        return {"ok": store.promote(item_id, title=body.title,
-                                    summary=body.summary, type=body.type)}
+        return {"ok": store.promote(item_id, title=body.title, summary=body.summary,
+                                    type=body.type, tier=body.tier)}
 
     @app.post("/items/{item_id}/demote")
     def demote(item_id: str):

@@ -61,7 +61,8 @@ class Store:
             return existing  # dedup: same fact, don't duplicate
         item = ContextItem(
             id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
-            type=enr.type, tags=enr.tags, source=source, scope=scope, confidence=confidence,
+            type=enr.type, tier=getattr(enr, "tier", "leaf"), tags=enr.tags, source=source,
+            scope=scope, confidence=confidence,
             promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model, content_hash=h,
             source_episode_id=episode_id, locator=locator or None)
@@ -307,9 +308,10 @@ class Store:
 
     def promote(self, item_id: str, *, title: str | None = None,
                 summary: str | None = None, type: str | None = None,
-                confidence: float = 0.95) -> bool:
+                tier: str | None = None, confidence: float = 0.95) -> bool:
         """Move a working item into the verified `main` graph, optionally refining
-        its fields. This is how only-true things enter the trusted layer."""
+        its fields (including its tier/altitude). This is how only-true things
+        enter the trusted layer."""
         full = self.db.resolve_id(item_id)
         if not full:
             return False
@@ -321,6 +323,8 @@ class Store:
             fields["summary"] = summary
         if type is not None:
             fields["type"] = type
+        if tier is not None:
+            fields["tier"] = tier
         ok = self.db.update(full, fields, now_iso())
         if ok:
             if title is not None or summary is not None:  # refined text → re-embed

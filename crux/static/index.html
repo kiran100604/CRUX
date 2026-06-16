@@ -232,6 +232,12 @@
   .fitbox .exist .es{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5}
   .ideep .reason{font-size:13.5px; color:var(--muted); line-height:1.6; margin:8px 0}
   .ideep .reason b{color:var(--ink); font-weight:600}
+  .ipill.tier-core{background:var(--teal-bg); color:var(--teal)}
+  .ipill.tier-mid{background:var(--peach-bg); color:var(--peach)}
+  .ipill.tier-leaf{background:var(--card); color:var(--muted)}
+  .tiersel{width:100%; height:42px; border:1px solid var(--hair); background:var(--canvas); color:var(--ink);
+    border-radius:var(--r-md); padding:0 12px; font-family:var(--sans); font-size:14px; outline:none}
+  .tiersel:focus{border-color:var(--ink)}
 
   ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--strong); border-radius:8px}
 </style>
@@ -341,21 +347,21 @@ function renderAttn(it){
 }
 
 /* ---------------- KNOWLEDGE BASE ---------------- */
+const TIER_LABEL={core:"Core Strategy",mid:"Mid Planning",leaf:"Leaf / Operational"};
+const TIER_DESC={core:"company mission, vision & strategy",mid:"product decisions, roadmap & architecture",leaf:"operational facts & day-to-day work"};
 function vKB(){
   const main=state.items.filter(i=>i.scope==="main");
-  const group=(label,types)=>{const g=main.filter(i=>types.includes(i.type));
-    return g.length?`<div class="sectlabel">${label} · ${g.length}</div>${g.map(itemRow).join("")}`:"";};
+  const group=(tier)=>{const g=main.filter(i=>(i.tier||'leaf')===tier);
+    return g.length?`<div class="sectlabel">${TIER_LABEL[tier].toUpperCase()} · ${TIER_DESC[tier]} · ${g.length}</div>${g.map(itemRow).join("")}`:"";};
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
     <h1 class="head display">Verified knowledge</h1>
-    <p class="sub">Everything you've promoted to the main graph — the only things your agents treat as locked truth, ranked by tier.</p>
+    <p class="sub">Everything you've promoted to the main graph — organized by altitude, from company strategy down to operational detail. The only things your agents treat as locked truth.</p>
     <div class="capture" style="max-width:520px; position:relative; margin-bottom:8px">
       <input id="cap" placeholder="Search your knowledge…" autocomplete="off"/>
       <div id="res"></div>
     </div>
-    ${main.length? group("TIER 1 · CORE — decisions & constraints",CORE)
-      + group("TIER 2 · STRUCTURE — architecture & design",MID)
-      + group("TIER 3 · SUPPORTING — references & context",LEAF)
+    ${main.length? group("core")+group("mid")+group("leaf")
       : `<div class="empty"><div class="big">Nothing verified yet</div>Promote working notes in Review to build your knowledge base.</div>`}`);
   wireSearch();
 }
@@ -419,7 +425,7 @@ function inboxRow(it){
       <span class="cdot c-${it.status}"></span>
       <div class="imain">
         <div class="ititle">${esc(it.title||it.summary||'')}</div>
-        <div class="imeta"><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
+        <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Leaf')}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
       </div>
       <span class="iwhen mono">${rel(it.captured_at)}</span>
       ${it.status==='clean'?`<button class="btn sm teal" onclick="event.stopPropagation();promote('${it.id}')">Promote</button>`:''}
@@ -462,9 +468,14 @@ function inboxDeep(it){
   }
   const sup=(r&&(rel==='conflict'||rel==='refines'||rel==='duplicate'))
     ?`<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>`:'';
+  const tier=it.tier||'leaf';
+  const opt=(t)=>`<option value="${t}" ${t===tier?'selected':''}>${TIER_LABEL[t]} — ${TIER_DESC[t]}</option>`;
   return `<div class="ideep">
     <div class="kv"><div class="pl">WHAT YOU CAPTURED</div><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
     ${fit}
+    <div class="kv"><div class="pl">WILL BE FILED UNDER</div>
+      <select id="rtier-${it.id}" class="tiersel">${opt('core')}${opt('mid')}${opt('leaf')}</select>
+    </div>
     <div class="kv"><div class="pl">REFINE BEFORE PROMOTING</div></div>
     <div class="refine">
       <input id="rt-${it.id}" value="${esc(it.title||'')}" placeholder="Title…"/>
@@ -531,8 +542,8 @@ let stmr; function wireSearch(){const i=document.getElementById("cap"); if(!i)re
 
 async function promote(id){await post(`/items/${id}/promote`,{}); toast("✓ Verified — agents will prioritize it"); await load();}
 async function promoteRefined(id){
-  const t=document.getElementById("rt-"+id), s=document.getElementById("rs-"+id);
-  await post(`/items/${id}/promote`,{title:(t&&t.value.trim())||null, summary:(s&&s.value.trim())||null});
+  const t=document.getElementById("rt-"+id), s=document.getElementById("rs-"+id), tr=document.getElementById("rtier-"+id);
+  await post(`/items/${id}/promote`,{title:(t&&t.value.trim())||null, summary:(s&&s.value.trim())||null, tier:(tr&&tr.value)||null});
   toast("✓ Verified & promoted"); await load();}
 async function archive(id){await post(`/items/${id}/archive`,{}); toast("Discarded"); closeDrawer(); await load();}
 async function demote(id){await post(`/items/${id}/demote`,{}); toast("Returned to working layer"); closeDrawer(); await load();}

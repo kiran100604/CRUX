@@ -31,6 +31,15 @@ LOW_VALUE_TYPES = frozenset({"reference", "context", "exploration"})
 #                after refinement. Prioritized in retrieval; never decays.
 SCOPES = ("individual", "main")
 
+# Altitude / tier — how high-level a fact is, INDEPENDENT of its type. A
+# "decision" can be Core ("focus on the India market") or Leaf ("use tabs").
+# Classified by the LLM at enrichment time (heuristic only as an offline stand-in).
+#   core = company mission, vision, philosophy, the core problem & strategy
+#   mid  = product decisions, roadmap, planning, architecture choices
+#   leaf = granular operational facts, tasks, references, day-to-day work
+TIERS = ("core", "mid", "leaf")
+TIER_LABELS = {"core": "Core Strategy", "mid": "Mid Planning", "leaf": "Leaf / Operational"}
+
 # Everything captured — a note, a clipboard grab, a whole document, an agent's
 # observation — is stored first as an Episode: the raw, untouched source of truth
 # with provenance. Facts (ContextItems) are extracted FROM episodes and link back.
@@ -71,6 +80,7 @@ class ContextItem:
     title: str
     summary: str
     type: str
+    tier: str = "leaf"  # core | mid | leaf — altitude, set by enrichment
     tags: list[str] = field(default_factory=list)
     source: str | None = None
     scope: str = "individual"  # everything starts in the working layer
@@ -98,6 +108,7 @@ class ContextItem:
             title=row["title"],
             summary=row["summary"],
             type=row["type"],
+            tier=(row["tier"] if "tier" in row.keys() else None) or "leaf",
             tags=json.loads(row["tags"] or "[]"),
             source=row["source"],
             scope=row["scope"],

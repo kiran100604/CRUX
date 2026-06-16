@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS items (
     title           TEXT NOT NULL,
     summary         TEXT NOT NULL,
     type            TEXT NOT NULL,
+    tier            TEXT NOT NULL DEFAULT 'leaf',
     tags            TEXT NOT NULL DEFAULT '[]',
     source          TEXT,
     scope           TEXT NOT NULL DEFAULT 'individual',
@@ -103,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
-_UPDATABLE = {"title", "summary", "type", "tags", "source", "scope",
+_UPDATABLE = {"title", "summary", "type", "tier", "tags", "source", "scope",
               "confidence", "superseded_by", "archived", "promoted_at", "version"}
 
 
@@ -145,6 +146,8 @@ class Database:
         for col in ("source_episode_id", "locator"):
             if col not in cols:
                 self.conn.execute(f"ALTER TABLE items ADD COLUMN {col} TEXT")
+        if "tier" not in cols:
+            self.conn.execute("ALTER TABLE items ADD COLUMN tier TEXT NOT NULL DEFAULT 'leaf'")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
@@ -170,12 +173,12 @@ class Database:
 
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(
-            """INSERT INTO items (id, raw_content, title, summary, type, tags, source,
+            """INSERT INTO items (id, raw_content, title, summary, type, tier, tags, source,
                    scope, confidence, superseded_by, archived, embedding, embedding_model,
                    content_hash, version, promoted_at, source_episode_id, locator,
                    captured_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (item.id, item.raw_content, item.title, item.summary, item.type,
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (item.id, item.raw_content, item.title, item.summary, item.type, item.tier,
              json.dumps(item.tags), item.source, item.scope, item.confidence,
              item.superseded_by, int(item.archived), pack(embedding), item.embedding_model,
              item.content_hash, item.version, item.promoted_at, item.source_episode_id,
