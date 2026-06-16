@@ -238,6 +238,19 @@
   .tiersel{width:100%; height:42px; border:1px solid var(--hair); background:var(--canvas); color:var(--ink);
     border-radius:var(--r-md); padding:0 12px; font-family:var(--sans); font-size:14px; outline:none}
   .tiersel:focus{border-color:var(--ink)}
+  .ideep .extracted{font-size:15.5px; color:var(--ink); line-height:1.55; background:var(--soft);
+    border:1px solid var(--hair); border-radius:var(--r-sm); padding:13px 15px; font-weight:500}
+  .discs{display:flex; flex-direction:column; gap:8px; margin:14px 0 4px}
+  .disc{border:1px solid var(--hair); border-radius:var(--r-sm); background:var(--canvas)}
+  .disc>summary{list-style:none; cursor:pointer; padding:9px 13px; font-size:12.5px; color:var(--muted);
+    font-family:var(--mono); letter-spacing:.02em; user-select:none}
+  .disc>summary::-webkit-details-marker{display:none}
+  .disc>summary:hover{color:var(--ink)}
+  .disc>summary b{color:var(--ink); font-weight:600}
+  .disc[open]>summary{border-bottom:1px solid var(--hair); color:var(--ink)}
+  .disc .raw,.disc .refine{margin:12px 13px 13px}
+  .disc .tiersel{margin:12px 13px 13px; width:calc(100% - 26px)}
+  .disc .refine{display:flex; flex-direction:column; gap:9px}
 
   ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--strong); border-radius:8px}
 </style>
@@ -471,15 +484,17 @@ function inboxDeep(it){
   const tier=it.tier||'leaf';
   const opt=(t)=>`<option value="${t}" ${t===tier?'selected':''}>${TIER_LABEL[t]} — ${TIER_DESC[t]}</option>`;
   return `<div class="ideep">
-    <div class="kv"><div class="pl">WHAT YOU CAPTURED</div><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
+    <div class="kv"><div class="pl">EXTRACTED KNOWLEDGE</div><div class="extracted">${esc(it.summary||it.title)}</div></div>
     ${fit}
-    <div class="kv"><div class="pl">WILL BE FILED UNDER</div>
-      <select id="rtier-${it.id}" class="tiersel">${opt('core')}${opt('mid')}${opt('leaf')}</select>
-    </div>
-    <div class="kv"><div class="pl">REFINE BEFORE PROMOTING</div></div>
-    <div class="refine">
-      <input id="rt-${it.id}" value="${esc(it.title||'')}" placeholder="Title…"/>
-      <input id="rs-${it.id}" value="${esc(it.summary||'')}" placeholder="Summary…"/>
+    <div class="discs">
+      <details class="disc"><summary>Show original text</summary><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></details>
+      <details class="disc"><summary>Change tier — currently <b>${TIER_LABEL[tier]}</b></summary>
+        <select id="rtier-${it.id}" class="tiersel">${opt('core')}${opt('mid')}${opt('leaf')}</select></details>
+      <details class="disc"><summary>Edit title / summary</summary>
+        <div class="refine">
+          <input id="rt-${it.id}" value="${esc(it.title||'')}" placeholder="Title…"/>
+          <input id="rs-${it.id}" value="${esc(it.summary||'')}" placeholder="Summary…"/>
+        </div></details>
     </div>
     <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${it.id.slice(0,8)}${it.source?' · '+esc(it.source):''}</span>
       <div class="dactions">
