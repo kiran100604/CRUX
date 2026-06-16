@@ -10,6 +10,7 @@ CRUX" works.
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 DEFAULT_MODS = ["ctrl", "shift"]
@@ -23,6 +24,28 @@ _HS_MOD = {"ctrl": "ctrl", "shift": "shift", "alt": "alt", "cmd": "cmd", "win": 
 
 def chord_label(mods, key) -> str:
     return " + ".join([m.capitalize() for m in mods] + [key.capitalize()])
+
+
+_ALLOWED_KEY = re.compile(r"^([a-z0-9]|space|f([1-9]|1[0-2]))$")
+_RESERVED = {
+    "ctrl+shift+i": "browser DevTools", "ctrl+shift+j": "browser DevTools",
+    "ctrl+shift+c": "browser DevTools", "ctrl+shift+k": "browser console",
+    "ctrl+w": "close tab", "ctrl+t": "new tab", "ctrl+n": "new window", "ctrl+q": "quit",
+    "ctrl+c": "copy", "ctrl+v": "paste", "ctrl+x": "cut", "ctrl+z": "undo",
+    "ctrl+a": "select all", "ctrl+s": "save", "alt+f4": "close window",
+}
+
+
+def valid_chord(mods, key) -> tuple[bool, str]:
+    """Validate a custom chord (server-side safety net mirroring the wizard)."""
+    if not key or not _ALLOWED_KEY.match(str(key)):
+        return False, "key must be a letter, number, space, or F-key"
+    if not any(m in ("ctrl", "alt", "cmd", "win") for m in mods):
+        return False, "needs a Ctrl/Alt/Super modifier"
+    cid = "+".join(m for m in ("ctrl", "alt", "shift", "cmd") if m in mods) + "+" + key
+    if cid in _RESERVED:
+        return False, f"reserved for {_RESERVED[cid]}"
+    return True, ""
 
 
 # pynput GlobalHotKeys uses "<ctrl>+<shift>+<space>" style strings.

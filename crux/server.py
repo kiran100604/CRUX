@@ -109,7 +109,7 @@ def create_app(cfg: Config):
     @app.post("/api/setup")
     def setup_apply(body: SetupIn):
         from .config import save_env_file
-        from .hotkey import chord_label, write_snippets
+        from .hotkey import chord_label, valid_chord, write_snippets
         from .install import claude_settings_path, install_claude_hook
 
         vals: dict[str, str] = {}
@@ -119,8 +119,12 @@ def create_app(cfg: Config):
         if body.openai_key:
             vals["OPENAI_API_KEY"] = body.openai_key.strip()
             vals["CRUX_EMBEDDING_PROVIDER"] = "openai"
+        # validate the chord; on an invalid custom chord, keep the current one
         mods = body.chord_mods or list(cfg.hotkey_mods)
         key = body.chord_key or cfg.hotkey_key
+        ok, reason = valid_chord(mods, key)
+        if not ok:
+            mods, key = list(cfg.hotkey_mods), cfg.hotkey_key  # fall back, don't persist a bad chord
         vals["CRUX_HOTKEY_MODS"] = ",".join(mods)
         vals["CRUX_HOTKEY_KEY"] = key
         save_env_file(cfg.home, vals)
@@ -135,6 +139,7 @@ def create_app(cfg: Config):
             "ok": True,
             "hook": hook_status,
             "chord": chord_label(mods, key),
+            "chord_rejected": (None if ok else reason),
             "keys_saved": [k for k in vals if k.endswith("_API_KEY")],
         }
 

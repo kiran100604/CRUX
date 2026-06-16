@@ -257,6 +257,17 @@ def test_quickcapture_save(store):
     assert "fact" in _save(cfg, "Payments via Stripe.\nErrors go to Sentry.\nWebhooks signed.")
 
 
+def test_valid_chord():
+    from crux.hotkey import valid_chord
+    assert valid_chord(["ctrl", "shift"], "z")[0]
+    assert valid_chord(["ctrl", "alt"], "space")[0]
+    assert not valid_chord([], "z")[0]                 # no modifier
+    assert not valid_chord(["shift"], "a")[0]          # shift-only isn't enough
+    assert not valid_chord(["ctrl", "shift"], "j")[0]  # reserved (DevTools)
+    assert not valid_chord(["ctrl"], "w")[0]           # reserved (close tab)
+    assert not valid_chord(["ctrl"], ".")[0]           # punctuation not portable
+
+
 def test_pynput_hotkey_format():
     from crux.hotkey import pynput_hotkey
     assert pynput_hotkey(["ctrl", "shift"], "space") == "<ctrl>+<shift>+<space>"
@@ -273,11 +284,11 @@ def test_setup_persists_chord_for_tray_app(tmp_path, monkeypatch):
     from crux.hotkey import pynput_hotkey
     from crux.server import create_app
     c = TestClient(create_app(Config.load()))
-    c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "k",
+    c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "z",
                                "install_hook": False})
     cfg = Config.load()  # reload from the saved config.env
-    assert cfg.hotkey_mods == ("ctrl", "shift") and cfg.hotkey_key == "k"
-    assert pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key) == "<ctrl>+<shift>+k"
+    assert cfg.hotkey_mods == ("ctrl", "shift") and cfg.hotkey_key == "z"
+    assert pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key) == "<ctrl>+<shift>+z"
 
 
 def test_first_run_setup_flow(tmp_path, monkeypatch):
@@ -294,9 +305,9 @@ def test_first_run_setup_flow(tmp_path, monkeypatch):
     assert c.get("/", follow_redirects=False).status_code == 307
     assert c.get("/setup").status_code == 200
     assert c.get("/api/setup").json()["configured"] is False
-    r = c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "k",
+    r = c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "z",
                                    "install_hook": False}).json()
-    assert r["ok"] and r["chord"] == "Ctrl + Shift + K"
+    assert r["ok"] and r["chord"] == "Ctrl + Shift + Z"
     # now configured → dashboard serves directly
     assert c.get("/", follow_redirects=False).status_code == 200
     assert c.get("/api/setup").json()["configured"] is True

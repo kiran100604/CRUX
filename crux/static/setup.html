@@ -41,6 +41,11 @@
     padding:11px 15px; font-family:var(--mono); font-size:13px; cursor:pointer; transition:.12s}
   .chord:hover{border-color:var(--muted2)}
   .chord.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .recorder{border:1.5px dashed var(--muted2); border-radius:10px; padding:14px 16px; font-family:var(--mono);
+    font-size:14px; color:var(--ink); background:var(--canvas); cursor:text; outline:none; text-align:center}
+  .recorder:focus{border-style:solid; border-color:var(--ink); background:var(--soft)}
+  .vmsg{font-size:12.5px; color:var(--muted); margin-top:8px}
+  .vmsg.ok{color:var(--green)} .vmsg.bad{color:var(--coral)}
   .toggle{display:flex; align-items:center; gap:12px; cursor:pointer}
   .switch{width:44px; height:26px; border-radius:var(--pill); background:var(--strong,#e3d9bf); position:relative; transition:.18s; flex:none; border:1px solid var(--hair)}
   .switch::after{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.18s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
@@ -76,11 +81,51 @@
 <script>
 const $=s=>document.querySelector(s);
 const post=(u,b)=>fetch(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json());
-let S={}, sel=0, hook=true, presets=[];
+let S={}, sel=0, hook=true, presets=[], customMode=false, custom=null;
+
+const _cap = m => m==="cmd"?"Super":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
+const chordLabel=(mods,key)=>[...mods.map(_cap), (key==='space'?'Space':key.toUpperCase())].join(" + ");
+
+const RESERVED={
+  "ctrl+shift+i":"browser DevTools","ctrl+shift+j":"browser DevTools",
+  "ctrl+shift+c":"browser DevTools","ctrl+shift+k":"browser console",
+  "ctrl+w":"close tab","ctrl+t":"new tab","ctrl+n":"new window","ctrl+q":"quit app",
+  "ctrl+c":"copy","ctrl+v":"paste","ctrl+x":"cut","ctrl+z":"undo","ctrl+a":"select all","ctrl+s":"save",
+  "alt+tab":"switch windows","alt+f4":"close window",
+};
+function validateChord(mods,key){
+  if(!key) return {ok:false,msg:"Press a key."};
+  if(!/^([a-z0-9]|space|f([1-9]|1[0-2]))$/.test(key))
+    return {ok:false,msg:"Use a letter, number, Space, or F-key — punctuation/sequences aren't portable."};
+  if(!mods.some(m=>["ctrl","alt","cmd"].includes(m)))
+    return {ok:false,msg:"Add Ctrl, Alt, or Super — a bare key would fire all the time."};
+  const order=["ctrl","alt","shift","cmd"];
+  const id=order.filter(m=>mods.includes(m)).join("+")+"+"+key;
+  if(RESERVED[id]) return {ok:false,msg:`Reserved for ${RESERVED[id]} — pick another.`};
+  return {ok:true,msg:"Looks good."};
+}
+function _normKey(e){
+  if(e.key===" "||e.code==="Space") return "space";
+  if(/^[a-zA-Z]$/.test(e.key)) return e.key.toLowerCase();
+  if(/^[0-9]$/.test(e.key)) return e.key;
+  if(/^F([1-9]|1[0-2])$/.test(e.key)) return e.key.toLowerCase();
+  return e.key.length===1 ? e.key.toLowerCase() : e.key.toLowerCase(); // flagged by validate
+}
+function onRecord(e){
+  e.preventDefault();
+  if(["Control","Alt","Shift","Meta","OS"].includes(e.key)) return; // wait for the real key
+  const mods=[];
+  if(e.ctrlKey) mods.push("ctrl");
+  if(e.altKey) mods.push("alt");
+  if(e.shiftKey) mods.push("shift");
+  if(e.metaKey) mods.push("cmd");
+  const key=_normKey(e);
+  custom={mods,key,label:chordLabel(mods,key)};
+  updateHint();
+}
 
 function buildPresets(plat){
-  const cap = m => m==="cmd"?"Cmd":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
-  const mk = (mods,key)=>({mods,key,label:[...mods.map(cap),key.toUpperCase()].join(" + ")});
+  const mk = (mods,key)=>({mods,key,label:chordLabel(mods,key)});
   if(plat==="darwin")
     return [ mk(["cmd","shift"],"space"), mk(["cmd","ctrl"],"c"), mk(["cmd","ctrl"],"space"), mk(["cmd","shift"],"u") ];
   // Windows/Linux: avoid Ctrl+Shift+{I,J,C,K} (browser DevTools). Space is safe.
@@ -138,27 +183,47 @@ function form(){
 
 function drawChords(){
   $("#chords").innerHTML = presets.map((c,i)=>
-    `<button class="chord ${i===sel?'on':''}" data-i="${i}">${c.label}</button>`).join("");
-  $("#chords").querySelectorAll(".chord").forEach(b=>b.onclick=()=>{
-    sel=+b.dataset.i; drawChords(); updateHint();});
+    `<button class="chord ${(!customMode&&i===sel)?'on':''}" data-i="${i}">${c.label}</button>`).join("")
+    + `<button class="chord ${customMode?'on':''}" id="customchip">✎ Custom…</button>`;
+  $("#chords").querySelectorAll(".chord[data-i]").forEach(b=>b.onclick=()=>{
+    customMode=false; sel=+b.dataset.i; drawChords(); updateHint();});
+  $("#customchip").onclick=()=>{customMode=true; drawChords(); updateHint();
+    setTimeout(()=>{const r=$("#recorder"); if(r) r.focus();},0);};
   updateHint();
 }
 function updateHint(){
+  if(customMode){
+    const v = custom ? validateChord(custom.mods,custom.key) : null;
+    $("#chordhint").innerHTML =
+      `<div tabindex="0" id="recorder" class="recorder">${custom?custom.label:"Click here, then press your shortcut…"}</div>`
+      + `<div class="vmsg ${v?(v.ok?'ok':'bad'):''}">`
+      + (v ? (v.ok?"✓ ":"⚠ ")+v.msg : "Press a modifier + a letter/number/Space/F-key (e.g. Ctrl+Shift+Z).")
+      + `</div>`;
+    const r=$("#recorder"); if(r) r.onkeydown=onRecord;
+    return;
+  }
   const c=presets[sel];
-  const tips={darwin:"The CRUX tray app registers this chord directly (needs Accessibility permission).",
-    win32:"The CRUX tray app registers this chord directly — no AutoHotkey needed.",
-    linux:"The CRUX tray app registers this chord directly (needs xclip for clipboard)."};
+  const tips={darwin:"The tray app registers this chord (needs Accessibility permission).",
+    win32:"The tray app registers this chord directly.",
+    linux:"On Wayland, run `crux bind` to register it at the OS level."};
   $("#chordhint").textContent = `Chosen: ${c.label}. ` + (tips[S.platform]||"");
 }
 
 async function apply(useDefaults){
+  let mods, key;
+  if(!useDefaults){
+    if(customMode){
+      const v = custom && validateChord(custom.mods,custom.key);
+      if(!v || !v.ok){ updateHint(); return; }   // block invalid custom chord
+      mods=custom.mods; key=custom.key;
+    } else { mods=presets[sel].mods; key=presets[sel].key; }
+  }
   $("#finish").disabled=true; $("#finish").textContent="Saving…";
-  const c=presets[sel];
   const payload = useDefaults ? {install_hook:true} : {
     anthropic_key: $("#ak").value || null,
     openai_key: $("#ok").value || null,
     install_hook: hook,
-    chord_mods: c.mods, chord_key: c.key,
+    chord_mods: mods, chord_key: key,
   };
   const r = await post("/api/setup", payload);
   done(r);
