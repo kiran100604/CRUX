@@ -50,13 +50,13 @@ def _warn_wayland(chord: str) -> None:
     if sys.platform != "linux" or not _is_wayland():
         return
     print(
-        "\n[crux] ⚠ Wayland detected. Two notes:\n"
-        "       1. Auto-copy is blocked on Wayland — so COPY FIRST (Ctrl+C), then\n"
-        "          press the hotkey. CRUX captures whatever you copied.\n"
-        "       2. The in-app hotkey may or may not fire depending on your setup.\n"
-        "          If it doesn't, bind it in the OS instead (works reliably):\n"
-        "            GNOME → Settings → Keyboard → Custom Shortcuts → +\n"
-        "            Command: crux capture     Shortcut: " + chord + "\n",
+        "\n[crux] ⚠ Wayland detected. The in-app hotkey only sees keys when an\n"
+        "       XWayland window is focused — so it WON'T fire from native Wayland\n"
+        "       apps (e.g. Chrome). The reliable fix is a compositor-level binding:\n\n"
+        "           crux bind          ← one command: binds your chord to capture\n\n"
+        "       Then: select text anywhere → Ctrl+C → press " + chord + ".\n"
+        "       (Quit this with Ctrl+C; you don't need `crux app` once bound —\n"
+        "        just keep `crux serve` running for the dashboard.)\n",
         flush=True)
 
 

@@ -253,6 +253,45 @@ def cmd_popup(args):
     print(run_standalone(Config.load()))
 
 
+def cmd_bind(args):
+    """Register a GNOME custom shortcut → `crux capture`. This is the reliable
+    capture path on Wayland (the compositor grabs the key, regardless of which
+    app is focused — unlike an in-app hotkey)."""
+    import shutil
+    import subprocess
+    from .hotkey import chord_label, gnome_binding
+    cfg = Config.load()
+    chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
+    binding = gnome_binding(cfg.hotkey_mods, cfg.hotkey_key)
+    command = f"{sys.executable} -m crux.cli capture"
+    if not shutil.which("gsettings"):
+        print("gsettings not found (not GNOME). Bind manually:\n"
+              "  Settings → Keyboard → Custom Shortcuts → +\n"
+              f"  Command: {command}\n  Shortcut: {chord}")
+        return
+    base = "org.gnome.settings-daemon.plugins.media-keys"
+    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/crux/"
+
+    def g(*a):
+        return subprocess.run(["gsettings", *a], capture_output=True, text=True)
+    import ast
+    cur = g("get", base, "custom-keybindings").stdout.strip()
+    try:
+        lst = ast.literal_eval(cur) if cur.startswith("[") else []
+    except Exception:
+        lst = []
+    if path not in lst:
+        lst.append(path)
+    g("set", base, "custom-keybindings", str(lst))
+    child = f"{base}.custom-keybinding:{path}"
+    g("set", child, "name", "Capture to CRUX")
+    g("set", child, "command", command)
+    g("set", child, "binding", binding)
+    print(f"✓ Bound {chord} → crux capture (GNOME).\n"
+          f"  Now: select text anywhere, Ctrl+C, press {chord}.\n"
+          f"  (Change it in Settings → Keyboard → Custom Shortcuts → 'Capture to CRUX'.)")
+
+
 def cmd_keytest(args):
     """Diagnose the global hotkey: prints every key pynput receives, and fires
     when your configured chord is detected. If NOTHING prints as you type, the OS
@@ -393,6 +432,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("popup", help="open the visible quick-capture box once (test the capture UI)").set_defaults(func=cmd_popup)
     sub.add_parser("keytest", help="diagnose the global hotkey: print keys pynput sees + detect your chord").set_defaults(func=cmd_keytest)
+    sub.add_parser("bind", help="register a GNOME shortcut → crux capture (reliable on Wayland)").set_defaults(func=cmd_bind)
     return p
 
 

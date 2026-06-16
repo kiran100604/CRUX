@@ -34,6 +34,17 @@ _KEY_CHAR = {"period": ".", "comma": ",", "slash": "/", "semicolon": ";",
              "backslash": "\\", "minus": "-", "equal": "="}
 
 
+# GNOME keybinding syntax (gsettings), e.g. "<Primary><Shift>space"
+_GNOME_MOD = {"ctrl": "<Primary>", "shift": "<Shift>", "alt": "<Alt>",
+              "cmd": "<Super>", "win": "<Super>"}
+
+
+def gnome_binding(mods, key) -> str:
+    mods = mods or DEFAULT_MODS
+    key = key or DEFAULT_KEY
+    return "".join(_GNOME_MOD[m] for m in mods) + key  # keysym name: space/k/period…
+
+
 def pynput_hotkey(mods, key) -> str:
     mods = mods or DEFAULT_MODS
     key = key or DEFAULT_KEY
