@@ -38,14 +38,28 @@ def _icon_image():
 
 
 def _copy_selection() -> None:
-    """Send Ctrl/Cmd+C so the popup can pre-fill with the highlighted text."""
+    """Send Ctrl/Cmd+C to copy the current selection.
+
+    Critical: when the hotkey fires, the user is usually still holding the chord
+    modifiers (e.g. Ctrl+Shift). A naive Ctrl+C would be read as Ctrl+Shift+C —
+    NOT copy — so nothing gets copied. We first release any held modifiers, then
+    send a clean Ctrl/Cmd+C.
+    """
     try:
         from pynput.keyboard import Controller, Key
         kb = Controller()
+        # neutralize chord modifiers the user is still pressing
+        for k in (Key.shift, Key.shift_r, Key.ctrl, Key.ctrl_r,
+                  Key.alt, Key.alt_r, Key.alt_gr, Key.cmd, Key.cmd_r):
+            try:
+                kb.release(k)
+            except Exception:
+                pass
+        time.sleep(0.06)
         mod = Key.cmd if sys.platform == "darwin" else Key.ctrl
         with kb.pressed(mod):
             kb.press("c"); kb.release("c")
-        time.sleep(0.15)
+        time.sleep(0.12)
     except Exception:
         pass  # fall back to whatever is already on the clipboard
 
