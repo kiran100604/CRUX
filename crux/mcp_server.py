@@ -30,16 +30,24 @@ def run() -> None:
         layer only).
         """
         s = None if scope == "all" else scope
-        results = store.search(query, limit=limit, scope=s, include_archived=include_archived)
-        return {
-            "items": [
-                {"id": r.item.id, "title": r.item.title, "summary": r.item.summary,
-                 "type": r.item.type, "scope": r.item.scope, "source": r.item.source,
-                 "score": round(r.score, 4)}
-                for r in results
-            ],
-            "returned": len(results),
-        }
+        # include_archived isn't graph-expanded; otherwise use the payoff retrieval
+        if include_archived:
+            results = store.search(query, limit=limit, scope=s, include_archived=True)
+            links = []
+        else:
+            results, links = store.retrieve(query, limit=limit, scope=s)
+        items = [
+            {"id": r.item.id, "title": r.item.title, "summary": r.item.summary,
+             "type": r.item.type, "tier": r.item.tier, "scope": r.item.scope,
+             "source": r.item.source, "score": round(r.score, 4)}
+            for r in results
+        ]
+        connected = [
+            {"id": it.id, "title": it.title, "summary": it.summary, "type": it.type,
+             "tier": it.tier, "scope": it.scope, "connected_to": pid[:8], "via": "extends"}
+            for pid, it in links
+        ]
+        return {"items": items, "connected": connected, "returned": len(results)}
 
     @mcp.tool()
     def add_context(content: str, type: str | None = None) -> dict:

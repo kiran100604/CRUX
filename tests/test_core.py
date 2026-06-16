@@ -183,6 +183,21 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_retrieve_pulls_in_connected_facts(store):
+    a = store.capture("Payments are processed through Stripe.", type_hint="decision")
+    store.promote(a.id)
+    # b extends a, but is worded so a 'stripe' query won't match it directly
+    b = store.capture("The finance team owns monthly reconciliation.", type_hint="reference")
+    store.promote(b.id)
+    store.extend(b.id, a.id, promote=False)
+    results, links = store.retrieve("stripe payment processing", limit=1)
+    assert [r.item.id for r in results] == [a.id]      # query found only A
+    assert [it.id for _, it in links] == [b.id]        # graph pulled in B
+    # without expansion, the connected fact is not added
+    _, no_links = store.retrieve("stripe payment processing", limit=1, expand=False)
+    assert no_links == []
+
+
 def test_extend_creates_linked_edge_and_promotes(store):
     a = store.capture("Alex is a PM at Stripe.")
     store.promote(a.id)

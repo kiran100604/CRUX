@@ -223,10 +223,11 @@ def cmd_ctx(args):
     """Print the context block for a task — paste into any tool without the hook."""
     from .hooks import _format
     store = _store()
-    results = store.search(args.task, limit=args.limit)
+    results, links = store.retrieve(args.task, limit=args.limit)
     if results:
-        store.record_usage([r.item.id for r in results], args.task)
-        print(_format(results))
+        ids = [r.item.id for r in results] + [it.id for _, it in links]
+        store.record_usage(ids, args.task)
+        print(_format(results, links))
     else:
         print("(no relevant context yet)")
     store.close()

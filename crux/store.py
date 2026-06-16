@@ -151,6 +151,32 @@ class Store:
         return search(self.db, qvec, query, limit=limit,
                       include_archived=include_archived, scope=scope)
 
+    def retrieve(self, query: str, limit: int = 5, *, expand: bool = True,
+                 max_links: int = 4, scope: str | None = None):
+        """Search + graph expansion — the retrieval payoff. For each top hit, pull
+        its extension neighbors (extends / extended-by) so an agent gets the whole
+        connected picture, not an isolated fragment. Returns (results, links),
+        where links = [(parent_item_id, ContextItem)] for the connected facts."""
+        results = self.search(query, limit=limit, scope=scope)
+        links: list[tuple[str, ContextItem]] = []
+        if expand and results:
+            seen = {r.item.id for r in results}
+            for r in results:
+                for edge in self.db.relations_for(r.item.id):
+                    if edge["kind"] != "extends":
+                        continue
+                    oid = edge["to_id"] if edge["from_id"] == r.item.id else edge["from_id"]
+                    if oid in seen:
+                        continue
+                    o = self.db.get(oid)
+                    if not o or o.archived or o.superseded_by:
+                        continue
+                    seen.add(oid)
+                    links.append((r.item.id, o))
+                    if len(links) >= max_links:
+                        return results, links
+        return results, links
+
     def record_usage(self, item_ids: list[str], query: str, session: str = "") -> None:
         """Log that these items were injected into a live agent session — this is
         what powers the dashboard's 'used N times' payoff loop."""

@@ -17,14 +17,23 @@ from .store import Store
 MAX_ITEMS = 5
 
 
-def _format(results) -> str:
+def _line(i, *, indent="• ", note="") -> str:
+    tier = "VERIFIED" if i.scope == "main" else "working"
+    cite = i.source or i.id[:8]
+    return f"{indent}[{tier}/{i.type}] {i.title} — {i.summary}{note} [src: {cite}]"
+
+
+def _format(results, links=None) -> str:
+    """Render retrieved facts, with their connected (extends) facts nested under
+    them so the agent sees the enriched picture, not isolated fragments."""
+    by_parent: dict = {}
+    for pid, it in (links or []):
+        by_parent.setdefault(pid, []).append(it)
     lines = ["[CRUX CONTEXT] (retrieved automatically — verify before trusting)"]
     for r in results:
-        i = r.item
-        # mark which tier each item came from: verified truth vs working note
-        tier = "VERIFIED" if i.scope == "main" else "working"
-        cite = i.source or i.id[:8]
-        lines.append(f"• [{tier}/{i.type}] {i.title} — {i.summary} [src: {cite}]")
+        lines.append(_line(r.item))
+        for li in by_parent.get(r.item.id, []):
+            lines.append(_line(li, indent="   ↳ connected: ", note=""))
     lines.append("[END CRUX CONTEXT]")
     return "\n".join(lines)
 
@@ -38,16 +47,16 @@ def hook_inject() -> int:
             print("{}")
             return 0
         store = Store(Config.load())
-        results = store.search(prompt, limit=MAX_ITEMS)
+        results, links = store.retrieve(prompt, limit=MAX_ITEMS)
         if results:
-            # record the payoff: these items just helped a real session
-            store.record_usage([r.item.id for r in results], prompt,
-                               session=payload.get("session_id", ""))
+            # record the payoff: these items (and their connected facts) just helped
+            ids = [r.item.id for r in results] + [it.id for _, it in links]
+            store.record_usage(ids, prompt, session=payload.get("session_id", ""))
         store.close()
         if not results:
             print("{}")
             return 0
-        print(json.dumps({"additionalContext": _format(results)}))
+        print(json.dumps({"additionalContext": _format(results, links)}))
         return 0
     except Exception:
         # Never break the user's turn because of CRUX.
