@@ -228,6 +228,10 @@
   .ideep .raw{font-size:14px; color:var(--body); line-height:1.55; background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-sm); padding:12px 14px; white-space:pre-wrap; word-break:break-word}
   .fitbox{background:var(--peach-bg); border:1px solid var(--peach-line); border-radius:var(--r-md); padding:12px 14px; margin:12px 0}
   .fitbox .pl{color:var(--peach)} .fitbox .pt{font-size:14px; color:var(--ink); line-height:1.5}
+  .fitbox .exist{font-size:14px; color:var(--ink); line-height:1.5}
+  .fitbox .exist .es{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5}
+  .ideep .reason{font-size:13.5px; color:var(--muted); line-height:1.6; margin:8px 0}
+  .ideep .reason b{color:var(--ink); font-weight:600}
 
   ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--strong); border-radius:8px}
 </style>
@@ -333,7 +337,7 @@ function renderAttn(it){
   return `<div class="card ${accent}"><div class="tagline ${tagcls}">${tag}</div>
     <h3>${esc(it.title)}</h3><div class="desc">${esc(it.implication||it.summary||'')}</div>
     <div class="foot"><button class="btn sm ${clean?'teal':'primary'}" onclick="${clean?`promote('${it.id}')`:`setView('decisions')`}">${clean?'Verify →':'Review →'}</button>
-    <button class="btn sm ghost" onclick="openItem('${w.id}')">Open</button></div></div>`;
+    <button class="btn sm ghost" onclick="setView('decisions')">Open</button></div></div>`;
 }
 
 /* ---------------- KNOWLEDGE BASE ---------------- */
@@ -425,21 +429,42 @@ function inboxRow(it){
   </div>`;
 }
 function inboxDeep(it){
-  const r=it.fit&&it.fit.related;
-  const cmp = (it.status==='conflict'&&r) ? `
-    <div class="compare" style="margin:14px 0">
-      <div class="pane a"><div class="pl">New · ${esc(it.type)}</div><div class="pt">${esc(it.summary||it.title)}</div></div>
-      <div class="arrow">⇄</div>
-      <div class="pane b"><div class="pl">Existing${r.scope==='main'?' · verified':''} · ${esc(r.type||'')}</div><div class="pt">${esc(r.summary||r.title)}</div></div>
-    </div>` : '';
-  const rel2 = (r&&it.status!=='conflict') ? `
-    <div class="fitbox"><div class="pl">${it.fit.relation==='duplicate'?'NEAR-DUPLICATE OF':it.fit.relation==='refines'?'MAY UPDATE':'RELATES TO'}${r.similarity?' · '+Math.round(r.similarity*100)+'%':''}</div>
-      <div class="pt">${esc(r.summary||r.title)}</div></div>`:'';
-  const sup = (r&&(it.status==='conflict'||it.fit.relation==='refines'))
-    ? `<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>` : '';
+  const r=it.fit&&it.fit.related, rel=it.fit?it.fit.relation:'new';
+  const sim=r&&r.similarity?Math.round(r.similarity*100)+'% similar':'';
+  const where=r?(r.scope==='main'?'verified knowledge':'a working note'):'';
+  let fit='';
+  if(r&&rel==='conflict'){
+    fit=`
+      <div class="kv"><div class="pl">⚠ CONFLICTS WITH ${r.scope==='main'?'VERIFIED KNOWLEDGE':'A WORKING NOTE'} · ${sim}</div></div>
+      <div class="compare" style="margin:8px 0 14px">
+        <div class="pane a"><div class="pl">YOUR CAPTURE · ${esc(it.type)}</div><div class="pt">${esc(it.summary||it.title)}</div></div>
+        <div class="arrow">⇄</div>
+        <div class="pane b"><div class="pl">EXISTING · ${esc(r.type||'')}</div><div class="pt">${esc(r.summary||r.title)}</div></div>
+      </div>
+      <div class="reason"><b>Why flagged —</b> these say different things about the same topic. Promoting both would hand your agents contradictory truth.</div>
+      <div class="reason"><b>If you act —</b> “Replace existing” supersedes the old fact (kept in history, never deleted). Or Discard this capture if it's wrong.</div>`;
+  } else if(r){
+    const verb=rel==='duplicate'?'NEAR-DUPLICATE OF':rel==='refines'?'LIKELY UPDATES':'RELATES TO';
+    const why=rel==='duplicate'?'almost identical to something you already have — you may be capturing it twice.'
+             :rel==='refines'?'same topic and type as an existing item — likely a newer version of it.'
+             :'on the same topic as an existing item.';
+    const outcome=rel==='relates'?'both are kept and will surface together for related queries.'
+             :'use “Replace existing” to supersede the old one (moved to history), or keep both.';
+    fit=`
+      <div class="fitbox">
+        <div class="pl">${verb} ${where.toUpperCase()} · ${sim}</div>
+        <div class="exist"><b>${esc(r.title||'')}</b>${r.summary&&r.summary!==r.title?'<div class="es">'+esc(r.summary)+'</div>':''}</div>
+      </div>
+      <div class="reason"><b>Why flagged —</b> ${why}</div>
+      <div class="reason"><b>If you promote —</b> ${outcome}</div>`;
+  } else {
+    fit=`<div class="reason"><b>New —</b> nothing similar in your knowledge yet. Promoting adds a fresh ${esc(it.type||'note')} to your Knowledge Base.</div>`;
+  }
+  const sup=(r&&(rel==='conflict'||rel==='refines'||rel==='duplicate'))
+    ?`<button class="btn sm out" onclick="supersede('${r.id}','${it.id}')">Replace existing</button>`:'';
   return `<div class="ideep">
     <div class="kv"><div class="pl">WHAT YOU CAPTURED</div><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
-    ${cmp}${rel2}
+    ${fit}
     <div class="kv"><div class="pl">REFINE BEFORE PROMOTING</div></div>
     <div class="refine">
       <input id="rt-${it.id}" value="${esc(it.title||'')}" placeholder="Title…"/>
