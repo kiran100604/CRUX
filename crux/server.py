@@ -118,22 +118,23 @@ def create_app(cfg: Config):
         if body.openai_key:
             vals["OPENAI_API_KEY"] = body.openai_key.strip()
             vals["CRUX_EMBEDDING_PROVIDER"] = "openai"
-        if vals:
-            save_env_file(cfg.home, vals)
+        mods = body.chord_mods or list(cfg.hotkey_mods)
+        key = body.chord_key or cfg.hotkey_key
+        vals["CRUX_HOTKEY_MODS"] = ",".join(mods)
+        vals["CRUX_HOTKEY_KEY"] = key
+        save_env_file(cfg.home, vals)
 
         hook_status = "skipped"
         if body.install_hook:
             hook_status = install_claude_hook(claude_settings_path(globally=True))
 
-        mods = body.chord_mods or None
-        key = body.chord_key or None
         write_snippets(cfg.home / "hotkey", mods, key)
         cfg.mark_configured()
         return {
             "ok": True,
             "hook": hook_status,
-            "chord": chord_label(mods or ["ctrl", "shift"], key or "space"),
-            "keys_saved": list(vals.keys()),
+            "chord": chord_label(mods, key),
+            "keys_saved": [k for k in vals if k.endswith("_API_KEY")],
         }
 
     class IngestIn(BaseModel):

@@ -183,6 +183,29 @@ def test_build_snippets_respects_chord():
     assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
 
 
+def test_pynput_hotkey_format():
+    from crux.hotkey import pynput_hotkey
+    assert pynput_hotkey(["ctrl", "shift"], "space") == "<ctrl>+<shift>+<space>"
+    assert pynput_hotkey(["cmd", "shift"], "k") == "<cmd>+<shift>+k"
+
+
+def test_setup_persists_chord_for_tray_app(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from fastapi.testclient import TestClient
+
+    from crux.config import Config
+    from crux.hotkey import pynput_hotkey
+    from crux.server import create_app
+    c = TestClient(create_app(Config.load()))
+    c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "k",
+                               "install_hook": False})
+    cfg = Config.load()  # reload from the saved config.env
+    assert cfg.hotkey_mods == ("ctrl", "shift") and cfg.hotkey_key == "k"
+    assert pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key) == "<ctrl>+<shift>+k"
+
+
 def test_first_run_setup_flow(tmp_path, monkeypatch):
     monkeypatch.setenv("CRUX_HOME", str(tmp_path))
     monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))

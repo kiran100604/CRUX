@@ -25,6 +25,18 @@ def chord_label(mods, key) -> str:
     return " + ".join([m.capitalize() for m in mods] + [key.capitalize()])
 
 
+# pynput GlobalHotKeys uses "<ctrl>+<shift>+<space>" style strings.
+_PYNPUT_MOD = {"ctrl": "<ctrl>", "shift": "<shift>", "alt": "<alt>", "cmd": "<cmd>", "win": "<cmd>"}
+
+
+def pynput_hotkey(mods, key) -> str:
+    mods = mods or DEFAULT_MODS
+    key = key or DEFAULT_KEY
+    parts = [_PYNPUT_MOD[m] for m in mods]
+    parts.append(f"<{key}>" if len(key) > 1 else key.lower())
+    return "+".join(parts)
+
+
 # macOS — Hammerspoon (https://www.hammerspoon.org). Copies the selection first,
 # then captures. hs.execute(..., true) runs through a login shell so `crux` is on PATH.
 _HAMMERSPOON_TMPL = """\

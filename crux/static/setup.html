@@ -59,6 +59,7 @@
     display:grid;place-items:center;margin:0 auto 22px}
   .done .tick svg{width:30px;height:30px;stroke:var(--green);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
   .done h1{margin-bottom:10px}
+  .mono{font-family:var(--mono); font-size:.92em; background:var(--soft); padding:1px 6px; border-radius:5px}
   .privacy{font-family:var(--mono); font-size:11px; color:var(--muted2); letter-spacing:.06em; text-align:center; margin-top:40px}
 </style>
 </head>
@@ -81,7 +82,7 @@ function buildPresets(plat){
   const p = plat==="darwin" ? "cmd" : "ctrl";
   const cap = m => m==="cmd"?"Cmd":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
   const mk = (mods,key)=>({mods,key,label:[...mods.map(cap),key.toUpperCase()].join(" + ")});
-  return [ mk([p,"shift"],"space"), mk([p,"shift"],"k"), mk([p,"shift"],"c"), mk(["alt"],"space") ];
+  return [ mk([p,"shift"],"space"), mk([p,"shift"],"k"), mk([p,"shift"],"j"), mk([p,"shift"],"period") ];
 }
 
 function form(){
@@ -106,7 +107,8 @@ function form(){
     <div class="step">
       <div class="n">Step 2 · Capture hotkey</div>
       <h2>Select text anywhere → press the chord → it's saved</h2>
-      <p>Pick the keyboard shortcut you want. We'll write the ready-to-use snippet for ${plat}.</p>
+      <p>Pick the keyboard shortcut you want. The hotkey is active whenever the
+        <b>CRUX tray app</b> is running (<span class="mono">crux app</span>).</p>
       <div class="chords" id="chords"></div>
       <div class="hint" id="chordhint"></div>
     </div>
@@ -141,10 +143,10 @@ function drawChords(){
 }
 function updateHint(){
   const c=presets[sel];
-  const tips={darwin:"Uses Hammerspoon or Raycast (snippet written to ~/.crux/hotkey).",
-    win32:"Uses AutoHotkey, or the built-in `crux app` tray (no extra install).",
-    linux:"Bind the script to this chord in your desktop's keyboard settings (needs xclip)."};
-  $("#chordhint").textContent = (tips[S.platform]||"")+`  Chosen: ${c.label}.`;
+  const tips={darwin:"The CRUX tray app registers this chord directly (needs Accessibility permission).",
+    win32:"The CRUX tray app registers this chord directly — no AutoHotkey needed.",
+    linux:"The CRUX tray app registers this chord directly (needs xclip for clipboard)."};
+  $("#chordhint").textContent = `Chosen: ${c.label}. ` + (tips[S.platform]||"");
 }
 
 async function apply(useDefaults){
@@ -167,8 +169,8 @@ function done(r){
       <h1>You're ready.</h1>
       <p class="lede" style="margin:0 auto 26px">
         Hotkey set to <b>${r.chord}</b>. Hook ${r.hook==="installed"?"installed":r.hook==="already-installed"?"already on":"skipped"}.
-        ${r.keys_saved&&r.keys_saved.length?"API keys saved — restart CRUX to use them.":"Running on offline models."}
-        Open the dashboard and capture your first decision.
+        ${r.keys_saved&&r.keys_saved.length?"API keys saved — restart CRUX to use them.":"Running on offline models."}<br>
+        To make the hotkey live, run <span class="mono">crux app</span> (the tray). Otherwise use the dashboard or <span class="mono">crux add</span>.
       </p>
       <button class="btn" id="open">Open dashboard →</button>
     </div>`;

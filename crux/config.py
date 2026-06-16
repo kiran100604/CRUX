@@ -7,6 +7,7 @@ home directory under ~/.crux. No config file format to maintain in v1.
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,6 +62,10 @@ class Config:
     host: str
     port: int
 
+    # Capture hotkey chosen in setup (modifiers + key), used by the tray app.
+    hotkey_mods: tuple[str, ...]
+    hotkey_key: str
+
     @staticmethod
     def load() -> "Config":
         home = _home()
@@ -79,6 +84,13 @@ class Config:
             openai_api_key=env.get("OPENAI_API_KEY"),
             host=env.get("CRUX_HOST", "127.0.0.1"),
             port=int(env.get("CRUX_PORT", "7432")),
+            hotkey_mods=tuple(
+                m for m in env.get(
+                    "CRUX_HOTKEY_MODS",
+                    "cmd,shift" if sys.platform == "darwin" else "ctrl,shift"
+                ).split(",") if m
+            ),
+            hotkey_key=env.get("CRUX_HOTKEY_KEY", "space"),
         )
 
     def ensure_home(self) -> None:

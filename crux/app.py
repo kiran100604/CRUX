@@ -18,11 +18,8 @@ import webbrowser
 
 from .cli import read_clipboard
 from .config import Config
+from .hotkey import chord_label, pynput_hotkey
 from .store import Store
-
-# pynput hotkey syntax; Cmd on macOS, Ctrl elsewhere
-HOTKEY = "<cmd>+<shift>+<space>" if sys.platform == "darwin" else "<ctrl>+<shift>+<space>"
-CHORD_LABEL = "Cmd+Shift+Space" if sys.platform == "darwin" else "Ctrl+Shift+Space"
 
 
 def _icon_image():
@@ -76,6 +73,9 @@ def run(open_dashboard: bool = True) -> None:
     base = f"http://{cfg.host}:{cfg.port}"
     # First launch → open the in-browser setup wizard; afterwards, the dashboard.
     url = base if cfg.is_configured() else f"{base}/setup"
+    # The capture chord the user chose in setup (falls back to the platform default).
+    hotkey = pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key)
+    chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
 
     # dashboard server in the background so "Open dashboard" always works
     def _serve():
@@ -97,7 +97,7 @@ def run(open_dashboard: bool = True) -> None:
     def on_hotkey() -> None:
         threading.Thread(target=_do_capture, args=(notify,), daemon=True).start()
 
-    hk = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
+    hk = keyboard.GlobalHotKeys({hotkey: on_hotkey})
     hk.start()
 
     def open_dash(*_): webbrowser.open(base)
@@ -114,5 +114,5 @@ def run(open_dashboard: bool = True) -> None:
     icon = pystray.Icon("crux", _icon_image(), "CRUX", menu)
     if open_dashboard:
         threading.Timer(1.2, open_first).start()
-    print(f"CRUX is running in your tray. Hotkey: {CHORD_LABEL}. Dashboard: {url}")
+    print(f"CRUX is running in your tray. Hotkey: {chord}. Dashboard: {base}")
     icon.run()  # blocks on the main thread (required on macOS)
