@@ -252,6 +252,42 @@ def cmd_popup(args):
     print(run_standalone(Config.load()))
 
 
+def cmd_keytest(args):
+    """Diagnose the global hotkey: prints every key pynput receives, and fires
+    when your configured chord is detected. If NOTHING prints as you type, the OS
+    is blocking low-level keyboard hooks (e.g. corporate security) — that's why
+    the hotkey can't work, and we'll need a different capture trigger."""
+    try:
+        from pynput import keyboard
+    except Exception as e:
+        raise SystemExit(f"pynput not installed ({e}). Run: pip install 'crux[app]'")
+    from .hotkey import chord_label, pynput_hotkey
+    cfg = Config.load()
+    hk = pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key)
+    chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
+    print(f"\nKey test. Your chord is {chord}  ({hk}).")
+    print("Type some keys, then try your chord. Ctrl+C to stop.\n")
+
+    fired = {"n": 0}
+    def on_chord():
+        fired["n"] += 1
+        print(f"  ✅ CHORD DETECTED  (#{fired['n']}) — the hotkey works!", flush=True)
+
+    g = keyboard.GlobalHotKeys({hk: on_chord})
+    g.start()
+
+    def on_press(key):
+        try:
+            print(f"  key: {key}", flush=True)
+        except Exception:
+            pass
+    with keyboard.Listener(on_press=on_press) as listener:
+        try:
+            listener.join()
+        except KeyboardInterrupt:
+            pass
+
+
 def cmd_hotkey(args):
     from .hotkey import run
     run(install=args.install, out_dir=Config.load().home / "hotkey")
@@ -350,6 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.set_defaults(func=cmd_app)
 
     sub.add_parser("popup", help="open the visible quick-capture box once (test the capture UI)").set_defaults(func=cmd_popup)
+    sub.add_parser("keytest", help="diagnose the global hotkey: print keys pynput sees + detect your chord").set_defaults(func=cmd_keytest)
     return p
 
 
