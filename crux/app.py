@@ -25,7 +25,7 @@ import webbrowser
 
 from .config import Config
 from .hotkey import chord_label, pynput_hotkey
-from .quickcapture import _save, flash_toast
+from .quickcapture import _save, build_popup, flash_toast
 
 
 def _icon_image():
@@ -97,30 +97,61 @@ def run(open_dashboard: bool = True) -> None:
     root = tk.Tk()
     root.withdraw()
 
-    def _read_clip() -> str:
-        """Fast clipboard read via tkinter (no PowerShell subprocess). GUI thread only."""
+    def _read_clip(label: str) -> str:
+        """Read the clipboard, logging exactly what happens. Tries tkinter first
+        (fast), then PowerShell as a fallback — and logs every failure."""
         try:
-            return root.clipboard_get()
-        except Exception:
+            v = root.clipboard_get()
+            print(f"[crux]   clip[{label}] via tk: {len(v)} chars {v[:40]!r}", flush=True)
+            return v
+        except Exception as e:
+            print(f"[crux]   clip[{label}] tk failed: {e!r}", flush=True)
+        try:
+            from .cli import read_clipboard
+            v = read_clipboard() or ""
+            print(f"[crux]   clip[{label}] via powershell: {len(v)} chars {v[:40]!r}", flush=True)
+            return v
+        except Exception as e:
+            print(f"[crux]   clip[{label}] powershell failed: {e!r}", flush=True)
             return ""
 
     def _save_and_flash(text: str) -> None:
         # worker thread: DB write can be slow, keep it off the GUI/hook threads
-        msg = _save(cfg, text)
-        print(f"[crux] {msg}", flush=True)
-        root.after(0, lambda: flash_toast(root, msg, ok=True))
+        try:
+            msg = _save(cfg, text)
+            print(f"[crux] saved → {msg}", flush=True)
+            root.after(0, lambda: flash_toast(root, msg, ok=True))
+        except Exception:
+            import traceback; traceback.print_exc()
+
+    def _popup_fallback(prefill: str) -> None:
+        """When auto-copy yields nothing usable, ALWAYS show a window so the user
+        gets feedback (never 'nothing happens'). They can edit/paste, Enter saves."""
+        print(f"[crux] opening capture popup (prefill {len(prefill)} chars)", flush=True)
+        def on_submit(val):
+            val = (val or "").strip()
+            if val:
+                threading.Thread(target=lambda: _save_and_flash(val), daemon=True).start()
+            else:
+                print("[crux] popup cancelled (empty)", flush=True)
+        build_popup(root, prefill, on_submit, lambda: print("[crux] popup cancelled", flush=True))
 
     def _do_capture() -> None:
-        # GUI thread: copy the selection, read the clipboard, capture if it changed
-        prev = _read_clip()
-        _copy_selection()                 # send Ctrl/Cmd+C (+0.15s settle)
-        cur = _read_clip()
-        if cur.strip() and cur != prev:
-            print(f"[crux] capturing {len(cur)} chars", flush=True)
-            threading.Thread(target=lambda: _save_and_flash(cur), daemon=True).start()
-        else:
-            print("[crux] nothing selected", flush=True)
-            flash_toast(root, "Select text first, then press the hotkey", ok=False)
+        try:
+            print("[crux] --- capture start ---", flush=True)
+            prev = _read_clip("before")
+            _copy_selection()                 # release modifiers + send Ctrl/Cmd+C
+            cur = _read_clip("after")
+            if cur.strip() and cur != prev:
+                print(f"[crux] selection copied ({len(cur)} chars) → capturing", flush=True)
+                threading.Thread(target=lambda: _save_and_flash(cur), daemon=True).start()
+            else:
+                # auto-copy didn't grab a fresh selection → fall back to the popup
+                # (prefilled with whatever IS on the clipboard) so capture still works.
+                print("[crux] no fresh selection copied → popup fallback", flush=True)
+                _popup_fallback(cur if cur.strip() else "")
+        except Exception:
+            import traceback; traceback.print_exc()
 
     def on_hotkey() -> None:
         # runs in the pynput hook thread — must return INSTANTLY or the whole
