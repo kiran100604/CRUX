@@ -135,11 +135,19 @@ def create_app(cfg: Config):
 
         write_snippets(cfg.home / "hotkey", mods, key)
         cfg.mark_configured()
+        # Linux: a changed chord must be re-bound at the compositor level or the
+        # old shortcut stays active. Auto-rebind so the new chord works immediately.
+        rebound = None
+        import sys as _sys
+        if _sys.platform == "linux":
+            from .hotkey import bind_gnome
+            rebound, _ = bind_gnome(mods, key, f"{_sys.executable} -m crux.cli capture")
         return {
             "ok": True,
             "hook": hook_status,
             "chord": chord_label(mods, key),
             "chord_rejected": (None if ok else reason),
+            "rebound": rebound,
             "keys_saved": [k for k in vals if k.endswith("_API_KEY")],
         }
 

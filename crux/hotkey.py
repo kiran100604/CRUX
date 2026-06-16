@@ -68,6 +68,39 @@ def gnome_binding(mods, key) -> str:
     return "".join(_GNOME_MOD[m] for m in mods) + key  # keysym name: space/k/period…
 
 
+def bind_gnome(mods, key, command: str) -> tuple[bool, str]:
+    """Register/update a GNOME custom shortcut → `command` for the given chord.
+    Returns (ok, info). Used by `crux bind` and auto-run after setup on Linux so a
+    changed chord takes effect immediately."""
+    import ast
+    import shutil
+    import subprocess
+    if sys.platform != "linux" or not shutil.which("gsettings"):
+        return False, "gsettings not available"
+    binding = gnome_binding(mods, key)
+    base = "org.gnome.settings-daemon.plugins.media-keys"
+    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/crux/"
+
+    def g(*a):
+        return subprocess.run(["gsettings", *a], capture_output=True, text=True)
+    try:
+        cur = g("get", base, "custom-keybindings").stdout.strip()
+        try:
+            lst = ast.literal_eval(cur) if cur.startswith("[") else []
+        except Exception:
+            lst = []
+        if path not in lst:
+            lst.append(path)
+        g("set", base, "custom-keybindings", str(lst))
+        child = f"{base}.custom-keybinding:{path}"
+        g("set", child, "name", "Capture to CRUX")
+        g("set", child, "command", command)
+        g("set", child, "binding", binding)
+        return True, binding
+    except Exception as e:  # pragma: no cover
+        return False, str(e)
+
+
 def pynput_hotkey(mods, key) -> str:
     mods = mods or DEFAULT_MODS
     key = key or DEFAULT_KEY

@@ -237,7 +237,11 @@ function done(r){
       <p class="lede" style="margin:0 auto 26px">
         Hotkey set to <b>${r.chord}</b>. Hook ${r.hook==="installed"?"installed":r.hook==="already-installed"?"already on":"skipped"}.
         ${r.keys_saved&&r.keys_saved.length?"API keys saved — restart CRUX to use them.":"Running on offline models."}<br>
-        To make the hotkey live, run <span class="mono">crux app</span> — and if it's already running, <b>restart it</b> so the new chord takes effect.
+        ${r.rebound===true
+          ? `<b>${r.chord}</b> is bound and live now — select text, Ctrl+C, press it.`
+          : r.rebound===false
+            ? `Run <span class="mono">crux bind</span> in a terminal to activate the shortcut.`
+            : `To make the hotkey live, run <span class="mono">crux app</span> — restart it if already running.`}
       </p>
       <button class="btn" id="open">Open dashboard →</button>
     </div>`;

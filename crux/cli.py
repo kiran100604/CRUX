@@ -282,39 +282,19 @@ def cmd_bind(args):
     """Register a GNOME custom shortcut → `crux capture`. This is the reliable
     capture path on Wayland (the compositor grabs the key, regardless of which
     app is focused — unlike an in-app hotkey)."""
-    import shutil
-    import subprocess
-    from .hotkey import chord_label, gnome_binding
+    from .hotkey import bind_gnome, chord_label
     cfg = Config.load()
     chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
-    binding = gnome_binding(cfg.hotkey_mods, cfg.hotkey_key)
     command = f"{sys.executable} -m crux.cli capture"
-    if not shutil.which("gsettings"):
-        print("gsettings not found (not GNOME). Bind manually:\n"
+    ok, info = bind_gnome(cfg.hotkey_mods, cfg.hotkey_key, command)
+    if ok:
+        print(f"✓ Bound {chord} → crux capture (GNOME).\n"
+              f"  Now: select text anywhere, Ctrl+C, press {chord}.\n"
+              f"  (Change it in Settings → Keyboard → Custom Shortcuts → 'Capture to CRUX'.)")
+    else:
+        print("Couldn't auto-bind (" + info + "). Bind manually:\n"
               "  Settings → Keyboard → Custom Shortcuts → +\n"
               f"  Command: {command}\n  Shortcut: {chord}")
-        return
-    base = "org.gnome.settings-daemon.plugins.media-keys"
-    path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/crux/"
-
-    def g(*a):
-        return subprocess.run(["gsettings", *a], capture_output=True, text=True)
-    import ast
-    cur = g("get", base, "custom-keybindings").stdout.strip()
-    try:
-        lst = ast.literal_eval(cur) if cur.startswith("[") else []
-    except Exception:
-        lst = []
-    if path not in lst:
-        lst.append(path)
-    g("set", base, "custom-keybindings", str(lst))
-    child = f"{base}.custom-keybinding:{path}"
-    g("set", child, "name", "Capture to CRUX")
-    g("set", child, "command", command)
-    g("set", child, "binding", binding)
-    print(f"✓ Bound {chord} → crux capture (GNOME).\n"
-          f"  Now: select text anywhere, Ctrl+C, press {chord}.\n"
-          f"  (Change it in Settings → Keyboard → Custom Shortcuts → 'Capture to CRUX'.)")
 
 
 def cmd_keytest(args):
