@@ -341,12 +341,27 @@ async function load(){
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
   state.stats=st; state.feed=fd.usages;
+  _sig=`${st.crystals}|${st.fluid}|${st.injections}`;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
   const need=state.inbox.length;
   const td=document.getElementById("t-dec"); td.textContent=need;
   document.querySelector('[data-v="decisions"]').classList.toggle("alert", (state.counts.conflict||0)>0);
   render();
 }
+// Auto-refresh: poll lightweight /stats; reload only when something changed, and
+// never while the user is typing/selecting (so it can't disrupt an edit).
+let _sig="";
+async function poll(){
+  if(document.hidden) return;
+  const ae=document.activeElement;
+  if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+  try{
+    const st=await api("/stats");
+    const sig=`${st.crystals}|${st.fluid}|${st.injections}`;
+    if(_sig && sig!==_sig) await load();
+  }catch(e){}
+}
+setInterval(poll, 5000);
 function setView(v){state.view=v;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
   render(); window.scrollTo(0,0);}

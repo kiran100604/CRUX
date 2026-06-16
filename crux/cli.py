@@ -50,20 +50,37 @@ def cmd_add(args):
     store.close()
 
 
+def _desktop_notify(msg: str) -> None:
+    """Best-effort desktop toast so a bound-shortcut capture gives visible feedback."""
+    import shutil
+    import subprocess
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["osascript", "-e",
+                            f'display notification "{msg}" with title "CRUX"'], timeout=3)
+        elif shutil.which("notify-send"):
+            subprocess.run(["notify-send", "-t", "2500", "CRUX", msg], timeout=3)
+    except Exception:
+        pass
+
+
 def cmd_capture(args):
     """Hotkey entrypoint: grab the clipboard and capture it. Bind a global
     shortcut to `crux capture` (see README for Raycast/Hammerspoon snippets)."""
     store = _store()
     text = read_clipboard()
     if not text or not text.strip():
+        _desktop_notify("Clipboard empty — copy text first")
         print("clipboard is empty — nothing to capture")
         store.close(); return
     if len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines()):
         res = store.ingest(text, source_type="paste", source_ref="clipboard")
-        print(f"✓ captured clipboard → {len(res['facts'])} fact(s) staged for review")
+        msg = f"Captured → {len(res['facts'])} fact(s) for review"
     else:
         item = store.capture(text, source_type="hotkey")
-        print(f"✓ captured: {item.title}  (id={item.id[:8]})")
+        msg = f"Captured: {item.title[:60]}"
+    print("✓ " + msg)
+    _desktop_notify(msg)
     store.close()
 
 
