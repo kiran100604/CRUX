@@ -23,6 +23,19 @@ stop re-explaining context and agents stop contradicting decisions you already m
 - **Runs fully offline by default** (deterministic fake embedding/enrichment), so
   you can wire and test the whole loop before adding any API key.
 
+## Install in one line
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bell-jj7bqr/install/install.sh | bash
+```
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bell-jj7bqr/install/install.ps1 | iex
+```
+This installs CRUX with the tray app, puts `crux` on your PATH, and configures it
+offline. To wire API keys up front, set `CRUX_ANTHROPIC_KEY` / `CRUX_OPENAI_KEY`
+(env vars) before running. Then open a new terminal and run `crux serve`.
+
 ## Quickstart (offline, zero keys)
 ```bash
 pip install -e .

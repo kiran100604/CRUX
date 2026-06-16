@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -213,7 +214,9 @@ def cmd_install_hook(args):
 
 def cmd_setup(args):
     from .setup_wizard import run
-    run()
+    run(non_interactive=args.yes,
+        anthropic_key=args.anthropic_key or os.environ.get("ANTHROPIC_API_KEY"),
+        openai_key=args.openai_key or os.environ.get("OPENAI_API_KEY"))
 
 
 def cmd_ctx(args):
@@ -310,7 +313,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("status").set_defaults(func=cmd_status)
 
-    sub.add_parser("setup", help="one-command guided setup (keys, hook, hotkey)").set_defaults(func=cmd_setup)
+    se = sub.add_parser("setup", help="one-command guided setup (keys, hook, hotkey)")
+    se.add_argument("--yes", "-y", action="store_true",
+                    help="non-interactive: apply recommended defaults, never prompt (for installers)")
+    se.add_argument("--anthropic-key", default=None, help="set Anthropic key without prompting")
+    se.add_argument("--openai-key", default=None, help="set OpenAI key without prompting")
+    se.set_defaults(func=cmd_setup)
 
     cx = sub.add_parser("ctx", help="print relevant context for a task (paste into any tool)")
     cx.add_argument("task"); cx.add_argument("--limit", type=int, default=5)

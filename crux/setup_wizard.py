@@ -16,7 +16,12 @@ def _ask(prompt: str, default_yes: bool = True) -> bool:
     return ans.startswith("y")
 
 
-def run() -> None:
+def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
+        openai_key: str | None = None, install_hook: bool = True,
+        write_hotkey: bool = True) -> None:
+    """Configure CRUX. In --yes/non-interactive mode it never prompts: it uses
+    the keys passed in (or leaves you on offline models) and applies the
+    recommended defaults, so an installer script can run it unattended."""
     cfg = Config.load()
     cfg.ensure_home()
     print("\n  CRUX setup — local-first, your data stays on this machine.\n")
@@ -24,13 +29,16 @@ def run() -> None:
 
     # 1. API keys (optional — everything works offline without them, just rougher)
     print("1) API keys make titles, search, and contradiction-checks much sharper.")
-    print("   Press Enter to skip any (CRUX still works offline).")
+    if non_interactive:
+        ak, ok = (anthropic_key or "").strip(), (openai_key or "").strip()
+    else:
+        print("   Press Enter to skip any (CRUX still works offline).")
+        ak = input("   Anthropic API key: ").strip()
+        ok = input("   OpenAI API key (for embeddings): ").strip()
     vals: dict[str, str] = {}
-    ak = input("   Anthropic API key: ").strip()
     if ak:
         vals["ANTHROPIC_API_KEY"] = ak
         vals["CRUX_PROCESSING_PROVIDER"] = "anthropic"
-    ok = input("   OpenAI API key (for embeddings): ").strip()
     if ok:
         vals["OPENAI_API_KEY"] = ok
         vals["CRUX_EMBEDDING_PROVIDER"] = "openai"
@@ -42,7 +50,7 @@ def run() -> None:
 
     # 2. Claude Code hook (global = works in every project automatically)
     print("2) Auto-inject context into Claude Code on every prompt.")
-    if _ask("   Install the hook globally (recommended)?"):
+    if install_hook if non_interactive else _ask("   Install the hook globally (recommended)?"):
         status = install_claude_hook(claude_settings_path(globally=True))
         print("   ✓ " + ("already installed" if status == "already-installed"
                           else "installed in ~/.claude/settings.json") + "\n")
@@ -51,7 +59,7 @@ def run() -> None:
 
     # 3. Capture hotkey snippets
     print("3) Global capture hotkey (select text anywhere → capture).")
-    if _ask("   Write the hotkey snippets for your OS?"):
+    if write_hotkey if non_interactive else _ask("   Write the hotkey snippets for your OS?"):
         from .hotkey import run as hotkey_run
         print()
         hotkey_run(install=True, out_dir=cfg.home / "hotkey")
