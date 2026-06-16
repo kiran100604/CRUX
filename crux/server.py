@@ -31,7 +31,7 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
 def create_app(cfg: Config):
     try:
         from fastapi import FastAPI
-        from fastapi.responses import FileResponse
+        from fastapi.responses import FileResponse, RedirectResponse
         from pydantic import BaseModel
     except ImportError as e:  # pragma: no cover
         raise SystemExit("FastAPI not installed. Run: pip install 'crux[server]'") from e
@@ -68,7 +68,73 @@ def create_app(cfg: Config):
 
     @app.get("/")
     def index():
+        # First run → send people through the in-browser setup wizard.
+        if not cfg.is_configured():
+            return RedirectResponse("/setup")
         return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/setup")
+    def setup_page():
+        return FileResponse(STATIC_DIR / "setup.html")
+
+    class SetupIn(BaseModel):
+        anthropic_key: str | None = None
+        openai_key: str | None = None
+        install_hook: bool = True
+        chord_mods: list[str] | None = None
+        chord_key: str | None = None
+
+    @app.get("/api/setup")
+    def setup_state():
+        import sys as _sys
+        from .install import claude_settings_path, hook_present
+        plat = "linux" if _sys.platform.startswith("linux") else _sys.platform
+        try:
+            import json as _json
+            sp = claude_settings_path(globally=True)
+            hook = hook_present(_json.loads(sp.read_text(encoding="utf-8"))) if sp.exists() else False
+        except Exception:
+            hook = False
+        return {
+            "platform": plat,
+            "configured": cfg.is_configured(),
+            "has_anthropic": bool(cfg.anthropic_api_key),
+            "has_openai": bool(cfg.openai_api_key),
+            "hook_installed": hook,
+            "default_mods": ["cmd" if plat == "darwin" else "ctrl", "shift"],
+            "default_key": "space",
+        }
+
+    @app.post("/api/setup")
+    def setup_apply(body: SetupIn):
+        from .config import save_env_file
+        from .hotkey import chord_label, write_snippets
+        from .install import claude_settings_path, install_claude_hook
+
+        vals: dict[str, str] = {}
+        if body.anthropic_key:
+            vals["ANTHROPIC_API_KEY"] = body.anthropic_key.strip()
+            vals["CRUX_PROCESSING_PROVIDER"] = "anthropic"
+        if body.openai_key:
+            vals["OPENAI_API_KEY"] = body.openai_key.strip()
+            vals["CRUX_EMBEDDING_PROVIDER"] = "openai"
+        if vals:
+            save_env_file(cfg.home, vals)
+
+        hook_status = "skipped"
+        if body.install_hook:
+            hook_status = install_claude_hook(claude_settings_path(globally=True))
+
+        mods = body.chord_mods or None
+        key = body.chord_key or None
+        write_snippets(cfg.home / "hotkey", mods, key)
+        cfg.mark_configured()
+        return {
+            "ok": True,
+            "hook": hook_status,
+            "chord": chord_label(mods or ["ctrl", "shift"], key or "space"),
+            "keys_saved": list(vals.keys()),
+        }
 
     class IngestIn(BaseModel):
         content: str

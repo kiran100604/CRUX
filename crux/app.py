@@ -73,7 +73,9 @@ def run(open_dashboard: bool = True) -> None:
 
     cfg = Config.load()
     cfg.ensure_home()
-    url = f"http://{cfg.host}:{cfg.port}"
+    base = f"http://{cfg.host}:{cfg.port}"
+    # First launch → open the in-browser setup wizard; afterwards, the dashboard.
+    url = base if cfg.is_configured() else f"{base}/setup"
 
     # dashboard server in the background so "Open dashboard" always works
     def _serve():
@@ -98,7 +100,8 @@ def run(open_dashboard: bool = True) -> None:
     hk = keyboard.GlobalHotKeys({HOTKEY: on_hotkey})
     hk.start()
 
-    def open_dash(*_): webbrowser.open(url)
+    def open_dash(*_): webbrowser.open(base)
+    def open_first(*_): webbrowser.open(url)
     def capture_now(*_): on_hotkey()
     def quit_app(*_):
         hk.stop(); icon.stop()
@@ -110,6 +113,6 @@ def run(open_dashboard: bool = True) -> None:
     )
     icon = pystray.Icon("crux", _icon_image(), "CRUX", menu)
     if open_dashboard:
-        threading.Timer(1.2, open_dash).start()
+        threading.Timer(1.2, open_first).start()
     print(f"CRUX is running in your tray. Hotkey: {CHORD_LABEL}. Dashboard: {url}")
     icon.run()  # blocks on the main thread (required on macOS)

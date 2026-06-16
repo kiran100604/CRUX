@@ -12,15 +12,26 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+DEFAULT_MODS = ["ctrl", "shift"]
+DEFAULT_KEY = "space"
 DEFAULT_CHORD = "Cmd/Ctrl + Shift + Space"
+
+# AutoHotkey v1 modifier symbols and Hammerspoon modifier names.
+_AHK_MOD = {"ctrl": "^", "shift": "+", "alt": "!", "cmd": "#", "win": "#"}
+_HS_MOD = {"ctrl": "ctrl", "shift": "shift", "alt": "alt", "cmd": "cmd", "win": "cmd"}
+
+
+def chord_label(mods, key) -> str:
+    return " + ".join([m.capitalize() for m in mods] + [key.capitalize()])
+
 
 # macOS — Hammerspoon (https://www.hammerspoon.org). Copies the selection first,
 # then captures. hs.execute(..., true) runs through a login shell so `crux` is on PATH.
-HAMMERSPOON = """\
--- CRUX quick capture — select text anywhere, press Cmd+Shift+Space.
+_HAMMERSPOON_TMPL = """\
+-- CRUX quick capture — select text anywhere, press {label}.
 -- Put this in ~/.hammerspoon/init.lua (or: require it), then reload Hammerspoon.
-hs.hotkey.bind({"cmd", "shift"}, "space", function()
-  hs.eventtap.keyStroke({"cmd"}, "c")           -- copy current selection
+hs.hotkey.bind({{{mods}}}, "{key}", function()
+  hs.eventtap.keyStroke({{"cmd"}}, "c")          -- copy current selection
   hs.timer.doAfter(0.15, function()
     local out, ok = hs.execute("crux capture", true)
     hs.alert.show(ok and "✓ Captured to CRUX" or "CRUX capture failed")
@@ -41,15 +52,30 @@ crux capture
 """
 
 # Windows — AutoHotkey v1 (https://autohotkey.com). Double-click the .ahk to run.
-AUTOHOTKEY = """\
-; CRUX quick capture — select text, press Ctrl+Shift+Space.
-^+Space::
+_AUTOHOTKEY_TMPL = """\
+; CRUX quick capture — select text, press {label}.
+{chord}::
 Send, ^c
 Sleep, 150
 RunWait, crux capture,, Hide
 TrayTip, CRUX, Captured to CRUX, 1
 return
 """
+
+
+def build_snippets(mods=None, key=None) -> dict[str, str]:
+    """Build the per-platform hotkey snippets for a chosen chord."""
+    mods = mods or DEFAULT_MODS
+    key = key or DEFAULT_KEY
+    label = chord_label(mods, key)
+    hs_mods = ", ".join(f'"{_HS_MOD[m]}"' for m in mods)
+    ahk_chord = "".join(_AHK_MOD[m] for m in mods) + (key.capitalize() if len(key) > 1 else key)
+    return {
+        "hammerspoon.lua": _HAMMERSPOON_TMPL.format(label=label, mods=hs_mods, key=key),
+        "raycast-capture.sh": RAYCAST,
+        "crux-capture.ahk": _AUTOHOTKEY_TMPL.format(label=label, chord=ahk_chord),
+        "linux-capture.sh": LINUX,
+    }
 
 # Linux — grabs the X PRIMARY selection (highlighted text) or clipboard, no Ctrl+C
 # needed. Bind it to a key via your DE (GNOME: Settings → Keyboard → Custom Shortcuts)
@@ -62,12 +88,7 @@ sel="$(xclip -o -selection primary 2>/dev/null)"
 [ -n "$sel" ] && printf '%s' "$sel" | crux add
 """
 
-SNIPPETS = {
-    "hammerspoon.lua": HAMMERSPOON,
-    "raycast-capture.sh": RAYCAST,
-    "crux-capture.ahk": AUTOHOTKEY,
-    "linux-capture.sh": LINUX,
-}
+SNIPPETS = build_snippets()  # default chord; for back-compat / `crux hotkey`
 
 _INSTRUCTIONS = {
     "darwin": (
@@ -99,15 +120,20 @@ def _platform() -> str:
     return sys.platform  # darwin | win32 | other
 
 
-def run(install: bool, out_dir: Path) -> None:
+def write_snippets(out_dir: Path, mods=None, key=None) -> None:
+    """Write the per-platform snippets for a chord (used by the UI setup too)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, body in build_snippets(mods, key).items():
+        p = out_dir / name
+        p.write_text(body, encoding="utf-8")
+        if name.endswith(".sh"):
+            p.chmod(0o755)
+
+
+def run(install: bool, out_dir: Path, mods=None, key=None) -> None:
     plat = _platform()
     if install:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        for name, body in SNIPPETS.items():
-            p = out_dir / name
-            p.write_text(body, encoding="utf-8")
-            if name.endswith(".sh"):
-                p.chmod(0o755)
+        write_snippets(out_dir, mods, key)
         print(f"✓ wrote hotkey snippets to {out_dir}\n")
     else:
         print("Hotkey snippets (run `crux hotkey --install` to write them out):\n")

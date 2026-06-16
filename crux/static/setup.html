@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>CRUX — Setup</title>
+<style>
+  :root{
+    --canvas:#fdf8ec; --soft:#f4ecd8; --card:#fffdf7; --hair:#d6ccb2;
+    --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f; --on:#fff;
+    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb; --green:#15833f;
+    --r:14px; --pill:9999px;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--canvas); color:var(--body); font-family:var(--sans); font-size:16px;
+    -webkit-font-smoothing:antialiased; display:flex; align-items:flex-start; justify-content:center}
+  .wrap{width:100%; max-width:680px; padding:48px 24px 80px}
+  .brand{display:flex; align-items:center; gap:11px; margin-bottom:34px}
+  .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--ink)}
+  .logo svg{width:20px;height:20px}
+  .name{font-weight:700; letter-spacing:.16em; font-size:15px; color:var(--ink)}
+  .sub{font-size:9px; letter-spacing:.22em; color:var(--muted2); margin-top:1px}
+  .kicker{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted2); margin-bottom:14px}
+  h1{font-size:38px; font-weight:600; letter-spacing:-.02em; color:var(--ink); margin:0 0 12px; line-height:1.1}
+  .lede{font-size:17px; color:var(--muted); line-height:1.55; margin:0 0 36px; max-width:560px}
+  .step{background:var(--card); border:1px solid var(--hair); border-radius:var(--r); padding:24px 26px; margin-bottom:18px}
+  .step .n{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--teal); margin-bottom:8px}
+  .step h2{font-size:19px; font-weight:600; color:var(--ink); margin:0 0 6px; letter-spacing:-.01em}
+  .step p{font-size:14px; color:var(--muted); line-height:1.55; margin:0 0 16px}
+  label.field{display:block; margin-bottom:12px}
+  label.field span{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+  input[type=text],input[type=password]{width:100%; height:46px; border:1px solid var(--hair); background:var(--canvas);
+    border-radius:10px; padding:0 15px; font-size:15px; color:var(--ink); outline:none; font-family:var(--mono)}
+  input:focus{border-color:var(--ink)}
+  .chords{display:flex; flex-wrap:wrap; gap:10px}
+  .chord{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:10px;
+    padding:11px 15px; font-family:var(--mono); font-size:13px; cursor:pointer; transition:.12s}
+  .chord:hover{border-color:var(--muted2)}
+  .chord.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .toggle{display:flex; align-items:center; gap:12px; cursor:pointer}
+  .switch{width:44px; height:26px; border-radius:var(--pill); background:var(--strong,#e3d9bf); position:relative; transition:.18s; flex:none; border:1px solid var(--hair)}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.18s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .toggle.on .switch{background:var(--green); border-color:var(--green)}
+  .toggle.on .switch::after{transform:translateX(18px)}
+  .toggle .lbl{font-size:14px; color:var(--ink); font-weight:500}
+  .toggle .lbl small{display:block; color:var(--muted); font-weight:400; font-size:12.5px; margin-top:2px}
+  .hint{font-size:12.5px; color:var(--muted2); margin-top:12px; line-height:1.5}
+  .go{margin-top:26px; display:flex; align-items:center; gap:16px}
+  .btn{border:none; border-radius:12px; font-size:15px; font-weight:600; padding:0 26px; height:50px;
+    background:var(--ink); color:#fff; cursor:pointer; display:inline-flex; align-items:center; gap:9px}
+  .btn:hover{filter:brightness(1.2)} .btn:disabled{opacity:.5; cursor:default}
+  .skip{font-size:14px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; cursor:pointer}
+  .done{text-align:center; padding:40px 0}
+  .done .tick{width:64px;height:64px;border-radius:50%;background:var(--teal-bg);border:1px solid var(--teal-line);
+    display:grid;place-items:center;margin:0 auto 22px}
+  .done .tick svg{width:30px;height:30px;stroke:var(--green);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .done h1{margin-bottom:10px}
+  .privacy{font-family:var(--mono); font-size:11px; color:var(--muted2); letter-spacing:.06em; text-align:center; margin-top:40px}
+</style>
+</head>
+<body>
+<div class="wrap" id="root">
+  <div class="brand">
+    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z" stroke="#fdf8ec" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="#fdf8ec"/></svg></span>
+    <div><div class="name">CRUX</div><div class="sub">CONTEXT BRAIN</div></div>
+  </div>
+  <div id="body"></div>
+  <div class="privacy">LOCAL-FIRST · YOUR DATA NEVER LEAVES THIS MACHINE</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const post=(u,b)=>fetch(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json());
+let S={}, sel=0, hook=true, presets=[];
+
+function buildPresets(plat){
+  const p = plat==="darwin" ? "cmd" : "ctrl";
+  const cap = m => m==="cmd"?"Cmd":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
+  const mk = (mods,key)=>({mods,key,label:[...mods.map(cap),key.toUpperCase()].join(" + ")});
+  return [ mk([p,"shift"],"space"), mk([p,"shift"],"k"), mk([p,"shift"],"c"), mk(["alt"],"space") ];
+}
+
+function form(){
+  const plat = S.platform==="darwin"?"macOS":S.platform==="win32"?"Windows":"Linux";
+  $("#body").innerHTML = `
+    <div class="kicker">First-time setup · about 30 seconds</div>
+    <h1>Welcome to CRUX.</h1>
+    <p class="lede">A local memory for your AI coding agents. Capture decisions once; CRUX
+      injects the right ones into Claude Code automatically. Let's wire it up — everything
+      here is optional and stays on this ${plat} machine.</p>
+
+    <div class="step">
+      <div class="n">Step 1 · API keys (optional)</div>
+      <h2>Sharper titles & search</h2>
+      <p>Skip both to run fully offline — CRUX still works, just rougher. You can add these later.</p>
+      <label class="field"><span>Anthropic API key</span>
+        <input id="ak" type="password" placeholder="${S.has_anthropic?'• already set — leave blank to keep':'sk-ant-…'}" autocomplete="off"></label>
+      <label class="field"><span>OpenAI API key (embeddings)</span>
+        <input id="ok" type="password" placeholder="${S.has_openai?'• already set — leave blank to keep':'sk-…'}" autocomplete="off"></label>
+    </div>
+
+    <div class="step">
+      <div class="n">Step 2 · Capture hotkey</div>
+      <h2>Select text anywhere → press the chord → it's saved</h2>
+      <p>Pick the keyboard shortcut you want. We'll write the ready-to-use snippet for ${plat}.</p>
+      <div class="chords" id="chords"></div>
+      <div class="hint" id="chordhint"></div>
+    </div>
+
+    <div class="step">
+      <div class="n">Step 3 · Claude Code</div>
+      <h2>Auto-inject context on every prompt</h2>
+      <p>Adds a global hook so Claude Code pulls your verified knowledge automatically — no tool calls needed.</p>
+      <div class="toggle ${hook?'on':''}" id="hooktoggle">
+        <div class="switch"></div>
+        <div class="lbl">Install the Claude Code hook${S.hook_installed?' <small>already installed — keeping it</small>':''}
+          ${S.hook_installed?'':'<small>Recommended. Writes to ~/.claude/settings.json</small>'}</div>
+      </div>
+    </div>
+
+    <div class="go">
+      <button class="btn" id="finish">Finish setup →</button>
+      <span class="skip" id="skip">Skip — use defaults</span>
+    </div>`;
+  drawChords();
+  $("#hooktoggle").onclick=()=>{hook=!hook; $("#hooktoggle").classList.toggle("on",hook);};
+  $("#finish").onclick=()=>apply(false);
+  $("#skip").onclick=()=>apply(true);
+}
+
+function drawChords(){
+  $("#chords").innerHTML = presets.map((c,i)=>
+    `<button class="chord ${i===sel?'on':''}" data-i="${i}">${c.label}</button>`).join("");
+  $("#chords").querySelectorAll(".chord").forEach(b=>b.onclick=()=>{
+    sel=+b.dataset.i; drawChords(); updateHint();});
+  updateHint();
+}
+function updateHint(){
+  const c=presets[sel];
+  const tips={darwin:"Uses Hammerspoon or Raycast (snippet written to ~/.crux/hotkey).",
+    win32:"Uses AutoHotkey, or the built-in `crux app` tray (no extra install).",
+    linux:"Bind the script to this chord in your desktop's keyboard settings (needs xclip)."};
+  $("#chordhint").textContent = (tips[S.platform]||"")+`  Chosen: ${c.label}.`;
+}
+
+async function apply(useDefaults){
+  $("#finish").disabled=true; $("#finish").textContent="Saving…";
+  const c=presets[sel];
+  const payload = useDefaults ? {install_hook:true} : {
+    anthropic_key: $("#ak").value || null,
+    openai_key: $("#ok").value || null,
+    install_hook: hook,
+    chord_mods: c.mods, chord_key: c.key,
+  };
+  const r = await post("/api/setup", payload);
+  done(r);
+}
+
+function done(r){
+  $("#body").innerHTML = `
+    <div class="done">
+      <div class="tick"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <h1>You're ready.</h1>
+      <p class="lede" style="margin:0 auto 26px">
+        Hotkey set to <b>${r.chord}</b>. Hook ${r.hook==="installed"?"installed":r.hook==="already-installed"?"already on":"skipped"}.
+        ${r.keys_saved&&r.keys_saved.length?"API keys saved — restart CRUX to use them.":"Running on offline models."}
+        Open the dashboard and capture your first decision.
+      </p>
+      <button class="btn" id="open">Open dashboard →</button>
+    </div>`;
+  $("#open").onclick=()=>location.href="/";
+}
+
+(async()=>{
+  S = await fetch("/api/setup").then(r=>r.json());
+  presets = buildPresets(S.platform);
+  form();
+})();
+</script>
+</body>
+</html>

@@ -51,10 +51,14 @@ crux status
 ## The app (simplest experience)
 ```bash
 pip install -e ".[app]"
-crux setup     # one-time: keys + global hook + hotkey
 crux app       # runs in your tray; owns the global hotkey; opens the dashboard
 ```
-With `crux app` running: **select text in any app → Cmd/Ctrl+Shift+Space → it's in CRUX.**
+On **first launch** the app opens an in-browser setup wizard — pick your capture
+hotkey, optionally paste API keys, toggle the Claude Code hook, click **Finish**.
+No terminal setup needed. (You can also run the wizard any time at
+`http://127.0.0.1:7432/setup`, or use the terminal flow `crux setup`.)
+
+With `crux app` running: **select text in any app → your chosen chord → it's in CRUX.**
 No manual key binding. (macOS needs Accessibility permission for the global hotkey.)
 
 ## One-command setup

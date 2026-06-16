@@ -6,12 +6,12 @@
 <title>CRUX</title>
 <style>
   :root{
-    --canvas:#fffaf0; --soft:#faf5e8; --card:#f5f0e0; --strong:#ebe6d6; --hair:#e5e5e5;
-    --ink:#0a0a0a; --body:#3a3a3a; --muted:#6a6a6a; --muted2:#9a9a9a; --on:#fff;
-    --teal:#1a3a3a; --teal-bg:#e8f0ee; --teal-line:#cfe0db;
-    --peach:#c2682a; --peach-bg:#fff1e6; --peach-line:#f3d8c2;
-    --coral:#d6402e; --coral-bg:#ffece9; --coral-line:#f6cfc8;
-    --green:#1f9d57;
+    --canvas:#fdf8ec; --soft:#f4ecd8; --card:#efe6d0; --strong:#e3d9bf; --hair:#d6ccb2;
+    --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f; --on:#fff;
+    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb;
+    --peach:#a8541d; --peach-bg:#fbead8; --peach-line:#eccba9;
+    --coral:#bf3422; --coral-bg:#fbe2dc; --coral-line:#eebcb1;
+    --green:#15833f;
     --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --pill:9999px;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
     --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -37,7 +37,9 @@
   .brand .sub{font-size:9px; letter-spacing:.22em; color:var(--muted2); margin-top:1px}
   .tabs{display:flex; gap:4px}
   .tab{border:none; background:none; color:var(--muted); font-size:14px; font-weight:500;
-    padding:8px 14px; border-radius:var(--pill); display:flex; align-items:center; gap:8px}
+    padding:8px 14px; border-radius:var(--pill); display:flex; align-items:center; gap:7px}
+  .tab svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round; flex:none}
   .tab:hover{color:var(--ink)}
   .tab.on{background:var(--ink); color:var(--on)}
   .tab .badge{font-family:var(--mono); font-size:11px; background:rgba(0,0,0,.08); color:var(--muted);
@@ -212,10 +214,10 @@
     <div><div class="name">CRUX</div><div class="sub">CONTEXT BRAIN</div></div>
   </div>
   <div class="tabs" id="tabs">
-    <button class="tab on" data-v="overview">◵ Overview</button>
-    <button class="tab" data-v="kb">▢ Knowledge Base <span class="badge" id="t-kb">0</span></button>
-    <button class="tab" data-v="decisions">☑ Review <span class="badge" id="t-dec">0</span></button>
-    <button class="tab" data-v="activity">⚡ Activity</button>
+    <button class="tab on" data-v="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Overview</button>
+    <button class="tab" data-v="kb"><svg viewBox="0 0 24 24"><path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5 12 21l9-4.5"/></svg> Knowledge Base <span class="badge" id="t-kb">0</span></button>
+    <button class="tab" data-v="decisions"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Review <span class="badge" id="t-dec">0</span></button>
+    <button class="tab" data-v="activity"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z"/></svg> Activity</button>
   </div>
   <div class="navright">
     <span class="status">Local · <b>READY</b></span>

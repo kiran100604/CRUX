@@ -174,6 +174,38 @@ def test_hook_inject_is_crash_safe(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "{}"
 
 
+def test_build_snippets_respects_chord():
+    from crux import hotkey
+    snaps = hotkey.build_snippets(["ctrl", "shift"], "k")
+    assert "^+k::" in snaps["crux-capture.ahk"]
+    snaps2 = hotkey.build_snippets(["cmd", "shift"], "space")
+    assert '"cmd", "shift"' in snaps2["hammerspoon.lua"]
+    assert hotkey.chord_label(["ctrl", "shift"], "space") == "Ctrl + Shift + Space"
+
+
+def test_first_run_setup_flow(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    # don't touch the real ~/.claude during tests
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from fastapi.testclient import TestClient
+
+    from crux.config import Config
+    from crux.server import create_app
+    c = TestClient(create_app(Config.load()))
+    # first run redirects to the wizard
+    assert c.get("/", follow_redirects=False).status_code == 307
+    assert c.get("/setup").status_code == 200
+    assert c.get("/api/setup").json()["configured"] is False
+    r = c.post("/api/setup", json={"chord_mods": ["ctrl", "shift"], "chord_key": "k",
+                                   "install_hook": False}).json()
+    assert r["ok"] and r["chord"] == "Ctrl + Shift + K"
+    # now configured → dashboard serves directly
+    assert c.get("/", follow_redirects=False).status_code == 200
+    assert c.get("/api/setup").json()["configured"] is True
+    assert (tmp_path / "hotkey" / "crux-capture.ahk").exists()
+
+
 def test_hotkey_snippets_written_as_utf8(tmp_path):
     # Regression: on Windows (cp1252) writing the '✓'-containing snippets crashed.
     from crux import hotkey

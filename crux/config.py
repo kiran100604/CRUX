@@ -84,3 +84,15 @@ class Config:
     def ensure_home(self) -> None:
         self.home.mkdir(parents=True, exist_ok=True)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def marker_path(self) -> Path:
+        """Flag file written once first-run setup completes (via UI or wizard)."""
+        return self.home / ".configured"
+
+    def is_configured(self) -> bool:
+        return self.marker_path.exists()
+
+    def mark_configured(self) -> None:
+        self.ensure_home()
+        self.marker_path.write_text("ok", encoding="utf-8")
