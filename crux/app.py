@@ -50,16 +50,13 @@ def _warn_wayland(chord: str) -> None:
     if sys.platform != "linux" or not _is_wayland():
         return
     print(
-        "\n[crux] ⚠ Wayland detected. Wayland blocks apps from capturing global\n"
-        "       hotkeys, so the in-app hotkey above probably WON'T fire, and\n"
-        "       auto-copy won't work either.\n"
-        "       Reliable fix — bind a shortcut in your OS instead:\n"
-        "         GNOME → Settings → Keyboard → Custom Shortcuts → +\n"
-        "           Name:    Capture to CRUX\n"
-        "           Command: crux capture\n"
-        f"           Shortcut: {chord}\n"
-        "       Then: select text, Ctrl+C, press your shortcut. (Or switch your\n"
-        "       login session to 'Xorg' where the in-app hotkey works.)\n",
+        "\n[crux] ⚠ Wayland detected. Two notes:\n"
+        "       1. Auto-copy is blocked on Wayland — so COPY FIRST (Ctrl+C), then\n"
+        "          press the hotkey. CRUX captures whatever you copied.\n"
+        "       2. The in-app hotkey may or may not fire depending on your setup.\n"
+        "          If it doesn't, bind it in the OS instead (works reliably):\n"
+        "            GNOME → Settings → Keyboard → Custom Shortcuts → +\n"
+        "            Command: crux capture     Shortcut: " + chord + "\n",
         flush=True)
 
 
@@ -123,23 +120,30 @@ def run(open_dashboard: bool = True) -> None:
     root = tk.Tk()
     root.withdraw()
 
+    def _read_clip_native() -> str:
+        from .cli import read_clipboard       # wl-paste / xclip / xsel / pbpaste
+        return read_clipboard() or ""
+
+    def _read_clip_tk() -> str:
+        return root.clipboard_get()
+
     def _read_clip(label: str) -> str:
-        """Read the clipboard, logging exactly what happens. Tries tkinter first
-        (fast), then PowerShell as a fallback — and logs every failure."""
-        try:
-            v = root.clipboard_get()
-            print(f"[crux]   clip[{label}] via tk: {len(v)} chars {v[:40]!r}", flush=True)
-            return v
-        except Exception as e:
-            print(f"[crux]   clip[{label}] tk failed: {e!r}", flush=True)
-        try:
-            from .cli import read_clipboard
-            v = read_clipboard() or ""
-            print(f"[crux]   clip[{label}] via powershell: {len(v)} chars {v[:40]!r}", flush=True)
-            return v
-        except Exception as e:
-            print(f"[crux]   clip[{label}] powershell failed: {e!r}", flush=True)
-            return ""
+        """Read the clipboard, logging exactly what happens. On Linux prefer the
+        native tool (wl-paste reads the real Wayland clipboard; tkinter only sees
+        the XWayland one, which can be stale). Elsewhere prefer tkinter (fast)."""
+        order = ([("native", _read_clip_native), ("tk", _read_clip_tk)]
+                 if sys.platform == "linux"
+                 else [("tk", _read_clip_tk), ("native", _read_clip_native)])
+        for name, fn in order:
+            try:
+                v = fn() or ""
+                if v:
+                    print(f"[crux]   clip[{label}] via {name}: {len(v)} chars {v[:40]!r}", flush=True)
+                    return v
+            except Exception as e:
+                print(f"[crux]   clip[{label}] {name} failed: {e!r}", flush=True)
+        print(f"[crux]   clip[{label}] empty", flush=True)
+        return ""
 
     def _save_and_flash(text: str) -> None:
         # worker thread: DB write can be slow, keep it off the GUI/hook threads
