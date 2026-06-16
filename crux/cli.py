@@ -267,6 +267,11 @@ def cmd_keytest(args):
     hk = pynput_hotkey(cfg.hotkey_mods, cfg.hotkey_key)
     chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
     print(f"\nKey test. Your chord is {chord}  ({hk}).")
+    if sys.platform == "linux":
+        sess = os.environ.get("XDG_SESSION_TYPE", "?")
+        print(f"Session: {sess}" + ("  ⚠ Wayland blocks global key capture — if nothing prints "
+              "below, bind `crux capture` via GNOME Settings instead." if sess == "wayland"
+              or os.environ.get("WAYLAND_DISPLAY") else ""))
     print("Type some keys, then try your chord. Ctrl+C to stop.\n")
 
     fired = {"n": 0}

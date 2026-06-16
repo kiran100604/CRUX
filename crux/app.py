@@ -37,6 +37,32 @@ def _icon_image():
     return img
 
 
+def _is_wayland() -> bool:
+    import os
+    return (os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+            or bool(os.environ.get("WAYLAND_DISPLAY")))
+
+
+def _warn_wayland(chord: str) -> None:
+    """On Wayland the compositor blocks apps from grabbing global keys / injecting
+    keystrokes, so this in-app hotkey usually won't fire. Point users to the
+    reliable path: bind `crux capture` to a shortcut in the OS settings."""
+    if sys.platform != "linux" or not _is_wayland():
+        return
+    print(
+        "\n[crux] ⚠ Wayland detected. Wayland blocks apps from capturing global\n"
+        "       hotkeys, so the in-app hotkey above probably WON'T fire, and\n"
+        "       auto-copy won't work either.\n"
+        "       Reliable fix — bind a shortcut in your OS instead:\n"
+        "         GNOME → Settings → Keyboard → Custom Shortcuts → +\n"
+        "           Name:    Capture to CRUX\n"
+        "           Command: crux capture\n"
+        f"           Shortcut: {chord}\n"
+        "       Then: select text, Ctrl+C, press your shortcut. (Or switch your\n"
+        "       login session to 'Xorg' where the in-app hotkey works.)\n",
+        flush=True)
+
+
 def _copy_selection() -> None:
     """Send Ctrl/Cmd+C to copy the current selection.
 
@@ -163,6 +189,7 @@ def run(open_dashboard: bool = True) -> None:
             "Try a different chord with `crux setup` (e.g. Ctrl+Shift+K), or use the\n"
             "tray menu's 'Capture now' / the dashboard capture box instead.")
     print(f"[crux] listening for hotkey: {hotkey}", flush=True)
+    _warn_wayland(chord)
 
     # best-effort tray icon (works on Windows/Linux in a thread; mac needs main
     # thread, so we just skip it there and rely on the hotkey + dashboard).
