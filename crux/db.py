@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS usages (
     item_id   TEXT NOT NULL,
     query     TEXT,
     session   TEXT,
+    user      TEXT,
     used_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usages_item ON usages(item_id);
@@ -161,6 +162,9 @@ class Database:
                 self.conn.execute(f"ALTER TABLE items ADD COLUMN {col} TEXT")
         if "tier" not in cols:
             self.conn.execute("ALTER TABLE items ADD COLUMN tier TEXT NOT NULL DEFAULT 'leaf'")
+        ucols = {r["name"] for r in self.conn.execute("PRAGMA table_info(usages)")}
+        if "user" not in ucols:
+            self.conn.execute("ALTER TABLE usages ADD COLUMN user TEXT")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
@@ -290,10 +294,11 @@ class Database:
 
     # --- usage / payoff loop -------------------------------------------------
 
-    def log_usage(self, item_id: str, query: str, session: str, used_at: str) -> None:
+    def log_usage(self, item_id: str, query: str, session: str, used_at: str,
+                  user: str | None = None) -> None:
         self.conn.execute(
-            "INSERT INTO usages (item_id, query, session, used_at) VALUES (?,?,?,?)",
-            (item_id, query, session, used_at),
+            "INSERT INTO usages (item_id, query, session, user, used_at) VALUES (?,?,?,?,?)",
+            (item_id, query, session, user, used_at),
         )
         self.conn.commit()
 

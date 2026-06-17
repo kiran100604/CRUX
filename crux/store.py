@@ -177,12 +177,14 @@ class Store:
                         return results, links
         return results, links
 
-    def record_usage(self, item_ids: list[str], query: str, session: str = "") -> None:
+    def record_usage(self, item_ids: list[str], query: str, session: str = "",
+                     user: str | None = None) -> None:
         """Log that these items were injected into a live agent session — this is
-        what powers the dashboard's 'used N times' payoff loop."""
+        what powers the dashboard's 'used N times' payoff loop (and, on a shared
+        server, who pulled what)."""
         ts = now_iso()
         for iid in item_ids:
-            self.db.log_usage(iid, query, session, ts)
+            self.db.log_usage(iid, query, session, ts, user=user)
 
     # --- contradiction-aware writes (the "neighborhood update") --------------
 

@@ -74,13 +74,30 @@ def _feedback(msg: str, ok: bool = True) -> None:
 def cmd_capture(args):
     """Hotkey entrypoint: grab the clipboard and capture it. Bind a global
     shortcut to `crux capture` (see README for Raycast/Hammerspoon snippets)."""
-    store = _store()
     text = read_clipboard()
     if not text or not text.strip():
-        store.close()
         print("clipboard is empty — nothing to capture")
         _feedback("Clipboard empty — copy text first", ok=False)
         return
+    cfg = Config.load()
+    if cfg.server:  # team mode: send to the shared graph
+        from . import client
+        try:
+            multi = len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines())
+            if multi:
+                client.ingest(cfg.server, text, source_ref="clipboard", user=cfg.user)
+                msg = "Captured to team graph → staged for review"
+            else:
+                r = client.capture(cfg.server, text, source="hotkey", user=cfg.user)
+                msg = f"Captured: {(r.get('title') or text)[:60]}"
+        except Exception as e:
+            print(f"error: shared server unreachable ({e})")
+            _feedback("Capture failed — server unreachable", ok=False)
+            return
+        print("✓ " + msg)
+        _feedback(msg, ok=True)
+        return
+    store = _store()
     if len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines()):
         res = store.ingest(text, source_type="paste", source_ref="clipboard")
         msg = f"Captured → {len(res['facts'])} fact(s) for review"
@@ -196,6 +213,13 @@ def cmd_dismiss(args):
 
 def cmd_status(args):
     cfg = Config.load()
+    if cfg.server:
+        from . import client
+        reachable = "reachable" if client.ping(cfg.server) else "UNREACHABLE"
+        print(f"mode:       team — shared server {cfg.server} ({reachable})")
+        print(f"user:       {cfg.user}")
+    else:
+        print(f"mode:       local (run `crux connect <url>` to join a team server)")
     store = _store()
     main = len(store.db.list(scope="main", limit=100000))
     working = len(store.db.list(scope="individual", limit=100000))
@@ -244,34 +268,55 @@ def cmd_setup(args):
         openai_key=args.openai_key or os.environ.get("OPENAI_API_KEY"))
 
 
-def cmd_ctx(args):
-    """Print the context block for a task — paste into any tool without the hook."""
+def _retrieve_brief(task, limit):
+    """Return the directive brief for a task — from the shared server if connected,
+    else the local graph."""
+    cfg = Config.load()
+    if cfg.server:
+        from . import client
+        return client.retrieve(cfg.server, task, user=cfg.user, limit=limit).get("context") or ""
     from .hooks import _format
     store = _store()
-    results, links = store.retrieve(args.task, limit=args.limit)
-    if results:
+    try:
+        results, links = store.retrieve(task, limit=limit)
+        if not results:
+            return ""
         ids = [r.item.id for r in results] + [it.id for _, it in links]
-        store.record_usage(ids, args.task)
-        print(_format(results, links))
-    else:
-        print("(no relevant context yet)")
-    store.close()
+        store.record_usage(ids, task, user=cfg.user)
+        return _format(results, links)
+    finally:
+        store.close()
+
+
+def cmd_ctx(args):
+    """Print the context block for a task — paste into any tool without the hook."""
+    print(_retrieve_brief(args.task, args.limit) or "(no relevant context yet)")
 
 
 def cmd_enhance(args):
     """Enrich a prompt with the team's intent: prints a ready-to-paste prompt =
     your task + the directive brief (constraints, decisions, architecture, context)
     so the agent builds what's actually intended."""
-    from .hooks import _format
-    store = _store()
-    results, links = store.retrieve(args.task, limit=args.limit)
-    if results:
-        ids = [r.item.id for r in results] + [it.id for _, it in links]
-        store.record_usage(ids, args.task)
-        print(f"TASK: {args.task}\n\n{_format(results, links)}")
+    brief = _retrieve_brief(args.task, args.limit)
+    print(f"TASK: {args.task}\n\n{brief or '(no relevant team context found — capture some first)'}")
+
+
+def cmd_connect(args):
+    """Point this machine at a shared CRUX server (team mode). After this, the
+    hook and capture/enhance talk to the team's intent graph, not the local DB."""
+    from . import client
+    from .config import save_env_file
+    cfg = Config.load()
+    url = args.url.rstrip("/")
+    vals = {"CRUX_SERVER": url}
+    if args.user:
+        vals["CRUX_USER"] = args.user
+    save_env_file(cfg.home, vals)
+    who = args.user or cfg.user
+    if client.ping(url):
+        print(f"✓ Connected to {url} as {who}. Hook & capture now use the team graph.")
     else:
-        print(f"TASK: {args.task}\n\n(no relevant team context found — capture some first)")
-    store.close()
+        print(f"Saved {url} as {who}, but couldn't reach it — is `crux serve` running there?")
 
 
 def cmd_serve(args):
@@ -434,6 +479,11 @@ def build_parser() -> argparse.ArgumentParser:
     en = sub.add_parser("enhance", help="enrich a prompt with team intent (task + directive brief)")
     en.add_argument("task"); en.add_argument("--limit", type=int, default=6)
     en.set_defaults(func=cmd_enhance)
+
+    cn = sub.add_parser("connect", help="connect to a shared CRUX server (team mode)")
+    cn.add_argument("url", help="e.g. http://crux.internal:7432")
+    cn.add_argument("--user", default=None, help="your name on the team graph")
+    cn.set_defaults(func=cmd_connect)
 
     ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook")
     ih.add_argument("--global", dest="globally", action="store_true",

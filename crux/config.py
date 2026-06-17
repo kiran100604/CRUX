@@ -16,6 +16,14 @@ def _home() -> Path:
     return Path(os.environ.get("CRUX_HOME", Path.home() / ".crux")).expanduser()
 
 
+def _default_user() -> str:
+    import getpass
+    try:
+        return getpass.getuser()
+    except Exception:
+        return "user"
+
+
 def _load_env_file(home: Path) -> dict:
     """Read ~/.crux/config.env (KEY=VALUE lines) so keys persist without the user
     editing their shell rc. Real environment variables still take precedence."""
@@ -66,6 +74,11 @@ class Config:
     hotkey_mods: tuple[str, ...]
     hotkey_key: str
 
+    # Team mode: when set, the hook/CLI talk to a shared CRUX server over HTTP
+    # instead of the local DB, so a whole team shares one intent graph.
+    server: str | None
+    user: str
+
     @staticmethod
     def load() -> "Config":
         home = _home()
@@ -91,6 +104,8 @@ class Config:
                 ).split(",") if m
             ),
             hotkey_key=env.get("CRUX_HOTKEY_KEY", "space"),
+            server=(env.get("CRUX_SERVER") or "").rstrip("/") or None,
+            user=env.get("CRUX_USER") or _default_user(),
         )
 
     def ensure_home(self) -> None:

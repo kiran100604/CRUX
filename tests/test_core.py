@@ -174,6 +174,30 @@ def test_hook_inject_is_crash_safe(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "{}"
 
 
+def test_retrieve_endpoint_brief_and_usage(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    from fastapi.testclient import TestClient
+
+    from crux.config import Config
+    from crux.server import create_app
+    from crux.store import Store
+    s = Store(Config.load())
+    i = s.capture("Never touch billing without sign-off.", type_hint="constraint")
+    s.promote(i.id)
+    s.close()
+    c = TestClient(create_app(Config.load()))
+    r = c.post("/retrieve", json={"prompt": "work on billing", "user": "kiran",
+                                  "session": "s1", "limit": 5}).json()
+    assert r["count"] >= 1
+    assert "CONSTRAINTS TO HONOR" in r["context"]
+    # usage was recorded server-side, tagged with the user
+    s = Store(Config.load())
+    users = [row["user"] for row in s.db.conn.execute("SELECT user FROM usages")]
+    s.close()
+    assert "kiran" in users
+
+
 def test_directive_brief_groups_by_intent(store):
     from crux.hooks import _format
     store.capture("Never touch billing without sign-off.", type_hint="constraint")

@@ -200,6 +200,25 @@ def create_app(cfg: Config):
     def related(id: str, limit: int = 6):
         return {"items": store.related(id, limit)}
 
+    class RetrieveIn(BaseModel):
+        prompt: str
+        session: str | None = None
+        user: str | None = None
+        limit: int = 5
+
+    @app.post("/retrieve")
+    def retrieve(body: RetrieveIn):
+        """Team-mode entrypoint: a client's hook/CLI sends a prompt; we retrieve,
+        build the directive brief, record usage (tagged by user), return the brief."""
+        from .hooks import _format
+        results, links = store.retrieve(body.prompt, limit=body.limit)
+        if not results:
+            return {"context": "", "count": 0}
+        ids = [r.item.id for r in results] + [it.id for _, it in links]
+        store.record_usage(ids, body.prompt, session=body.session or "",
+                           user=body.user or None)
+        return {"context": _format(results, links), "count": len(results)}
+
     @app.get("/stats")
     def stats():
         main = len(store.db.list(scope="main", limit=100000))

@@ -67,12 +67,26 @@ def hook_inject() -> int:
         if not prompt.strip():
             print("{}")
             return 0
-        store = Store(Config.load())
+        cfg = Config.load()
+        session = payload.get("session_id", "")
+        if cfg.server:
+            # team mode: pull from the shared intent graph over HTTP
+            from . import client
+            try:
+                resp = client.retrieve(cfg.server, prompt, session=session,
+                                       user=cfg.user, limit=MAX_ITEMS)
+            except Exception:
+                print("{}")  # server unreachable → never break the turn
+                return 0
+            ctx = resp.get("context") or ""
+            print(json.dumps({"additionalContext": ctx}) if ctx else "{}")
+            return 0
+        store = Store(cfg)
         results, links = store.retrieve(prompt, limit=MAX_ITEMS)
         if results:
             # record the payoff: these items (and their connected facts) just helped
             ids = [r.item.id for r in results] + [it.id for _, it in links]
-            store.record_usage(ids, prompt, session=payload.get("session_id", ""))
+            store.record_usage(ids, prompt, session=session, user=cfg.user)
         store.close()
         if not results:
             print("{}")
