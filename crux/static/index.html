@@ -430,6 +430,8 @@ function renderAttn(it){
 const TIER_LABEL={core:"Core Strategy",mid:"Mid Planning",leaf:"Leaf / Operational"};
 const TIER_DESC={core:"company mission, vision & strategy",mid:"product decisions, roadmap & architecture",leaf:"operational facts & day-to-day work"};
 const TIER_ORDER=["core","mid","leaf"];
+const DOMAIN_LABEL={product:"Product",technical:"Technical",user:"Users",market:"Market",competitor:"Competitors",legal:"Legal",process:"Process",other:"Other"};
+const DOMAIN_ORDER=["product","technical","user","market","competitor","legal","process","other"];
 
 function vKB(){
   const main=state.items.filter(i=>i.scope==="main");
@@ -449,7 +451,8 @@ function vKB(){
       <div class="kbnav">
         <input class="kbsearch" id="kbq" placeholder="Filter…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
         <div class="kbmodes">
-          <button class="kbmode ${state.kbMode!=='topic'?'on':''}" onclick="setKbMode('tier')">By tier</button>
+          <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By tier</button>
+          <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By domain</button>
           <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By topic</button>
         </div>
         <div class="kblist">${kbNav(main)}</div>
@@ -462,9 +465,15 @@ function vKB(){
 function conflictIds(){
   const s=new Set(); (state.conflicts||[]).forEach(c=>{s.add(c.a.id);s.add(c.b.id);}); return s;
 }
+function kbDomainGroups(main){
+  return DOMAIN_ORDER.map(d=>[DOMAIN_LABEL[d],'',main.filter(i=>(i.domain||'other')===d)])
+    .filter(g=>g[2].length);
+}
 function kbNav(main){
   const conf=conflictIds();
-  const groups = state.kbMode==='topic' ? kbTopicGroups(main) : kbTierGroups(main);
+  const groups = state.kbMode==='topic' ? kbTopicGroups(main)
+               : state.kbMode==='domain' ? kbDomainGroups(main)
+               : kbTierGroups(main);
   return groups.map(([label,sub,items])=>
     `<div class="kbgroup"><div class="kbglabel">${esc(label)}${sub?` · <span>${esc(sub)}</span>`:''} · ${items.length}</div>
      ${items.map(i=>navItem(i,conf)).join("")}</div>`).join("");
@@ -497,6 +506,7 @@ function kbDetail(it){
   const conns=[];
   if(edges.extends.length) conns.push(`<div class="edge"><span class="el">extends →</span>${edges.extends.map(chip).join("")}</div>`);
   if(edges.extended_by.length) conns.push(`<div class="edge"><span class="el">extended by ←</span>${edges.extended_by.map(chip).join("")}</div>`);
+  if((edges.related||[]).length) conns.push(`<div class="edge"><span class="el">related</span>${edges.related.map(chip).join("")}</div>`);
   if(see===undefined) conns.push(`<div class="edge"><span class="el">see also</span><span class="muted2" style="font-size:12px">loading…</span></div>`);
   else if(see.length) conns.push(`<div class="edge"><span class="el">see also</span>${see.map(chip).join("")}</div>`);
   const connBlock = conns.length
@@ -506,6 +516,7 @@ function kbDetail(it){
     <div class="dhead">
       <span class="tier teal">◆ VERIFIED · ${esc(it.type)}</span>
       <span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span>
+      <span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span>
     </div>
     <h2 class="dtitle">${esc(it.title||'')}</h2>
     <div class="dstmt">${esc(it.summary||it.title||'')}</div>
@@ -515,7 +526,8 @@ function kbDetail(it){
       <div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
     <div class="dsection"><div class="pl">DETAILS</div>
       <div class="meta"><div><b>id</b> ${it.id.slice(0,8)}</div>
-        <div><b>captured</b> ${(it.captured_at||'').slice(0,10)}</div>
+        <div><b>tier</b> ${TIER_LABEL[it.tier||'leaf']}</div>
+        <div><b>domain</b> ${DOMAIN_LABEL[it.domain||'other']}</div>
         ${it.promoted_at?`<div><b>verified</b> ${it.promoted_at.slice(0,10)}</div>`:''}
         <div><b>confidence</b> ${Math.round((it.confidence||0)*100)}%</div></div>
       <div class="tags">${(it.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div></div>
@@ -599,7 +611,7 @@ function inboxRow(it){
       <span class="cdot c-${it.status}"></span>
       <div class="imain">
         <div class="ititle">${esc(it.title||it.summary||'')}</div>
-        <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Leaf')}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
+        <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Leaf')}</span><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
       </div>
       <span class="iwhen mono">${rel(it.captured_at)}</span>
       ${it.status==='clean'?`<button class="btn sm teal" onclick="event.stopPropagation();promote('${it.id}')">Promote</button>`:''}

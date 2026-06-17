@@ -40,6 +40,16 @@ SCOPES = ("individual", "main")
 TIERS = ("core", "mid", "leaf")
 TIER_LABELS = {"core": "Core Strategy", "mid": "Mid Planning", "leaf": "Leaf / Operational"}
 
+# Domain — what a fact is ABOUT (independent of type and tier). Lets the graph
+# connect and weight knowledge across areas, and the dashboard filter by it.
+# Auto-classified by the LLM at capture (heuristic stand-in offline).
+DOMAINS = ("product", "technical", "user", "market", "competitor", "legal", "process", "other")
+DOMAIN_LABELS = {
+    "product": "Product", "technical": "Technical", "user": "Users",
+    "market": "Market", "competitor": "Competitors", "legal": "Legal",
+    "process": "Process", "other": "Other",
+}
+
 # Everything captured — a note, a clipboard grab, a whole document, an agent's
 # observation — is stored first as an Episode: the raw, untouched source of truth
 # with provenance. Facts (ContextItems) are extracted FROM episodes and link back.
@@ -81,6 +91,7 @@ class ContextItem:
     summary: str
     type: str
     tier: str = "leaf"  # core | mid | leaf — altitude, set by enrichment
+    domain: str = "other"  # product | technical | user | market | … — what it's about
     tags: list[str] = field(default_factory=list)
     source: str | None = None
     scope: str = "individual"  # everything starts in the working layer
@@ -109,6 +120,7 @@ class ContextItem:
             summary=row["summary"],
             type=row["type"],
             tier=(row["tier"] if "tier" in row.keys() else None) or "leaf",
+            domain=(row["domain"] if "domain" in row.keys() else None) or "other",
             tags=json.loads(row["tags"] or "[]"),
             source=row["source"],
             scope=row["scope"],

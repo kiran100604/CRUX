@@ -275,6 +275,23 @@ def test_extend_creates_linked_edge_and_promotes(store):
     assert store.relations_of(a.id)["extended_by"] == []
 
 
+def test_domain_classification_and_autolink(store):
+    # domain is auto-classified (heuristic offline, LLM when keyed)
+    assert store.capture("Users churn at the payment step.").domain == "user"
+    assert store.capture("The API uses a Postgres database.").domain == "technical"
+    assert store.capture("Our go-to-market is usage-based pricing.").domain == "market"
+    # auto-link: promoting connects genuinely-related verified facts ('relates' edge)
+    a = store.capture("The sync layer uses a local queue flushed on reconnect.")
+    store.promote(a.id)
+    b = store.capture("The sync layer uses a local queue, flushed when the device reconnects.")
+    store.promote(b.id)
+    rel = store.relations_of(a.id)["related"]
+    assert [x["id"] for x in rel] == [b.id]
+    # and retrieval follows the relates edge
+    results, links = store.retrieve("local queue sync", limit=1)
+    assert b.id in {it.id for _, it in links} or a.id in {it.id for _, it in links}
+
+
 def test_tier_classification_and_override(store):
     # enrichment assigns an altitude tier (heuristic offline, LLM when keyed)
     core = store.capture("Our mission is to give AI agents perfect long-term memory.")

@@ -83,6 +83,7 @@ def create_app(cfg: Config):
         summary: str | None = None
         type: str | None = None
         tier: str | None = None
+        domain: str | None = None
 
     def _scope(s: str | None):
         return None if s in (None, "all") else s
@@ -287,7 +288,7 @@ def create_app(cfg: Config):
     def promote(item_id: str, body: PromoteIn, request: Request):
         _leader(request)
         return {"ok": store.promote(item_id, title=body.title, summary=body.summary,
-                                    type=body.type, tier=body.tier)}
+                                    type=body.type, tier=body.tier, domain=body.domain)}
 
     class ExtendIn(BaseModel):
         target_id: str

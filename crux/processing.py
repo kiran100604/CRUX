@@ -11,15 +11,18 @@ import json
 import re
 from dataclasses import dataclass
 
-from .models import ITEM_TYPES, TIERS
+from .models import DOMAINS, ITEM_TYPES, TIERS
 
 _TIER_GUIDE = """- tier: one of core | mid | leaf — the ALTITUDE of the fact (independent of type)
     core = company mission, vision, philosophy, the core problem & overall strategy
     mid  = product decisions, roadmap, planning, architecture choices
-    leaf = granular operational facts, tasks, references, day-to-day work"""
+    leaf = granular operational facts, tasks, references, day-to-day work
+- domain: one of product | technical | user | market | competitor | legal | process | other
+    — what the fact is ABOUT (technical=architecture/code/infra, user=behaviour/feedback,
+    market=positioning/go-to-market, process=team workflow/ops)"""
 
 _PROMPT = """You process captured snippets for a developer/company context store.
-Return ONLY minified JSON with keys: title, summary, type, tier, tags.
+Return ONLY minified JSON with keys: title, summary, type, tier, domain, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
 - type: one of {types}
@@ -37,7 +40,7 @@ constraint, architectural choice, or important reference — one fact each. Igno
 filler, TODOs, and prose with no lasting signal. If the section holds nothing
 durable, return [].
 
-Return ONLY a minified JSON array; each element has keys: title, summary, type, tier, tags.
+Return ONLY a minified JSON array; each element has keys: title, summary, type, tier, domain, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
 - type: one of {types}
@@ -76,6 +79,7 @@ class Enrichment:
     type: str
     tags: list[str]
     tier: str = "leaf"
+    domain: str = "other"
 
 
 class FakeProcessor:
@@ -90,6 +94,7 @@ class FakeProcessor:
             type=_guess_type(clean),
             tags=_guess_tags(clean),
             tier=_guess_tier(clean),
+            domain=_guess_domain(clean),
         )
 
     def extract_facts(self, content: str) -> list[Enrichment]:
@@ -171,6 +176,7 @@ def _parse(text: str, content: str) -> Enrichment:
             type=t,
             tags=[str(x).lower() for x in tags],
             tier=_norm_tier(data.get("tier"), content),
+            domain=_norm_domain(data.get("domain"), content),
         )
     except Exception:
         return FakeProcessor().enrich(content)
@@ -192,6 +198,7 @@ def _parse_many(text: str) -> list[Enrichment]:
                 type=t,
                 tags=[str(x).lower() for x in d.get("tags", [])[:4]],
                 tier=_norm_tier(d.get("tier"), str(d.get("summary", ""))),
+                domain=_norm_domain(d.get("domain"), str(d.get("summary", ""))),
             ))
         return [e for e in out if e.title and e.title != "Untitled"]
     except Exception:
@@ -229,6 +236,32 @@ def _guess_tier(text: str) -> str:
 def _norm_tier(value, content: str) -> str:
     v = str(value or "").strip().lower()
     return v if v in TIERS else _guess_tier(content)
+
+
+_DOMAIN_HINTS = {
+    "technical": ("architecture", "code", "api", "database", "server", "infra", "schema",
+                  "pipeline", "deploy", "bug", "performance", "library", "framework"),
+    "user": ("user", "customer", "feedback", "behaviour", "behavior", "persona", "churn",
+             "onboarding", "retention", "ux", "usability"),
+    "market": ("market", "go-to-market", "gtm", "positioning", "pricing", "growth", "sales", "demand"),
+    "competitor": ("competitor", "competition", "rival", "alternative", "vs ", "compared to"),
+    "legal": ("legal", "compliance", "gdpr", "license", "contract", "policy", "regulation", "privacy"),
+    "process": ("process", "workflow", "meeting", "sprint", "standup", "ops", "team", "hiring", "roadmap"),
+    "product": ("product", "feature", "mission", "vision", "roadmap", "scope", "use case"),
+}
+
+
+def _guess_domain(text: str) -> str:
+    low = text.lower()
+    for dom, hints in _DOMAIN_HINTS.items():
+        if any(h in low for h in hints):
+            return dom
+    return "other"
+
+
+def _norm_domain(value, content: str) -> str:
+    v = str(value or "").strip().lower()
+    return v if v in DOMAINS else _guess_domain(content)
 
 
 def _guess_type(text: str) -> str:

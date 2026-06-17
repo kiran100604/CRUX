@@ -61,7 +61,8 @@ class Store:
             return existing  # dedup: same fact, don't duplicate
         item = ContextItem(
             id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
-            type=enr.type, tier=getattr(enr, "tier", "leaf"), tags=enr.tags, source=source,
+            type=enr.type, tier=getattr(enr, "tier", "leaf"),
+            domain=getattr(enr, "domain", "other"), tags=enr.tags, source=source,
             scope=scope, confidence=confidence,
             promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model, content_hash=h,
@@ -166,6 +167,7 @@ class Store:
                 summary=d.get("summary", ""),
                 type=d.get("type", "context"),
                 tier=d.get("tier", "leaf"),
+                domain=d.get("domain", "other"),
                 tags=d.get("tags", []),
                 source=d.get("source"),
                 scope=d.get("scope", "individual"),
@@ -200,7 +202,7 @@ class Store:
             seen = {r.item.id for r in results}
             for r in results:
                 for edge in self.db.relations_for(r.item.id):
-                    if edge["kind"] != "extends":
+                    if edge["kind"] not in ("extends", "relates"):
                         continue
                     oid = edge["to_id"] if edge["from_id"] == r.item.id else edge["from_id"]
                     if oid in seen:
@@ -375,12 +377,16 @@ class Store:
 
     # --- promotion: the refinement gate (individual -> main) -----------------
 
+    AUTO_LINK_SIM = 0.82   # auto-connect genuinely-related verified facts
+    AUTO_LINK_MAX = 3      # cap edges per promotion so the graph stays a graph, not a hairball
+
     def promote(self, item_id: str, *, title: str | None = None,
                 summary: str | None = None, type: str | None = None,
-                tier: str | None = None, confidence: float = 0.95) -> bool:
+                tier: str | None = None, domain: str | None = None,
+                confidence: float = 0.95) -> bool:
         """Move a working item into the verified `main` graph, optionally refining
-        its fields (including its tier/altitude). This is how only-true things
-        enter the trusted layer."""
+        its fields. Then auto-link it to genuinely-related verified facts so the
+        graph organizes itself (no manual filing)."""
         full = self.db.resolve_id(item_id)
         if not full:
             return False
@@ -394,6 +400,8 @@ class Store:
             fields["type"] = type
         if tier is not None:
             fields["tier"] = tier
+        if domain is not None:
+            fields["domain"] = domain
         ok = self.db.update(full, fields, now_iso())
         if ok:
             if title is not None or summary is not None:  # refined text → re-embed
@@ -401,7 +409,31 @@ class Store:
                 vec = self.embedder.embed(f"{it.title}\n{it.summary}\n{it.raw_content}")
                 self.db.set_embedding(full, vec, self.embedder.model, now_iso())
             self._detect_conflicts(self.db.get(full))  # now verified — recheck vs truth
+            self._auto_link(full)                       # connect to related verified facts
         return ok
+
+    def _auto_link(self, item_id: str) -> None:
+        """Create 'relates' edges from this verified fact to its nearest verified
+        neighbors (the graph self-organising across domains/topics)."""
+        from .embeddings import cosine
+        vec = self.db.embedding_of(item_id)
+        if not vec:
+            return
+        existing = {(r["to_id"] if r["from_id"] == item_id else r["from_id"])
+                    for r in self.db.relations_for(item_id)}
+        scored = []
+        for oid, ovec in self.db.all_embeddings():
+            if not ovec or oid == item_id or oid in existing:
+                continue
+            o = self.db.get(oid)
+            if not o or o.archived or o.superseded_by or o.scope != "main":
+                continue
+            s = cosine(vec, ovec)
+            if s >= self.AUTO_LINK_SIM:
+                scored.append((s, oid))
+        scored.sort(reverse=True)
+        for s, oid in scored[: self.AUTO_LINK_MAX]:
+            self.db.add_relation(item_id, oid, "relates", f"{int(s * 100)}% related", now_iso())
 
     def demote(self, item_id: str) -> bool:
         """Send a main item back to the working layer (undo a promotion)."""
@@ -455,18 +487,19 @@ class Store:
         """Edges for an item, split into what it extends vs what extends it —
         each enriched with the other item's title/scope for display."""
         full = self.db.resolve_id(item_id) or item_id
-        extends, extended_by = [], []
+        extends, extended_by, related = [], [], []
         for r in self.db.relations_for(full):
-            if r["kind"] != "extends":
-                continue
             other_id = r["to_id"] if r["from_id"] == full else r["from_id"]
             other = self.db.get(other_id)
             if not other or other.archived:
                 continue
             entry = {"id": other.id, "title": other.title, "scope": other.scope,
-                     "tier": other.tier, "reason": r["reason"]}
-            (extends if r["from_id"] == full else extended_by).append(entry)
-        return {"extends": extends, "extended_by": extended_by}
+                     "tier": other.tier, "domain": other.domain, "reason": r["reason"]}
+            if r["kind"] == "relates":
+                related.append(entry)
+            elif r["kind"] == "extends":
+                (extends if r["from_id"] == full else extended_by).append(entry)
+        return {"extends": extends, "extended_by": extended_by, "related": related}
 
     def related(self, item_id: str, limit: int = 6) -> list[dict]:
         """Semantic neighbors in the verified graph — facts related by meaning
