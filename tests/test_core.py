@@ -275,6 +275,20 @@ def test_extend_creates_linked_edge_and_promotes(store):
     assert store.relations_of(a.id)["extended_by"] == []
 
 
+def test_lens_gathers_relevant_facts(store):
+    for t in ["Pricing moves to usage-based billing.",
+              "The payment screen must show saved cards.",
+              "Deploy the API on AWS Fargate."]:
+        store.promote(store.capture(t).id)
+    lid = store.create_lens("Payments", "billing and the payment screen")
+    assert any(l["name"] == "Payments" for l in store.list_lenses())
+    ids = store.lens_item_ids(lid)
+    titles = {store.db.get(i).title for i in ids}
+    assert any("payment" in t.lower() or "pricing" in t.lower() for t in titles)
+    store.delete_lens(lid)
+    assert store.list_lenses() == []
+
+
 def test_domain_classification_and_autolink(store):
     # domain is auto-classified (heuristic offline, LLM when keyed)
     assert store.capture("Users churn at the payment step.").domain == "user"

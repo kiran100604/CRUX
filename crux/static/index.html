@@ -191,6 +191,15 @@
   .acts{display:flex; flex-direction:column; gap:9px}
   .acts .btn{justify-content:center; width:100%}
 
+  /* lenses (emergent topics) */
+  .lensbar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 14px}
+  .lens{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:var(--pill);
+    padding:6px 14px; font-size:13px; cursor:pointer}
+  .lens:hover{border-color:var(--muted2)}
+  .lens.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .lens.new{border-style:dashed; color:var(--muted)}
+  .lens .lx{margin-left:6px; opacity:.55} .lens .lx:hover{opacity:1; color:var(--coral)}
+
   /* knowledge explorer (two-pane) */
   .kbwrap{display:grid; grid-template-columns:320px 1fr; gap:18px; align-items:start; margin-top:8px}
   @media(max-width:900px){.kbwrap{grid-template-columns:1fr}}
@@ -336,14 +345,15 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
-  kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}, leader:true};
+  kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}, leader:true,
+  lenses:[], kbLens:null, lensIds:null};
 
 async function load(){
-  const [it,rv,st,fd]=await Promise.all([
-    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20")]);
+  const [it,rv,st,fd,ln]=await Promise.all([
+    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses")]);
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
-  state.stats=st; state.feed=fd.usages;
+  state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[];
   _sig=`${st.crystals}|${st.fluid}|${st.injections}`;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
   const need=state.inbox.length;
@@ -441,12 +451,23 @@ function vKB(){
       <div class="empty"><div class="big">Nothing verified yet</div>Promote working notes in Review to build your knowledge base.</div>`);
     return;
   }
-  const sel = main.find(i=>i.id===state.kbSel) || main[0];
-  state.kbSel = sel.id;
+  // a lens gathers the relevant slice of the graph; "All" shows everything
+  let shown = main;
+  if(state.kbLens!=null && state.lensIds){
+    const set=new Set(state.lensIds);
+    shown = main.filter(i=>set.has(i.id));
+  }
+  const sel = shown.find(i=>i.id===state.kbSel) || shown[0] || main[0];
+  state.kbSel = sel ? sel.id : null;
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
     <h1 class="head display">Knowledge explorer</h1>
-    <p class="sub">Browse your verified knowledge and walk its connections — every fact shows what it extends, what builds on it, and what it relates to.</p>
+    <p class="sub">Browse your verified knowledge and walk its connections. Lenses gather a relevant slice across domains — a fact appears in every lens it's relevant to.</p>
+    <div class="lensbar">
+      <button class="lens ${state.kbLens==null?'on':''}" onclick="selectLens(null)">All</button>
+      ${state.lenses.map(l=>`<button class="lens ${state.kbLens===l.id?'on':''}" onclick="selectLens(${l.id})" title="${esc(l.intent||'')}">${esc(l.name)}${state.leader?` <span class="lx" onclick="event.stopPropagation();delLens(${l.id})">×</span>`:''}</button>`).join("")}
+      ${state.leader?`<button class="lens new" onclick="newLens()">+ New lens</button>`:''}
+    </div>
     <div class="kbwrap">
       <div class="kbnav">
         <input class="kbsearch" id="kbq" placeholder="Filter…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
@@ -455,12 +476,31 @@ function vKB(){
           <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By domain</button>
           <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By topic</button>
         </div>
-        <div class="kblist">${kbNav(main)}</div>
+        <div class="kblist">${shown.length?kbNav(shown):'<div class="muted2" style="font-size:13px;padding:8px">No facts match this lens yet.</div>'}</div>
       </div>
-      <div class="kbdetail">${kbDetail(sel)}</div>
+      <div class="kbdetail">${sel?kbDetail(sel):'<div class="muted2">Nothing here yet.</div>'}</div>
     </div>`);
   if(state.kbQuery) kbFilter();
 }
+async function selectLens(id){
+  state.kbLens=id; state.kbSel=null;
+  if(id==null){ state.lensIds=null; render(); return; }
+  state.lensIds=[]; render();
+  const r=await api(`/lenses/${id}/items`); state.lensIds=r.ids||[]; render();
+}
+async function newLens(){
+  const name=prompt("Lens name (e.g. Offline Sync, Marketing Campaign):"); if(!name) return;
+  const intent=prompt("What is this lens about? (one line — helps it gather the right facts)")||"";
+  await post("/lenses",{name,intent}); toast("✓ Lens created");
+  const ln=await api("/lenses"); state.lenses=ln.lenses||[]; render();
+}
+async function delLens(id){
+  if(!confirm("Delete this lens? (facts are untouched — a lens is just a view)")) return;
+  await fetch(`/lenses/${id}`,{method:"DELETE",headers:_token?{"x-crux-token":_token}:{}});
+  if(state.kbLens===id){state.kbLens=null;state.lensIds=null;}
+  const ln=await api("/lenses"); state.lenses=ln.lenses||[]; render();
+}
+window.selectLens=selectLens; window.newLens=newLens; window.delLens=delLens;
 
 function conflictIds(){
   const s=new Set(); (state.conflicts||[]).forEach(c=>{s.add(c.a.id);s.add(c.b.id);}); return s;

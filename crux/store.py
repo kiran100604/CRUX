@@ -501,6 +501,38 @@ class Store:
                 (extends if r["from_id"] == full else extended_by).append(entry)
         return {"extends": extends, "extended_by": extended_by, "related": related}
 
+    # --- lenses (emergent topics: named views over the graph) ----------------
+
+    def create_lens(self, name: str, intent: str = "") -> int:
+        return self.db.add_lens(name.strip(), (intent or "").strip(), now_iso())
+
+    def list_lenses(self) -> list[dict]:
+        return self.db.list_lenses()
+
+    def delete_lens(self, lens_id: int) -> None:
+        self.db.delete_lens(int(lens_id))
+
+    def lens_item_ids(self, lens_id: int, limit: int = 60) -> list[str]:
+        """Gather the verified facts relevant to a lens (by its name+intent) plus
+        their graph neighbors — a fact surfaces in every lens it's relevant to."""
+        lens = self.db.get_lens(int(lens_id))
+        if not lens:
+            return []
+        q = f"{lens['name']} {lens.get('intent') or ''}".strip()
+        results = self.search(q, limit=limit, scope="main")
+        ids = {r.item.id for r in results}
+        for r in list(results):                      # one hop along the graph
+            for edge in self.db.relations_for(r.item.id):
+                if edge["kind"] not in ("extends", "relates"):
+                    continue
+                oid = edge["to_id"] if edge["from_id"] == r.item.id else edge["from_id"]
+                if oid in ids:
+                    continue
+                o = self.db.get(oid)
+                if o and not o.archived and not o.superseded_by and o.scope == "main":
+                    ids.add(oid)
+        return list(ids)
+
     def related(self, item_id: str, limit: int = 6) -> list[dict]:
         """Semantic neighbors in the verified graph — facts related by meaning
         even without an explicit edge ('See also'). Excludes self + hard-linked."""

@@ -234,6 +234,29 @@ def create_app(cfg: Config):
     def related(id: str, limit: int = 6):
         return {"items": store.related(id, limit)}
 
+    class LensIn(BaseModel):
+        name: str
+        intent: str | None = None
+
+    @app.get("/lenses")
+    def lenses():
+        return {"lenses": store.list_lenses()}
+
+    @app.post("/lenses")
+    def create_lens(body: LensIn, request: Request):
+        _leader(request)
+        return {"id": store.create_lens(body.name, body.intent or "")}
+
+    @app.delete("/lenses/{lens_id}")
+    def delete_lens(lens_id: int, request: Request):
+        _leader(request)
+        store.delete_lens(lens_id)
+        return {"ok": True}
+
+    @app.get("/lenses/{lens_id}/items")
+    def lens_items(lens_id: int):
+        return {"ids": store.lens_item_ids(lens_id)}
+
     class RetrieveIn(BaseModel):
         prompt: str
         session: str | None = None

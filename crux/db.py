@@ -116,6 +116,15 @@ CREATE TABLE IF NOT EXISTS relations (
 );
 CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_id);
 CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_id);
+
+-- lenses: named views that gather a relevant slice of the graph (emergent
+-- "topics"). No fact is filed into a lens — the lens pulls what's relevant.
+CREATE TABLE IF NOT EXISTS lenses (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    intent     TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
@@ -370,6 +379,27 @@ class Database:
 
     def delete_relations_for(self, item_id: str) -> None:
         self.conn.execute("DELETE FROM relations WHERE from_id=? OR to_id=?", (item_id, item_id))
+        self.conn.commit()
+
+    # --- lenses (emergent topics) --------------------------------------------
+
+    def add_lens(self, name: str, intent: str, created_at: str) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO lenses (name, intent, created_at) VALUES (?,?,?)",
+            (name, intent, created_at))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def list_lenses(self) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM lenses ORDER BY id DESC")]
+
+    def get_lens(self, lens_id: int) -> dict | None:
+        row = self.conn.execute("SELECT * FROM lenses WHERE id=?", (lens_id,)).fetchone()
+        return dict(row) if row else None
+
+    def delete_lens(self, lens_id: int) -> None:
+        self.conn.execute("DELETE FROM lenses WHERE id=?", (lens_id,))
         self.conn.commit()
 
 
