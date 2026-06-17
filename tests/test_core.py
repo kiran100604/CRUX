@@ -198,6 +198,28 @@ def test_retrieve_endpoint_brief_and_usage(tmp_path, monkeypatch):
     assert "kiran" in users
 
 
+def test_role_enforcement(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    monkeypatch.setenv("CRUX_ADMIN_TOKEN", "secret123")
+    from fastapi.testclient import TestClient
+
+    from crux.config import Config
+    from crux.server import create_app
+    from crux.store import Store
+    it = Store(Config.load()).capture("We use PostgreSQL.", type_hint="decision")
+    c = TestClient(create_app(Config.load()))   # TestClient host is remote, not localhost
+    hdr = {"x-crux-token": "secret123"}
+    assert c.get("/api/whoami").json()["leader"] is False
+    assert c.get("/api/whoami", headers=hdr).json()["leader"] is True
+    # member is blocked from validating; leader (token) is allowed
+    assert c.post(f"/items/{it.id}/promote", json={}).status_code == 403
+    assert c.post(f"/items/{it.id}/promote", json={}, headers=hdr).status_code == 200
+    # members can still propose (capture) and use (retrieve)
+    assert c.post("/capture", json={"content": "a member idea"}).status_code == 200
+    assert c.post("/retrieve", json={"prompt": "database"}).status_code == 200
+
+
 def test_directive_brief_groups_by_intent(store):
     from crux.hooks import _format
     store.capture("Never touch billing without sign-off.", type_hint="constraint")

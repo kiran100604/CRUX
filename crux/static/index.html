@@ -324,7 +324,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const api=async(u,o)=>(await fetch(u,o)).json();
+// team mode: a leader token (from ?token=… or saved) unlocks validation actions.
+const _token=(()=>{const t=new URL(location.href).searchParams.get("token");
+  if(t){localStorage.setItem("crux_token",t);} return localStorage.getItem("crux_token")||"";})();
+const api=async(u,o)=>{o=o||{}; o.headers=Object.assign({}, o.headers||{}, _token?{"x-crux-token":_token}:{}); return (await fetch(u,o)).json();};
 const post=(u,b)=>api(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b||{})});
 const esc=s=>(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/1000;
@@ -333,7 +336,7 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
-  kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}};
+  kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}, leader:true};
 
 async function load(){
   const [it,rv,st,fd]=await Promise.all([
@@ -375,26 +378,31 @@ function vOverview(){
   const flagged=(state.counts.conflict||0)+(state.counts.attention||0);
   const date=new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"}).toUpperCase();
   const attn=state.inbox.slice(0,2);
-  const hero = need
+  const hero = !state.leader
+    ? `<h1 class="display">Capture & use your team's knowledge.</h1>
+       <p>Anything you capture is <b>proposed</b> to the team leader for review. Your agents automatically pull the verified knowledge below.</p>
+       <div class="row"><button class="btn primary" onclick="setView('kb')">Browse knowledge →</button></div>`
+    : need
     ? `<h1 class="display">${need} thing${need>1?'s':''} in your inbox.</h1>
        <p>${flagged?`${flagged} need${flagged>1?'':'s'} a closer look; the rest are clean and promote in one click.`:`All clean — promote them in one click.`} A quick review keeps your agents pulling only what's true.</p>
        <div class="row"><button class="btn primary" onclick="setView('decisions')">Review now →</button>
        <button class="btn ghost" onclick="setView('kb')">or browse everything</button></div>`
     : `<h1 class="display">You're all clear.</h1>
        <p>Nothing to review. Everything captured is either verified or settling in your working layer. Capture something below whenever a decision or constraint comes up.</p>`;
+  const proposeWord = state.leader ? "Capture" : "Propose";
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> OVERVIEW</div>
     <div class="hero">
       <div class="kicker">${date} · LOCAL-FIRST</div>
       ${hero}
       <div class="capture" style="position:relative">
-        <input id="cap" placeholder="Capture a decision, constraint, or note…" autocomplete="off"/>
-        <button class="btn primary" onclick="doCapture()">Capture</button>
+        <input id="cap" placeholder="${proposeWord} a decision, constraint, or note…" autocomplete="off"/>
+        <button class="btn primary" onclick="doCapture()">${proposeWord}</button>
         <div id="res"></div>
       </div>
     </div>
     <div class="cols">
-      ${attn.length?attn.map(renderAttn).join(""):`<div class="card" style="grid-column:span 2"><div class="tagline teal">ALL CLEAR</div><h3>No pending items</h3><div class="desc">Captured notes you promote will become verified knowledge your agents prioritize.</div></div>`}
+      ${state.leader&&attn.length?attn.map(renderAttn).join(""):`<div class="card" style="grid-column:span 2"><div class="tagline teal">VERIFIED KNOWLEDGE</div><h3>${state.stats.crystals||0} facts your agents trust</h3><div class="desc">${state.leader?'Captured notes you promote become verified knowledge your agents prioritize.':'Browse the Knowledge Base to see what the team has verified.'}</div></div>`}
       <div class="card act">
         <h4>Recent activity <span class="live">LIVE</span></h4>
         ${feedHTML(state.feed.slice(0,5)) || '<div class="muted2" style="font-size:13px">No injections yet. When an agent pulls your context, it shows here.</div>'}
@@ -511,6 +519,7 @@ function kbDetail(it){
         ${it.promoted_at?`<div><b>verified</b> ${it.promoted_at.slice(0,10)}</div>`:''}
         <div><b>confidence</b> ${Math.round((it.confidence||0)*100)}%</div></div>
       <div class="tags">${(it.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div></div>
+    ${state.leader?`
     <div class="refine" id="kbedit" style="display:none;margin:10px 0 14px">
       <input id="et" value="${esc(it.title)}" placeholder="Title…"/>
       <input id="es" value="${esc(it.summary||'')}" placeholder="Summary…"/>
@@ -519,7 +528,7 @@ function kbDetail(it){
       <button class="btn sm out" onclick="document.getElementById('kbedit').style.display='flex'">✎ Edit</button>
       <button class="btn sm out" onclick="demote('${it.id}')">↩ Return to working</button>
       <button class="btn sm danger" onclick="archive('${it.id}')">Archive</button>
-    </div>`;
+    </div>`:`<div class="muted2" style="font-size:12px;margin-top:14px">Read-only — the team leader maintains the knowledge base.</div>`}`;
 }
 function selectKb(id){
   state.kbSel=id; render();
@@ -759,7 +768,21 @@ document.addEventListener("click",e=>{const box=document.getElementById("res");
 window.setView=setView;window.openItem=openItem;window.doCapture=doCapture;window.promote=promote;
 window.promoteRefined=promoteRefined;window.archive=archive;window.demote=demote;window.supersede=supersede;
 window.closeDrawer=closeDrawer;window.toast=toast;
-load();
+async function init(){
+  try{ const w=await api("/api/whoami"); state.leader=!!w.leader; }catch(e){ state.leader=true; }
+  applyRole();
+  load();
+}
+function applyRole(){
+  // members propose & use; only the leader validates. Hide the Review tab + the
+  // role chip reflects it. (The server enforces this regardless of the UI.)
+  const dec=document.querySelector('[data-v="decisions"]');
+  if(dec) dec.style.display = state.leader ? "" : "none";
+  const st=document.querySelector(".status");
+  if(st) st.innerHTML = state.leader ? 'Leader · <b>VALIDATES KB</b>' : 'Member · <b>PROPOSE &amp; USE</b>';
+  if(!state.leader && state.view==="decisions") state.view="overview";
+}
+init();
 </script>
 </body>
 </html>

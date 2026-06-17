@@ -7,6 +7,8 @@ Requires the optional `server` extra:  pip install "crux[server]"
 # NOTE: no `from __future__ import annotations` here — FastAPI must see the real
 # Pydantic model objects as body annotations, not stringized forward refs.
 
+import os
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -14,6 +16,21 @@ from .config import Config
 from .store import Store
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _admin_token(cfg: Config) -> str:
+    """The leader's token. Env override, else a generated one stored in CRUX home.
+    Whoever can read this file (the person running the server) is the leader."""
+    env = os.environ.get("CRUX_ADMIN_TOKEN")
+    if env:
+        return env
+    p = cfg.home / "admin_token"
+    if p.exists():
+        return p.read_text(encoding="utf-8").strip()
+    cfg.ensure_home()
+    tok = secrets.token_urlsafe(24)
+    p.write_text(tok, encoding="utf-8")
+    return tok
 
 
 def _bg_process(cfg: Config, episode_id: str, content: str,
@@ -30,11 +47,26 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
 
 def create_app(cfg: Config):
     try:
-        from fastapi import FastAPI
+        from fastapi import FastAPI, HTTPException, Request
         from fastapi.responses import FileResponse, RedirectResponse
         from pydantic import BaseModel
     except ImportError as e:  # pragma: no cover
         raise SystemExit("FastAPI not installed. Run: pip install 'crux[server]'") from e
+
+    token = _admin_token(cfg)
+
+    def _is_leader(request: "Request") -> bool:
+        # the person running the server (localhost) is the leader; remote callers
+        # must present the admin token. (Assumes a direct connection, no proxy.)
+        host = request.client.host if request.client else ""
+        if host in ("127.0.0.1", "::1", "localhost"):
+            return True
+        return secrets.compare_digest(request.headers.get("x-crux-token", ""), token)
+
+    def _leader(request: "Request") -> None:
+        if not _is_leader(request):
+            raise HTTPException(status_code=403,
+                                detail="leader only — connect with the admin token to validate the KB")
 
     store = Store(cfg)
     app = FastAPI(title="CRUX")
@@ -178,7 +210,8 @@ def create_app(cfg: Config):
         return {"episode_id": ep.id, "status": "processing"}
 
     @app.post("/items/{item_id}/edit")
-    def edit(item_id: str, body: EditIn):
+    def edit(item_id: str, body: EditIn, request: Request):
+        _leader(request)
         return {"ok": store.edit(item_id, title=body.title,
                                  summary=body.summary, type=body.type)}
 
@@ -238,15 +271,21 @@ def create_app(cfg: Config):
                   "conflict": sum(1 for i in items if i["status"] == "conflict")}
         return {"inbox": items, "conflicts": store.open_conflicts(), "counts": counts}
 
+    @app.get("/api/whoami")
+    def whoami(request: Request):
+        return {"leader": _is_leader(request), "user": cfg.user}
+
     @app.post("/promote-clean")
-    def promote_clean():
+    def promote_clean(request: Request):
+        _leader(request)
         ids = [i["id"] for i in store.triage() if i["status"] == "clean"]
         for i in ids:
             store.promote(i)
         return {"promoted": len(ids)}
 
     @app.post("/items/{item_id}/promote")
-    def promote(item_id: str, body: PromoteIn):
+    def promote(item_id: str, body: PromoteIn, request: Request):
+        _leader(request)
         return {"ok": store.promote(item_id, title=body.title, summary=body.summary,
                                     type=body.type, tier=body.tier)}
 
@@ -256,24 +295,29 @@ def create_app(cfg: Config):
         promote: bool = True
 
     @app.post("/items/{item_id}/extend")
-    def extend(item_id: str, body: ExtendIn):
+    def extend(item_id: str, body: ExtendIn, request: Request):
+        _leader(request)
         return {"ok": store.extend(item_id, body.target_id,
                                    reason=body.reason or "", promote=body.promote)}
 
     @app.post("/items/{item_id}/demote")
-    def demote(item_id: str):
+    def demote(item_id: str, request: Request):
+        _leader(request)
         return {"ok": store.demote(item_id)}
 
     @app.post("/items/{item_id}/archive")
-    def archive(item_id: str, restore: bool = False):
+    def archive(item_id: str, request: Request, restore: bool = False):
+        _leader(request)
         return {"ok": store.archive(item_id, value=not restore)}
 
     @app.post("/items/{item_id}/supersede")
-    def supersede(item_id: str, new_id: str):
+    def supersede(item_id: str, new_id: str, request: Request):
+        _leader(request)
         return {"ok": store.supersede(item_id, new_id)}
 
     @app.post("/conflicts/{conflict_id}/dismiss")
-    def dismiss(conflict_id: int):
+    def dismiss(conflict_id: int, request: Request):
+        _leader(request)
         return {"ok": store.dismiss_conflict(conflict_id)}
 
     return app

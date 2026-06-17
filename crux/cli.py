@@ -311,17 +311,28 @@ def cmd_connect(args):
     vals = {"CRUX_SERVER": url}
     if args.user:
         vals["CRUX_USER"] = args.user
+    if args.leader:
+        vals["CRUX_ADMIN_TOKEN"] = args.leader
     save_env_file(cfg.home, vals)
     who = args.user or cfg.user
+    role = "leader" if args.leader else "member (propose & use)"
     if client.ping(url):
-        print(f"✓ Connected to {url} as {who}. Hook & capture now use the team graph.")
+        print(f"✓ Connected to {url} as {who} — {role}. Hook & capture now use the team graph.")
+        if args.leader:
+            print(f"  Validate the KB in the dashboard: {url}/?token={args.leader}")
     else:
         print(f"Saved {url} as {who}, but couldn't reach it — is `crux serve` running there?")
 
 
 def cmd_serve(args):
-    from .server import run
-    run(Config.load())
+    from .server import _admin_token, run
+    cfg = Config.load()
+    tok = _admin_token(cfg)
+    print(f"CRUX server on http://{cfg.host}:{cfg.port}  (you = leader on this machine)")
+    print("Team setup:")
+    print(f"  • Members:        crux connect http://<this-host>:{cfg.port} --user <name>")
+    print(f"  • Leader (remote): open  http://<this-host>:{cfg.port}/?token={tok}")
+    run(cfg)
 
 
 def cmd_mcp(args):
@@ -483,6 +494,8 @@ def build_parser() -> argparse.ArgumentParser:
     cn = sub.add_parser("connect", help="connect to a shared CRUX server (team mode)")
     cn.add_argument("url", help="e.g. http://crux.internal:7432")
     cn.add_argument("--user", default=None, help="your name on the team graph")
+    cn.add_argument("--leader", default=None, metavar="TOKEN",
+                    help="admin token → validate the KB remotely (else member: propose & use)")
     cn.set_defaults(func=cmd_connect)
 
     ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook")
