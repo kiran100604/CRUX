@@ -340,6 +340,73 @@ def cmd_mcp(args):
     run()
 
 
+def cmd_install_mcp(args):
+    """Register CRUX as an MCP server in Claude Code, so the agent can pull context
+    (get_context) and log decisions (log_work) into your CRUX. One command."""
+    import shutil
+    import subprocess
+    py = sys.executable
+    try:
+        import mcp  # noqa: F401
+    except Exception:
+        print("⚠ MCP SDK missing — run:  py -m pip install 'crux[mcp]'  (then re-run this)")
+    if shutil.which("claude"):
+        try:
+            r = subprocess.run(["claude", "mcp", "add", "crux", "-s", "user",
+                                "--", py, "-m", "crux.cli", "mcp"],
+                               capture_output=True, text=True)
+        except Exception as e:
+            r = subprocess.CompletedProcess([], 1, "", str(e))
+        if r.returncode == 0:
+            print("✓ Registered CRUX with Claude Code (user scope).")
+            print("  Restart Claude Code, then run /mcp — you should see 'crux'.")
+            print("  The agent can now call get_context() and log_work() against your CRUX.")
+            return
+        print("  (`claude mcp add` failed: " + (r.stderr or r.stdout).strip()[:160] + ")")
+    # fallback: project-scoped .mcp.json in the current folder
+    import json
+    p = Path(".mcp.json")
+    data = {}
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data.setdefault("mcpServers", {})["crux"] = {"command": py, "args": ["-m", "crux.cli", "mcp"]}
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    print(f"✓ Wrote {p.resolve()}")
+    print("  Open Claude Code in this folder and approve the 'crux' server (/mcp).")
+
+
+# CRUX documenting itself — cross-platform seed (works on Windows/macOS/Linux).
+_SEED = [
+    ("decision", "CRUX is a shared intent graph for AI-built software."),
+    ("constraint", "The problem: AI builds fast but widens the gap between intended and built."),
+    ("reference", "Primary users are software teams with a lead and AI-using developers."),
+    ("decision", "The leader owns verified truth; members propose and use it."),
+    ("architecture", "Two-tier memory: working layer for proposals, main graph for verified truth."),
+    ("decision", "Promotion is the human validation gate; nothing reaches agents unverified."),
+    ("architecture", "Knowledge is tiered by altitude: Core strategy, Mid planning, Leaf operational."),
+    ("decision", "Steer prompts with a directive brief instead of auditing built code."),
+    ("architecture", "Team mode shares one graph via a small server; leader role enforced by token."),
+    ("constraint", "Capture flow is copy-first then hotkey; Windows and Wayland block auto-copy."),
+    ("reference", "On Linux use 'crux bind' (GNOME shortcut); on Windows run 'crux app'."),
+    ("reference", "Agents log decisions via the MCP 'log_work' tool; they land in Review."),
+]
+
+
+def cmd_seed_demo(args):
+    """Document CRUX inside CRUX: load its own product knowledge into the KB."""
+    store = _store()
+    for typ, txt in _SEED:
+        store.capture(txt, type_hint=typ, scope="main", confidence=0.95,
+                      source="crux-docs", source_type="note")
+        print(f"  + [{typ}] {txt}")
+    store.close()
+    print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base.")
+
+
+
 def cmd_app(args):
     from .app import run
     run(open_dashboard=not args.no_open)
@@ -513,6 +580,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
+    sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
+    sub.add_parser("seed-demo", help="load CRUX's own product knowledge into the KB (cross-platform)").set_defaults(func=cmd_seed_demo)
 
     ap = sub.add_parser("app", help="run the tray/menubar app (owns the global hotkey)")
     ap.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")

@@ -48,7 +48,7 @@ Enforcement is server-side via an admin token (see below), not just hidden UI.
 
 5. **Agents pull intent** automatically:
    - **Claude Code:** the `UserPromptSubmit` hook injects a directive brief on every prompt (`crux install-hook`).
-   - **Any MCP agent:** calls `get_context(task)` before working, `log_work(...)` after.
+   - **Any MCP agent (incl. Claude Code):** run `crux install-mcp` once to register CRUX, then the agent calls `get_context(task)` before working and `log_work(...)` after. (Needs the MCP extra: `pip install 'crux[mcp]'`.)
    - **Any tool / manual:** `crux enhance "build the login flow"` → paste the enriched prompt.
 
 ## Capturing without the dashboard (per OS)
@@ -90,7 +90,17 @@ crux setup            # paste Anthropic (enrichment/judge) and/or OpenAI (embedd
 Seed a CRUX instance with CRUX's own product knowledge and explore it:
 
 ```bash
-bash docs/seed-demo.sh     # loads decisions/constraints/context about CRUX
-crux serve                 # open http://127.0.0.1:7432 → Knowledge Base
+crux seed-demo     # cross-platform; loads decisions/constraints/context about CRUX
+crux serve         # open http://127.0.0.1:7432 → Knowledge Base
 crux enhance "add a new capture surface"   # see the brief it produces
 ```
+
+## Connect Claude Code (so the agent uses your CRUX)
+
+```bash
+pip install 'crux[mcp]'   # one-time
+crux install-mcp          # registers CRUX with Claude Code (user scope)
+```
+Restart Claude Code, run `/mcp` → you should see **crux**. Now the agent pulls your
+team context (`get_context`) before tasks and logs decisions (`log_work`) into
+Review after — CRUX fills itself as you work.

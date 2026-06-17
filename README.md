@@ -5,7 +5,8 @@ CRUX **automatically injects** the relevant pieces into your coding agent so you
 stop re-explaining context and agents stop contradicting decisions you already made.
 
 > **Using it as a team?** See [`docs/TEAM.md`](docs/TEAM.md) — leader serves, members
-> connect, agents pull + log, leader validates. Try it on CRUX itself: `bash docs/seed-demo.sh`.
+> connect, agents pull + log, leader validates.
+> **Connect Claude Code:** `crux install-mcp`. **Try it on CRUX itself:** `crux seed-demo`.
 
 > Design rationale, architecture decisions, and the build roadmap live in
 > [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md). Read that first.
