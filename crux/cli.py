@@ -258,6 +258,22 @@ def cmd_ctx(args):
     store.close()
 
 
+def cmd_enhance(args):
+    """Enrich a prompt with the team's intent: prints a ready-to-paste prompt =
+    your task + the directive brief (constraints, decisions, architecture, context)
+    so the agent builds what's actually intended."""
+    from .hooks import _format
+    store = _store()
+    results, links = store.retrieve(args.task, limit=args.limit)
+    if results:
+        ids = [r.item.id for r in results] + [it.id for _, it in links]
+        store.record_usage(ids, args.task)
+        print(f"TASK: {args.task}\n\n{_format(results, links)}")
+    else:
+        print(f"TASK: {args.task}\n\n(no relevant team context found — capture some first)")
+    store.close()
+
+
 def cmd_serve(args):
     from .server import run
     run(Config.load())
@@ -414,6 +430,10 @@ def build_parser() -> argparse.ArgumentParser:
     cx = sub.add_parser("ctx", help="print relevant context for a task (paste into any tool)")
     cx.add_argument("task"); cx.add_argument("--limit", type=int, default=5)
     cx.set_defaults(func=cmd_ctx)
+
+    en = sub.add_parser("enhance", help="enrich a prompt with team intent (task + directive brief)")
+    en.add_argument("task"); en.add_argument("--limit", type=int, default=6)
+    en.set_defaults(func=cmd_enhance)
 
     ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook")
     ih.add_argument("--global", dest="globally", action="store_true",

@@ -174,6 +174,20 @@ def test_hook_inject_is_crash_safe(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == "{}"
 
 
+def test_directive_brief_groups_by_intent(store):
+    from crux.hooks import _format
+    store.capture("Never touch billing without sign-off.", type_hint="constraint")
+    store.capture("We use PostgreSQL for persistence.", type_hint="decision")
+    store.capture("Target users are enterprise ops teams.", type_hint="reference")
+    results, links = store.retrieve("build the sync feature", limit=5)
+    brief = _format(results, links)
+    assert "CONSTRAINTS TO HONOR (hard rules):" in brief
+    assert "DECISIONS ALREADY MADE:" in brief
+    assert "PRODUCT & CONTEXT:" in brief
+    # constraints must appear before product-context (directive ordering)
+    assert brief.index("CONSTRAINTS TO HONOR") < brief.index("PRODUCT & CONTEXT")
+
+
 def test_build_snippets_respects_chord():
     from crux import hotkey
     snaps = hotkey.build_snippets(["ctrl", "shift"], "k")

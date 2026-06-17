@@ -16,25 +16,46 @@ from .store import Store
 
 MAX_ITEMS = 5
 
+# Group retrieved facts into a directive brief so the agent treats them as
+# guardrails for the task — not a passive pile of references.
+_BUCKET = {
+    "constraint": "CONSTRAINTS TO HONOR (hard rules)",
+    "decision": "DECISIONS ALREADY MADE",
+    "architecture": "ARCHITECTURE & DESIGN",
+    "design": "ARCHITECTURE & DESIGN",
+}
+_DEFAULT_BUCKET = "PRODUCT & CONTEXT"
+_ORDER = ["CONSTRAINTS TO HONOR (hard rules)", "DECISIONS ALREADY MADE",
+          "ARCHITECTURE & DESIGN", "PRODUCT & CONTEXT"]
+_HEADER = ("[CRUX TEAM CONTEXT — apply this to the task. Treat constraints as hard "
+           "rules, honor decisions already made, follow the documented architecture, "
+           "and call out anything in the request that conflicts with the below.]")
 
-def _line(i, *, indent="• ", note="") -> str:
-    tier = "VERIFIED" if i.scope == "main" else "working"
+
+def _line(i) -> str:
+    tier = "verified" if i.scope == "main" else "working"
     cite = i.source or i.id[:8]
-    return f"{indent}[{tier}/{i.type}] {i.title} — {i.summary}{note} [src: {cite}]"
+    return f"• {i.title} — {i.summary} [{tier}; src: {cite}]"
 
 
 def _format(results, links=None) -> str:
-    """Render retrieved facts, with their connected (extends) facts nested under
-    them so the agent sees the enriched picture, not isolated fragments."""
-    by_parent: dict = {}
-    for pid, it in (links or []):
-        by_parent.setdefault(pid, []).append(it)
-    lines = ["[CRUX CONTEXT] (retrieved automatically — verify before trusting)"]
-    for r in results:
-        lines.append(_line(r.item))
-        for li in by_parent.get(r.item.id, []):
-            lines.append(_line(li, indent="   ↳ connected: ", note=""))
-    lines.append("[END CRUX CONTEXT]")
+    """Directive brief: facts grouped into constraints / decisions / architecture /
+    product-context, so the agent applies them rather than just reading them.
+    Connected (extends) facts are folded into the same buckets."""
+    buckets: dict = {}
+    items = [r.item for r in results] + [it for _, it in (links or [])]
+    seen = set()
+    for it in items:
+        if it.id in seen:
+            continue
+        seen.add(it.id)
+        buckets.setdefault(_BUCKET.get(it.type, _DEFAULT_BUCKET), []).append(it)
+    lines = [_HEADER]
+    for b in _ORDER:
+        if buckets.get(b):
+            lines.append(f"\n{b}:")
+            lines.extend(_line(it) for it in buckets[b])
+    lines.append("\n[END CRUX TEAM CONTEXT]")
     return "\n".join(lines)
 
 
