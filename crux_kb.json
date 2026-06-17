@@ -2,6 +2,168 @@
   "version": 1,
   "items": [
     {
+      "id": "defc7ef2-d4f2-4b78-b5da-f1b3d3cebb70",
+      "raw_content": "Microservices teams lack visibility into other repos/decisions; lenses can scope knowledge by service/area.",
+      "title": "Microservices teams lack visibility into other repos/decisions; lenses",
+      "summary": "Microservices teams lack visibility into other repos/decisions; lenses can scope knowledge by service/area.",
+      "type": "architecture",
+      "tier": "leaf",
+      "domain": "process",
+      "tags": [
+        "microservices",
+        "teams",
+        "lack"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "bd11ca1f63de10cb94e1c2357ca51efb57fc4ef2d24f61bfde3795194184a94b",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.609335+00:00",
+      "source_episode_id": "b68fda9f-0abc-48c7-b9af-c4a46008c029",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.609358+00:00",
+      "updated_at": "2026-06-17T21:25:40.609361+00:00"
+    },
+    {
+      "id": "49b85570-adf6-4d09-9a90-a88c328abf1c",
+      "raw_content": "ADRs underperform because capture is manual; CRUX's bet is low-friction AI auto-capture (MCP log_work).",
+      "title": "ADRs underperform because capture is manual; CRUX's bet",
+      "summary": "ADRs underperform because capture is manual; CRUX's bet is low-friction AI auto-capture (MCP log_work).",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "capture",
+        "adrs",
+        "underperform"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "0a476c5d13c9f2f3a7472d80ff2057acbf94d7552130de3f91a1fdf70bdb94b4",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.510309+00:00",
+      "source_episode_id": "757c104e-f7e3-4bb1-b4dc-d63e3a6ba4d7",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.510329+00:00",
+      "updated_at": "2026-06-17T21:25:40.510331+00:00"
+    },
+    {
+      "id": "2e07aba8-6fbb-4b4b-a3b2-6a593cb48246",
+      "raw_content": "Cross-team decision conflicts should surface before building, via conflict detection on the shared graph.",
+      "title": "Cross-team decision conflicts should surface before building, via",
+      "summary": "Cross-team decision conflicts should surface before building, via conflict detection on the shared graph.",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "process",
+      "tags": [
+        "cross",
+        "team",
+        "decision"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "4bf231e411c8f19463a0e3afcd0b52f6144fa706aded9e262b54b053ab5208d9",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.416385+00:00",
+      "source_episode_id": "24f4eda6-5423-40b5-9790-42b3df190f2b",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.416410+00:00",
+      "updated_at": "2026-06-17T21:25:40.416413+00:00"
+    },
+    {
+      "id": "2b240795-8f12-409c-b14c-f6827de6ad5b",
+      "raw_content": "CRUX must complement, not replace, Backstage/Pact/service-mesh; stay the decision and intent knowledge layer.",
+      "title": "CRUX must complement, not replace, Backstage/Pact/service-mesh; stay the",
+      "summary": "CRUX must complement, not replace, Backstage/Pact/service-mesh; stay the decision and intent knowledge layer.",
+      "type": "constraint",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "crux",
+        "must",
+        "complement"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "218998774c5317d25de128cc8d5fde9b289cf324b44088a7ee6b8cedb889fbf2",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.316633+00:00",
+      "source_episode_id": "95fd9b9c-23e1-4401-ac7e-e6ad12c2d3b4",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.316661+00:00",
+      "updated_at": "2026-06-17T21:25:40.316665+00:00"
+    },
+    {
+      "id": "7a365c51-d00d-49dd-85ba-233230d74abd",
+      "raw_content": "Big-co tools solve adjacent problems: Backstage (service catalog), Pact (contract testing), ADRs (decision records), service mesh (infra).",
+      "title": "Big-co tools solve adjacent problems: Backstage (service catalog)",
+      "summary": "Big-co tools solve adjacent problems: Backstage (service catalog), Pact (contract testing), ADRs (decision records), service mesh (infra).",
+      "type": "reference",
+      "tier": "leaf",
+      "domain": "technical",
+      "tags": [
+        "service",
+        "tools",
+        "solve"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "a668bc13e7a2dadb0ce31df680cf10d6ce347b47229791c232c813f8e2ade8a3",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.214057+00:00",
+      "source_episode_id": "fb797c31-b036-475d-b717-1fcbcac5b86b",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.214074+00:00",
+      "updated_at": "2026-06-17T21:25:40.214077+00:00"
+    },
+    {
+      "id": "fa322ebe-d158-4c15-a7ed-59bf8ed71992",
+      "raw_content": "Even at scale, nothing connects decisions and implementation plans across teams — this is CRUX's core gap.",
+      "title": "Even at scale, nothing connects decisions and implementation",
+      "summary": "Even at scale, nothing connects decisions and implementation plans across teams — this is CRUX's core gap.",
+      "type": "decision",
+      "tier": "mid",
+      "domain": "user",
+      "tags": [
+        "even",
+        "scale",
+        "nothing"
+      ],
+      "source": "field-notes",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "9db860aae8d149bc0937c3d2db024190f3e943bf4f7e90c39179073d8e43fd0f",
+      "version": 1,
+      "promoted_at": "2026-06-17T21:25:40.121559+00:00",
+      "source_episode_id": "59f89de7-97b4-46ce-9343-cc382a3ec4e7",
+      "locator": null,
+      "captured_at": "2026-06-17T21:25:40.121576+00:00",
+      "updated_at": "2026-06-17T21:25:40.121578+00:00"
+    },
+    {
       "id": "629d6ede-3436-423c-861a-064420db0fe8",
       "raw_content": "In multi-microservice orgs, a lens per team or service gives cross-team decision visibility.",
       "title": "In multi-microservice orgs, a lens per team or",
@@ -23,10 +185,10 @@
       "content_hash": "0c398506bb791c0646b328d554fec9d5ad0399177999ca83c8d552e6d5c532bf",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.415372+00:00",
-      "source_episode_id": "5f82520d-bdbb-4c1c-9772-2daaf4492551",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.415395+00:00",
-      "updated_at": "2026-06-17T19:41:38.415398+00:00"
+      "updated_at": "2026-06-17T21:25:39.982589+00:00"
     },
     {
       "id": "2e35c885-5496-4dcf-a891-8f8bb5c397b1",
@@ -50,10 +212,10 @@
       "content_hash": "bf7c84803d0b6b83d1b63a879a4e0b47bfa47a252fee60aafc9a452f157eaae0",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.341618+00:00",
-      "source_episode_id": "4f4dfb1c-4edd-489f-b7d5-1838097386de",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.341633+00:00",
-      "updated_at": "2026-06-17T19:41:38.341637+00:00"
+      "updated_at": "2026-06-17T21:25:39.984241+00:00"
     },
     {
       "id": "cb4baa10-22f0-403f-9758-578c45e4230a",
@@ -77,10 +239,10 @@
       "content_hash": "76f9043fe555782e89054ba4eb9107b3cf1bd88e00702f9c1a5d59999a2ac457",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.250662+00:00",
-      "source_episode_id": "8e3b4891-35fb-489b-b19e-605e38a83cda",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.250676+00:00",
-      "updated_at": "2026-06-17T19:41:38.250678+00:00"
+      "updated_at": "2026-06-17T21:25:39.985586+00:00"
     },
     {
       "id": "e35fd91f-ec70-4d5c-9cdf-349678818c33",
@@ -104,10 +266,10 @@
       "content_hash": "4b680fd6cc3d9db0b99559468c0abb4db2da04fdf7554f44138a750167f438b1",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.171752+00:00",
-      "source_episode_id": "98063051-94b6-44c0-896a-f4948c7f7cbc",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.171775+00:00",
-      "updated_at": "2026-06-17T19:41:38.171778+00:00"
+      "updated_at": "2026-06-17T21:25:39.987276+00:00"
     },
     {
       "id": "6a27b3bc-10f3-4c83-ac37-764582f449dc",
@@ -131,10 +293,10 @@
       "content_hash": "ad7207d695399a61df9efca8ec359988e4c7d74ee83214f3c3a2c69434551d7e",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.096858+00:00",
-      "source_episode_id": "5971e0d2-022b-46f3-914b-a967e8437084",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.096871+00:00",
-      "updated_at": "2026-06-17T19:41:38.096874+00:00"
+      "updated_at": "2026-06-17T21:25:39.988550+00:00"
     },
     {
       "id": "6c03011d-4761-4b1a-9965-2cff377f671b",
@@ -158,10 +320,10 @@
       "content_hash": "106f6297cf6bcbfbf72b352e6441485d5dcd911573f91301b127e2531aca22db",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:38.019295+00:00",
-      "source_episode_id": "17473a16-7e20-42cc-a0a8-dad4238d0606",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.019310+00:00",
-      "updated_at": "2026-06-17T19:41:38.019312+00:00"
+      "updated_at": "2026-06-17T21:25:39.989933+00:00"
     },
     {
       "id": "e941fb08-90e4-4270-8247-16a51e7df6d9",
@@ -185,10 +347,10 @@
       "content_hash": "166d22892b5dacdeca1c3108d8bcc0aac8ccfce721f25e0933b2c547f0ed2028",
       "version": 1,
       "promoted_at": "2026-06-17T19:41:37.940805+00:00",
-      "source_episode_id": "3389b54e-0375-4037-92b7-5377a1df001c",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:37.940819+00:00",
-      "updated_at": "2026-06-17T19:41:37.940821+00:00"
+      "updated_at": "2026-06-17T21:25:39.991115+00:00"
     },
     {
       "id": "0d4ee98d-2b83-4a36-81c6-241aaf98150c",
@@ -215,7 +377,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.959976+00:00",
-      "updated_at": "2026-06-17T19:41:37.824634+00:00"
+      "updated_at": "2026-06-17T21:25:39.992616+00:00"
     },
     {
       "id": "3bac1a85-6004-4fe4-9884-1dde29bc0ed9",
@@ -242,7 +404,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.890314+00:00",
-      "updated_at": "2026-06-17T19:41:37.827084+00:00"
+      "updated_at": "2026-06-17T21:25:39.993909+00:00"
     },
     {
       "id": "57dea7c0-f62e-42f2-b467-d9f3f99248a2",
@@ -269,7 +431,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.817149+00:00",
-      "updated_at": "2026-06-17T19:41:37.828973+00:00"
+      "updated_at": "2026-06-17T21:25:39.995359+00:00"
     },
     {
       "id": "d943c473-2add-4be5-9f5c-0afccade529f",
@@ -296,7 +458,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.749700+00:00",
-      "updated_at": "2026-06-17T19:41:37.831098+00:00"
+      "updated_at": "2026-06-17T21:25:39.996658+00:00"
     },
     {
       "id": "0c25763f-a58b-4b9a-a7f2-ec6dbba9e610",
@@ -323,7 +485,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.842606+00:00",
-      "updated_at": "2026-06-17T19:41:37.833102+00:00"
+      "updated_at": "2026-06-17T21:25:39.997999+00:00"
     },
     {
       "id": "7c64c1d9-29f0-418e-9ab1-557df9b0aa9a",
@@ -350,7 +512,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.771532+00:00",
-      "updated_at": "2026-06-17T19:41:37.835157+00:00"
+      "updated_at": "2026-06-17T21:25:39.999457+00:00"
     },
     {
       "id": "2fa43b94-a90e-43cb-aee2-322968463379",
@@ -377,7 +539,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.700452+00:00",
-      "updated_at": "2026-06-17T19:41:37.837006+00:00"
+      "updated_at": "2026-06-17T21:25:40.000884+00:00"
     },
     {
       "id": "bff50c17-9d83-42fd-b3ab-6312a774ccc4",
@@ -404,7 +566,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.632385+00:00",
-      "updated_at": "2026-06-17T19:41:37.838877+00:00"
+      "updated_at": "2026-06-17T21:25:40.002088+00:00"
     },
     {
       "id": "74f292b5-dc14-46f9-b012-4d4186185827",
@@ -431,7 +593,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.562802+00:00",
-      "updated_at": "2026-06-17T19:41:37.840712+00:00"
+      "updated_at": "2026-06-17T21:25:40.003589+00:00"
     },
     {
       "id": "fe53994d-074e-4331-82fb-8ae081be4030",
@@ -458,7 +620,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.494378+00:00",
-      "updated_at": "2026-06-17T19:41:37.842622+00:00"
+      "updated_at": "2026-06-17T21:25:40.005295+00:00"
     },
     {
       "id": "410806d7-ffd6-4510-ae6d-ecbb2b1c4d3f",
@@ -485,7 +647,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.425138+00:00",
-      "updated_at": "2026-06-17T19:41:37.844421+00:00"
+      "updated_at": "2026-06-17T21:25:40.006788+00:00"
     },
     {
       "id": "fece0bff-ed93-428e-aa1b-8ea702a21095",
@@ -512,7 +674,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.423831+00:00",
-      "updated_at": "2026-06-17T19:41:37.846243+00:00"
+      "updated_at": "2026-06-17T21:25:40.007968+00:00"
     },
     {
       "id": "0779c432-e680-47e6-8f75-caf27a27301e",
@@ -539,7 +701,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.418735+00:00",
-      "updated_at": "2026-06-17T19:41:37.847974+00:00"
+      "updated_at": "2026-06-17T21:25:40.009224+00:00"
     },
     {
       "id": "7456529f-f300-4001-9ffa-d4dcbc1a29ed",
@@ -566,7 +728,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.413139+00:00",
-      "updated_at": "2026-06-17T19:41:37.849676+00:00"
+      "updated_at": "2026-06-17T21:25:40.010513+00:00"
     },
     {
       "id": "5403c74b-fd85-445d-8b08-c9118b41764d",
@@ -593,7 +755,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.406958+00:00",
-      "updated_at": "2026-06-17T19:41:37.851467+00:00"
+      "updated_at": "2026-06-17T21:25:40.011887+00:00"
     },
     {
       "id": "169e8bff-ca81-4193-8070-fcd955d3bb54",
@@ -620,7 +782,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.400956+00:00",
-      "updated_at": "2026-06-17T19:41:37.853367+00:00"
+      "updated_at": "2026-06-17T21:25:40.013095+00:00"
     },
     {
       "id": "251660e6-a110-428d-99dd-ecc63cf7a8b2",
@@ -647,7 +809,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.395410+00:00",
-      "updated_at": "2026-06-17T19:41:37.855272+00:00"
+      "updated_at": "2026-06-17T21:25:40.015464+00:00"
     },
     {
       "id": "baa79989-db04-455b-86bd-362a935fb08d",
@@ -674,7 +836,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.391005+00:00",
-      "updated_at": "2026-06-17T19:41:37.857118+00:00"
+      "updated_at": "2026-06-17T21:25:40.017554+00:00"
     },
     {
       "id": "0999b0fc-753d-468e-bfc7-a53161db7461",
@@ -701,7 +863,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.387033+00:00",
-      "updated_at": "2026-06-17T19:41:37.858969+00:00"
+      "updated_at": "2026-06-17T21:25:40.019825+00:00"
     },
     {
       "id": "ae12ebdb-73a4-4481-bf9b-e450f510c83f",
@@ -728,7 +890,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.380948+00:00",
-      "updated_at": "2026-06-17T19:41:37.861125+00:00"
+      "updated_at": "2026-06-17T21:25:40.021924+00:00"
     },
     {
       "id": "c1c746a0-b2e0-47b4-af73-40c1674e13dc",
@@ -755,7 +917,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.376103+00:00",
-      "updated_at": "2026-06-17T19:41:37.862999+00:00"
+      "updated_at": "2026-06-17T21:25:40.024122+00:00"
     },
     {
       "id": "22557414-0c26-41a7-bb4c-0fb9083011b0",
@@ -782,7 +944,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.370571+00:00",
-      "updated_at": "2026-06-17T19:41:37.864822+00:00"
+      "updated_at": "2026-06-17T21:25:40.026341+00:00"
     },
     {
       "id": "d39c3b6f-44cc-4501-ab69-d9f2c3211c61",
@@ -809,7 +971,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.365506+00:00",
-      "updated_at": "2026-06-17T19:41:37.866526+00:00"
+      "updated_at": "2026-06-17T21:25:40.028435+00:00"
     }
   ]
 }
