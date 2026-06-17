@@ -406,6 +406,32 @@ def cmd_seed_demo(args):
     print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base.")
 
 
+def cmd_export(args):
+    """Export the KB to a JSON file (commit it to git so the KB travels with the repo)."""
+    import json
+    store = _store()
+    items = store.export_items()
+    store.close()
+    Path(args.path).write_text(
+        json.dumps({"version": 1, "items": items}, indent=2, ensure_ascii=False),
+        encoding="utf-8")
+    print(f"✓ exported {len(items)} item(s) → {args.path}")
+
+
+def cmd_import(args):
+    """Import a KB JSON file into this machine's CRUX (idempotent — deduped by hash)."""
+    import json
+    p = Path(args.path)
+    if not p.exists():
+        print(f"file not found: {p}"); return
+    data = json.loads(p.read_text(encoding="utf-8"))
+    store = _store()
+    n = store.import_items(data.get("items", []))
+    store.close()
+    print(f"✓ imported {n} new item(s) from {args.path}  (run `crux serve` to view)")
+
+
+
 
 def cmd_app(args):
     from .app import run
@@ -582,6 +608,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
     sub.add_parser("seed-demo", help="load CRUX's own product knowledge into the KB (cross-platform)").set_defaults(func=cmd_seed_demo)
+
+    ex = sub.add_parser("export", help="export the KB to JSON (commit it so the KB travels via git)")
+    ex.add_argument("path", nargs="?", default="crux_kb.json")
+    ex.set_defaults(func=cmd_export)
+
+    im = sub.add_parser("import", help="import a KB JSON file into this machine (deduped)")
+    im.add_argument("path", nargs="?", default="crux_kb.json")
+    im.set_defaults(func=cmd_import)
 
     ap = sub.add_parser("app", help="run the tray/menubar app (owns the global hotkey)")
     ap.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")

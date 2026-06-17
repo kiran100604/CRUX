@@ -145,6 +145,43 @@ class Store:
 
     # --- retrieval -----------------------------------------------------------
 
+    def export_items(self) -> list[dict]:
+        """Serialize the live KB (working + verified, minus superseded/archived) so
+        it can be committed to git — the KB then travels with the repo."""
+        return [i.to_public_dict() for i in self.db.list(archived=False, limit=100000)
+                if not i.superseded_by]
+
+    def import_items(self, items: list[dict]) -> int:
+        """Load exported items into this store, deduped by content hash (idempotent
+        — re-importing the same file adds nothing)."""
+        n = 0
+        for d in items:
+            h = d.get("content_hash") or _hash(f"{d.get('title')}\n{d.get('summary')}")
+            if self.db.get_by_hash(h):
+                continue
+            it = ContextItem(
+                id=d.get("id") or str(uuid.uuid4()),
+                raw_content=d.get("raw_content", ""),
+                title=d.get("title", "Untitled"),
+                summary=d.get("summary", ""),
+                type=d.get("type", "context"),
+                tier=d.get("tier", "leaf"),
+                tags=d.get("tags", []),
+                source=d.get("source"),
+                scope=d.get("scope", "individual"),
+                confidence=d.get("confidence", 0.7),
+                embedding_model=self.embedder.model,
+                content_hash=h,
+                version=d.get("version", 1),
+                promoted_at=d.get("promoted_at"),
+                locator=d.get("locator"),
+                captured_at=d.get("captured_at") or now_iso(),
+                updated_at=now_iso(),
+            )
+            self.db.insert(it, self.embedder.embed(f"{it.title}\n{it.summary}\n{it.raw_content}"))
+            n += 1
+        return n
+
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
         qvec = self.embedder.embed(query)

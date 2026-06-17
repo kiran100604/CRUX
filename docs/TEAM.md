@@ -95,6 +95,24 @@ crux serve         # open http://127.0.0.1:7432 → Knowledge Base
 crux enhance "add a new capture surface"   # see the brief it produces
 ```
 
+## Sync the KB via git (no server needed)
+
+If you don't want to host anything, let the KB travel with the repo:
+
+```bash
+crux export crux_kb.json     # dump the KB to a committed file
+git add crux_kb.json && git commit -m "update KB" && git push
+
+# on another machine / after someone else pushes:
+git pull
+crux import crux_kb.json     # load it into your local CRUX (idempotent, deduped)
+crux serve                   # view it
+```
+
+The committed `crux_kb.json` is human-readable in diffs (titles/summaries), so a
+`git pull` literally shows what changed. Good enough until you want a live shared
+server (Fly.io / VPS), which removes the manual export/import step.
+
 ## Connect Claude Code (so the agent uses your CRUX)
 
 ```bash
