@@ -1,8 +1,13 @@
-"""MCP server — the fallback injection path for agents without lifecycle hooks,
-and for explicit on-demand queries. Talks straight to the DB via Store; it does
-not depend on the FastAPI server running.
+"""MCP server — lets any agent both PULL the team's context and PUSH back what it
+decided, so capture stops depending on a human remembering to do it.
 
-Requires the optional `mcp` extra:  pip install "crux[mcp]"
+Two tools:
+  • get_context  — pull the directive brief for the current task.
+  • log_work     — at the end of a task, record the decisions/knowledge made so
+                   they enter Review (a human validates before they're trusted).
+
+Team-aware: when CRUX_SERVER is set, reads/writes go to the shared graph; else
+local. Requires the optional `mcp` extra:  pip install "crux[mcp]"
 """
 
 from __future__ import annotations
@@ -17,49 +22,68 @@ def run() -> None:
     except ImportError as e:  # pragma: no cover
         raise SystemExit("MCP SDK not installed. Run: pip install 'crux[mcp]'") from e
 
-    store = Store(Config.load())
+    cfg = Config.load()
+    store = None if cfg.server else Store(cfg)
     mcp = FastMCP("crux")
 
-    @mcp.tool()
-    def get_context(query: str, limit: int = 5, scope: str = "all",
-                    include_archived: bool = False) -> dict:
-        """Fetch relevant project context from CRUX for the current task.
-
-        scope: "all" (default — verified main graph prioritized, recent working
-        notes included), "main" (verified truth only), or "individual" (working
-        layer only).
-        """
-        s = None if scope == "all" else scope
-        # include_archived isn't graph-expanded; otherwise use the payoff retrieval
-        if include_archived:
-            results = store.search(query, limit=limit, scope=s, include_archived=True)
-            links = []
-        else:
-            results, links = store.retrieve(query, limit=limit, scope=s)
-        items = [
-            {"id": r.item.id, "title": r.item.title, "summary": r.item.summary,
-             "type": r.item.type, "tier": r.item.tier, "scope": r.item.scope,
-             "source": r.item.source, "score": round(r.score, 4)}
-            for r in results
-        ]
-        connected = [
-            {"id": it.id, "title": it.title, "summary": it.summary, "type": it.type,
-             "tier": it.tier, "scope": it.scope, "connected_to": pid[:8], "via": "extends"}
-            for pid, it in links
-        ]
-        return {"items": items, "connected": connected, "returned": len(results)}
+    def _stage(content: str, type_hint: str | None, session: str) -> dict:
+        """Stage one proposal into the working layer (never the trusted KB)."""
+        if cfg.server:
+            from . import client
+            r = client.capture(cfg.server, content, type=type_hint,
+                               source="agent", user=cfg.user)
+            return {"title": r.get("title", content[:48])}
+        item = store.capture(content, type_hint=type_hint, scope="individual",
+                             confidence=0.4, source="agent", source_type="agent")
+        return {"title": item.title}
 
     @mcp.tool()
-    def add_context(content: str, type: str | None = None) -> dict:
-        """Log a piece of context from inside an agent session.
+    def get_context(task: str, limit: int = 6) -> dict:
+        """Pull the team's relevant knowledge for the task you're about to do.
 
-        Agent-written items always land in the WORKING (individual) layer at low
-        confidence — they are "what the agent is doing", not verified truth. A human
-        refines and promotes them to the main graph later, so an over-eager agent
-        can never pollute the trusted layer.
+        Returns a directive brief — constraints to honor, decisions already made,
+        architecture, and product context. Apply it: treat constraints as hard
+        rules, follow decisions, and flag anything in the request that conflicts.
+        Call this BEFORE starting work.
         """
-        item = store.capture(content, type_hint=type, scope="individual",
-                             confidence=0.4, source_type="agent")
-        return {"id": item.id, "title": item.title, "summary": item.summary, "scope": item.scope}
+        if cfg.server:
+            from . import client
+            r = client.retrieve(cfg.server, task, user=cfg.user, limit=limit)
+            return {"context": r.get("context", ""), "count": r.get("count", 0)}
+        from .hooks import _format
+        results, links = store.retrieve(task, limit=limit)
+        if not results:
+            return {"context": "", "count": 0}
+        ids = [r.item.id for r in results] + [it.id for _, it in links]
+        store.record_usage(ids, task, user=cfg.user)
+        return {"context": _format(results, links), "count": len(results)}
+
+    @mcp.tool()
+    def log_work(decisions: list[str] = [], constraints: list[str] = [],
+                 knowledge: list[str] = [], session: str = "") -> dict:
+        """Record what this session produced, so it enters the team's knowledge.
+
+        Call this when you FINISH a meaningful unit of work (or whenever you make a
+        notable choice). Capture only durable, reusable things — not step-by-step
+        chatter:
+          • decisions  — choices made ("chose Stripe over Razorpay for fees")
+          • constraints — rules to honor going forward ("never call billing sync directly")
+          • knowledge  — facts worth remembering ("the auth token expires in 15m")
+        Everything you log is a PROPOSAL: it lands in Review for a human to validate
+        before it becomes trusted knowledge — so log generously, it can't pollute
+        the KB.
+        """
+        staged, titles = 0, []
+        for c in decisions:
+            if c and c.strip():
+                titles.append(_stage(c, "decision", session)["title"]); staged += 1
+        for c in constraints:
+            if c and c.strip():
+                titles.append(_stage(c, "constraint", session)["title"]); staged += 1
+        for c in knowledge:
+            if c and c.strip():
+                titles.append(_stage(c, "context", session)["title"]); staged += 1
+        return {"staged": staged, "titles": titles,
+                "note": "Proposed to Review — a human will validate before it's trusted."}
 
     mcp.run()

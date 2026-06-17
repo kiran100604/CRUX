@@ -29,11 +29,11 @@ def retrieve(server: str, prompt: str, *, session: str = "", user: str = "",
                  {"prompt": prompt, "session": session, "user": user, "limit": limit})
 
 
-def capture(server: str, content: str, *, source: str = "hotkey",
-            user: str = "") -> dict:
-    """Capture text into the shared graph's working layer."""
+def capture(server: str, content: str, *, type: str | None = None,
+            source: str = "agent", user: str = "") -> dict:
+    """Capture/propose text into the shared graph's working layer."""
     return _post(server, "/capture",
-                 {"content": content, "source": source, "user": user})
+                 {"content": content, "type": type, "source": source, "user": user})
 
 
 def ingest(server: str, content: str, *, source_ref: str = "clipboard",
