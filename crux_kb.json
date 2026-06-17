@@ -2,12 +2,121 @@
   "version": 1,
   "items": [
     {
+      "id": "0d4ee98d-2b83-4a36-81c6-241aaf98150c",
+      "raw_content": "Auto-linking is similarity-gated so only genuinely-related facts connect, not everything to everything.",
+      "title": "Auto-linking is similarity-gated so only genuinely-related facts connect",
+      "summary": "Auto-linking is similarity-gated so only genuinely-related facts connect, not everything to everything.",
+      "type": "constraint",
+      "tier": "leaf",
+      "domain": "other",
+      "tags": [
+        "everything",
+        "auto",
+        "linking"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "ced5fca128f58f6b6bb93041479f97c804d058a20ac7aa5f8bf8c0126da60e71",
+      "version": 1,
+      "promoted_at": "2026-06-17T17:15:43.959964+00:00",
+      "source_episode_id": "64315d36-b59f-4dfd-b12d-2dbd43ad3bd6",
+      "locator": null,
+      "captured_at": "2026-06-17T17:15:43.959976+00:00",
+      "updated_at": "2026-06-17T17:15:43.959978+00:00"
+    },
+    {
+      "id": "3bac1a85-6004-4fe4-9884-1dde29bc0ed9",
+      "raw_content": "Topics are lenses (named views that gather the relevant subgraph), not containers a fact is filed into.",
+      "title": "Topics are lenses (named views that gather the",
+      "summary": "Topics are lenses (named views that gather the relevant subgraph), not containers a fact is filed into.",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "other",
+      "tags": [
+        "topics",
+        "lenses",
+        "named"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "1bb4724606b26827b8658e8b01bc5095e87eadcd964265840c2eddde6a667074",
+      "version": 1,
+      "promoted_at": "2026-06-17T17:15:43.890299+00:00",
+      "source_episode_id": "4f58f114-d722-4b2f-96da-5e1a212da8eb",
+      "locator": null,
+      "captured_at": "2026-06-17T17:15:43.890314+00:00",
+      "updated_at": "2026-06-17T17:15:43.890316+00:00"
+    },
+    {
+      "id": "57dea7c0-f62e-42f2-b467-d9f3f99248a2",
+      "raw_content": "The KB is one self-organising graph, not folders; facts auto-link to related facts across domains.",
+      "title": "The KB is one self-organising graph, not folders",
+      "summary": "The KB is one self-organising graph, not folders; facts auto-link to related facts across domains.",
+      "type": "architecture",
+      "tier": "leaf",
+      "domain": "other",
+      "tags": [
+        "facts",
+        "self",
+        "organising"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "24824292fa835ebf936b79e5eecb72af1abc5cdcad313c14388363da6781345d",
+      "version": 1,
+      "promoted_at": "2026-06-17T17:15:43.817136+00:00",
+      "source_episode_id": "960a6db5-f0b7-44c0-b908-77f2339b5520",
+      "locator": null,
+      "captured_at": "2026-06-17T17:15:43.817149+00:00",
+      "updated_at": "2026-06-17T17:15:43.817151+00:00"
+    },
+    {
+      "id": "d943c473-2add-4be5-9f5c-0afccade529f",
+      "raw_content": "Every fact has a domain (product/technical/user/market/competitor/legal/process), auto-classified at capture.",
+      "title": "Every fact has a domain (product/technical/user/market/competitor/legal/process), auto-classified at",
+      "summary": "Every fact has a domain (product/technical/user/market/competitor/legal/process), auto-classified at capture.",
+      "type": "architecture",
+      "tier": "core",
+      "domain": "user",
+      "tags": [
+        "every",
+        "fact",
+        "domain"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "00576aae5714cbefb0cc4dc80c3a1517bf3b988155f691699aa87bf4f61b6505",
+      "version": 1,
+      "promoted_at": "2026-06-17T17:15:43.749685+00:00",
+      "source_episode_id": "e7e420d8-35ab-4bd7-8d61-d4bf126b92fb",
+      "locator": null,
+      "captured_at": "2026-06-17T17:15:43.749700+00:00",
+      "updated_at": "2026-06-17T17:15:43.749702+00:00"
+    },
+    {
       "id": "0c25763f-a58b-4b9a-a7f2-ec6dbba9e610",
       "raw_content": "Capture steers prompts with a directive brief; it does not verify the built code.",
       "title": "Capture steers prompts with a directive brief; it",
       "summary": "Capture steers prompts with a directive brief; it does not verify the built code.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "capture",
         "steers",
@@ -22,10 +131,10 @@
       "content_hash": "73b9f9f1531799b6ab9f0f1df63694315bf451efee6baf7dc94ec406e0b91208",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.842593+00:00",
-      "source_episode_id": "845540f4-44e9-43ed-a5b9-0a7bfe974728",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.842606+00:00",
-      "updated_at": "2026-06-17T16:40:10.842608+00:00"
+      "updated_at": "2026-06-17T17:15:43.654903+00:00"
     },
     {
       "id": "7c64c1d9-29f0-418e-9ab1-557df9b0aa9a",
@@ -34,6 +143,7 @@
       "summary": "Tiers and relationships are LLM-classified; offline heuristics are only stand-ins until API keys are added.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "tiers",
         "relationships",
@@ -48,10 +158,10 @@
       "content_hash": "36c5a6435da896a76c911264d84d41580bedddb93b60218c690baa2614770b1d",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.771520+00:00",
-      "source_episode_id": "d1a4d5f7-0458-4da2-aaf6-41b4cc125c04",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.771532+00:00",
-      "updated_at": "2026-06-17T16:40:10.771534+00:00"
+      "updated_at": "2026-06-17T17:15:43.655981+00:00"
     },
     {
       "id": "2fa43b94-a90e-43cb-aee2-322968463379",
@@ -60,6 +170,7 @@
       "summary": "Custom hotkeys are validated: no-modifier, reserved, and punctuation chords are flagged.",
       "type": "constraint",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "custom",
         "hotkeys",
@@ -74,10 +185,10 @@
       "content_hash": "b418d0b8703a193607afdd35bbf89d97bc54d548e7ecfb400f266f7595b4a2ac",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.700438+00:00",
-      "source_episode_id": "12786110-b2c1-4fba-a5ab-678c091aaf94",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.700452+00:00",
-      "updated_at": "2026-06-17T16:40:10.700454+00:00"
+      "updated_at": "2026-06-17T17:15:43.656948+00:00"
     },
     {
       "id": "bff50c17-9d83-42fd-b3ab-6312a774ccc4",
@@ -86,6 +197,7 @@
       "summary": "The KB can sync via git (crux export/import crux_kb.json) when there is no hosted server.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "crux",
         "sync",
@@ -100,10 +212,10 @@
       "content_hash": "857e02b10a122dca82e4509e6fd1ce622702e0661200780a6899c6676b980cf8",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.632372+00:00",
-      "source_episode_id": "627dc4b5-74da-47c1-b988-50eba83f4e3d",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.632385+00:00",
-      "updated_at": "2026-06-17T16:40:10.632387+00:00"
+      "updated_at": "2026-06-17T17:15:43.657979+00:00"
     },
     {
       "id": "74f292b5-dc14-46f9-b012-4d4186185827",
@@ -112,6 +224,7 @@
       "summary": "Roles are enforced server-side by a shared admin token; localhost or a valid token equals leader.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "token",
         "roles",
@@ -126,10 +239,10 @@
       "content_hash": "f3c5083bc6f019c5b0d979615346d382d16379b74d4d12fee0420ee0e65995b2",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.562783+00:00",
-      "source_episode_id": "c6e9325d-543f-41e8-9a7f-3e69ba836b3b",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.562802+00:00",
-      "updated_at": "2026-06-17T16:40:10.562805+00:00"
+      "updated_at": "2026-06-17T17:15:43.659142+00:00"
     },
     {
       "id": "fe53994d-074e-4331-82fb-8ae081be4030",
@@ -138,6 +251,7 @@
       "summary": "The Knowledge Base is a two-pane Explorer: a navigator plus a detail pane with walkable connections.",
       "type": "architecture",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "pane",
         "knowledge",
@@ -152,10 +266,10 @@
       "content_hash": "adc6ebccf2e2a96bd577d31a41765b030c4e32f39e22d909c6bf8aaea333b5c2",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.494364+00:00",
-      "source_episode_id": "f353e482-36f1-46f3-8165-15f654ca4fb9",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.494378+00:00",
-      "updated_at": "2026-06-17T16:40:10.494380+00:00"
+      "updated_at": "2026-06-17T17:15:43.660141+00:00"
     },
     {
       "id": "410806d7-ffd6-4510-ae6d-ecbb2b1c4d3f",
@@ -164,6 +278,7 @@
       "summary": "Retrieval pulls a fact's connected (extends) facts so agents get the whole picture, not fragments.",
       "type": "architecture",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "retrieval",
         "pulls",
@@ -178,10 +293,10 @@
       "content_hash": "377fb1c5e2585f36df911ae6c59db7e10826e40a480c9cb3759ced586fde66ef",
       "version": 1,
       "promoted_at": "2026-06-17T16:40:10.425124+00:00",
-      "source_episode_id": "88354a30-329d-4881-bd51-b228014d7e48",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.425138+00:00",
-      "updated_at": "2026-06-17T16:40:10.425140+00:00"
+      "updated_at": "2026-06-17T17:15:43.661096+00:00"
     },
     {
       "id": "fece0bff-ed93-428e-aa1b-8ea702a21095",
@@ -190,6 +305,7 @@
       "summary": "Agents log decisions via the MCP 'log_work' tool; they land in Review.",
       "type": "reference",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "agents",
         "decisions",
@@ -207,7 +323,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.423831+00:00",
-      "updated_at": "2026-06-17T16:40:10.335421+00:00"
+      "updated_at": "2026-06-17T17:15:43.662148+00:00"
     },
     {
       "id": "0779c432-e680-47e6-8f75-caf27a27301e",
@@ -216,6 +332,7 @@
       "summary": "On Linux use 'crux bind' (GNOME shortcut); on Windows run 'crux app'.",
       "type": "reference",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "crux",
         "linux",
@@ -233,7 +350,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.418735+00:00",
-      "updated_at": "2026-06-17T16:40:10.336810+00:00"
+      "updated_at": "2026-06-17T17:15:43.663788+00:00"
     },
     {
       "id": "7456529f-f300-4001-9ffa-d4dcbc1a29ed",
@@ -242,6 +359,7 @@
       "summary": "Capture flow is copy-first then hotkey; Windows and Wayland block auto-copy.",
       "type": "constraint",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "copy",
         "capture",
@@ -259,7 +377,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.413139+00:00",
-      "updated_at": "2026-06-17T16:40:10.337841+00:00"
+      "updated_at": "2026-06-17T17:15:43.665432+00:00"
     },
     {
       "id": "5403c74b-fd85-445d-8b08-c9118b41764d",
@@ -268,6 +386,7 @@
       "summary": "Team mode shares one graph via a small server; leader role enforced by token.",
       "type": "architecture",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "team",
         "mode",
@@ -285,7 +404,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.406958+00:00",
-      "updated_at": "2026-06-17T16:40:10.338939+00:00"
+      "updated_at": "2026-06-17T17:15:43.667040+00:00"
     },
     {
       "id": "169e8bff-ca81-4193-8070-fcd955d3bb54",
@@ -294,6 +413,7 @@
       "summary": "Steer prompts with a directive brief instead of auditing built code.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "steer",
         "prompts",
@@ -311,7 +431,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.400956+00:00",
-      "updated_at": "2026-06-17T16:40:10.339880+00:00"
+      "updated_at": "2026-06-17T17:15:43.668614+00:00"
     },
     {
       "id": "251660e6-a110-428d-99dd-ecc63cf7a8b2",
@@ -320,6 +440,7 @@
       "summary": "Knowledge is tiered by altitude: Core strategy, Mid planning, Leaf operational.",
       "type": "architecture",
       "tier": "core",
+      "domain": "other",
       "tags": [
         "knowledge",
         "tiered",
@@ -337,7 +458,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.395410+00:00",
-      "updated_at": "2026-06-17T16:40:10.341701+00:00"
+      "updated_at": "2026-06-17T17:15:43.670135+00:00"
     },
     {
       "id": "baa79989-db04-455b-86bd-362a935fb08d",
@@ -346,6 +467,7 @@
       "summary": "Promotion is the human validation gate; nothing reaches agents unverified.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "promotion",
         "human",
@@ -363,7 +485,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.391005+00:00",
-      "updated_at": "2026-06-17T16:40:10.343368+00:00"
+      "updated_at": "2026-06-17T17:15:43.671713+00:00"
     },
     {
       "id": "0999b0fc-753d-468e-bfc7-a53161db7461",
@@ -372,6 +494,7 @@
       "summary": "Two-tier memory: working layer for proposals, main graph for verified truth.",
       "type": "architecture",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "tier",
         "memory",
@@ -389,7 +512,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.387033+00:00",
-      "updated_at": "2026-06-17T16:40:10.345274+00:00"
+      "updated_at": "2026-06-17T17:15:43.673251+00:00"
     },
     {
       "id": "ae12ebdb-73a4-4481-bf9b-e450f510c83f",
@@ -398,6 +521,7 @@
       "summary": "The leader owns verified truth; members propose and use it.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "leader",
         "owns",
@@ -415,7 +539,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.380948+00:00",
-      "updated_at": "2026-06-17T16:40:10.348159+00:00"
+      "updated_at": "2026-06-17T17:15:43.674921+00:00"
     },
     {
       "id": "c1c746a0-b2e0-47b4-af73-40c1674e13dc",
@@ -424,6 +548,7 @@
       "summary": "Primary users are software teams with a lead and AI-using developers.",
       "type": "reference",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "primary",
         "users",
@@ -441,7 +566,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.376103+00:00",
-      "updated_at": "2026-06-17T16:40:10.350135+00:00"
+      "updated_at": "2026-06-17T17:15:43.676711+00:00"
     },
     {
       "id": "22557414-0c26-41a7-bb4c-0fb9083011b0",
@@ -450,6 +575,7 @@
       "summary": "The problem: AI builds fast but widens the gap between intended and built.",
       "type": "constraint",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "problem",
         "builds",
@@ -467,7 +593,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.370571+00:00",
-      "updated_at": "2026-06-17T16:40:10.351911+00:00"
+      "updated_at": "2026-06-17T17:15:43.678475+00:00"
     },
     {
       "id": "d39c3b6f-44cc-4501-ab69-d9f2c3211c61",
@@ -476,6 +602,7 @@
       "summary": "CRUX is a shared intent graph for AI-built software.",
       "type": "decision",
       "tier": "leaf",
+      "domain": "other",
       "tags": [
         "crux",
         "shared",
@@ -493,7 +620,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.365506+00:00",
-      "updated_at": "2026-06-17T16:40:10.353721+00:00"
+      "updated_at": "2026-06-17T17:15:43.680099+00:00"
     }
   ]
 }
