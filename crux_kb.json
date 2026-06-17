@@ -2,6 +2,188 @@
   "version": 1,
   "items": [
     {
+      "id": "0c25763f-a58b-4b9a-a7f2-ec6dbba9e610",
+      "raw_content": "Capture steers prompts with a directive brief; it does not verify the built code.",
+      "title": "Capture steers prompts with a directive brief; it",
+      "summary": "Capture steers prompts with a directive brief; it does not verify the built code.",
+      "type": "decision",
+      "tier": "leaf",
+      "tags": [
+        "capture",
+        "steers",
+        "prompts"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "73b9f9f1531799b6ab9f0f1df63694315bf451efee6baf7dc94ec406e0b91208",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.842593+00:00",
+      "source_episode_id": "845540f4-44e9-43ed-a5b9-0a7bfe974728",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.842606+00:00",
+      "updated_at": "2026-06-17T16:40:10.842608+00:00"
+    },
+    {
+      "id": "7c64c1d9-29f0-418e-9ab1-557df9b0aa9a",
+      "raw_content": "Tiers and relationships are LLM-classified; offline heuristics are only stand-ins until API keys are added.",
+      "title": "Tiers and relationships are LLM-classified; offline heuristics are",
+      "summary": "Tiers and relationships are LLM-classified; offline heuristics are only stand-ins until API keys are added.",
+      "type": "decision",
+      "tier": "leaf",
+      "tags": [
+        "tiers",
+        "relationships",
+        "classified"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "36c5a6435da896a76c911264d84d41580bedddb93b60218c690baa2614770b1d",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.771520+00:00",
+      "source_episode_id": "d1a4d5f7-0458-4da2-aaf6-41b4cc125c04",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.771532+00:00",
+      "updated_at": "2026-06-17T16:40:10.771534+00:00"
+    },
+    {
+      "id": "2fa43b94-a90e-43cb-aee2-322968463379",
+      "raw_content": "Custom hotkeys are validated: no-modifier, reserved, and punctuation chords are flagged.",
+      "title": "Custom hotkeys are validated: no-modifier, reserved, and punctuation",
+      "summary": "Custom hotkeys are validated: no-modifier, reserved, and punctuation chords are flagged.",
+      "type": "constraint",
+      "tier": "leaf",
+      "tags": [
+        "custom",
+        "hotkeys",
+        "validated"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "b418d0b8703a193607afdd35bbf89d97bc54d548e7ecfb400f266f7595b4a2ac",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.700438+00:00",
+      "source_episode_id": "12786110-b2c1-4fba-a5ab-678c091aaf94",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.700452+00:00",
+      "updated_at": "2026-06-17T16:40:10.700454+00:00"
+    },
+    {
+      "id": "bff50c17-9d83-42fd-b3ab-6312a774ccc4",
+      "raw_content": "The KB can sync via git (crux export/import crux_kb.json) when there is no hosted server.",
+      "title": "The KB can sync via git (crux export/import",
+      "summary": "The KB can sync via git (crux export/import crux_kb.json) when there is no hosted server.",
+      "type": "decision",
+      "tier": "leaf",
+      "tags": [
+        "crux",
+        "sync",
+        "export"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "857e02b10a122dca82e4509e6fd1ce622702e0661200780a6899c6676b980cf8",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.632372+00:00",
+      "source_episode_id": "627dc4b5-74da-47c1-b988-50eba83f4e3d",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.632385+00:00",
+      "updated_at": "2026-06-17T16:40:10.632387+00:00"
+    },
+    {
+      "id": "74f292b5-dc14-46f9-b012-4d4186185827",
+      "raw_content": "Roles are enforced server-side by a shared admin token; localhost or a valid token equals leader.",
+      "title": "Roles are enforced server-side by a shared admin",
+      "summary": "Roles are enforced server-side by a shared admin token; localhost or a valid token equals leader.",
+      "type": "decision",
+      "tier": "leaf",
+      "tags": [
+        "token",
+        "roles",
+        "enforced"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "f3c5083bc6f019c5b0d979615346d382d16379b74d4d12fee0420ee0e65995b2",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.562783+00:00",
+      "source_episode_id": "c6e9325d-543f-41e8-9a7f-3e69ba836b3b",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.562802+00:00",
+      "updated_at": "2026-06-17T16:40:10.562805+00:00"
+    },
+    {
+      "id": "fe53994d-074e-4331-82fb-8ae081be4030",
+      "raw_content": "The Knowledge Base is a two-pane Explorer: a navigator plus a detail pane with walkable connections.",
+      "title": "The Knowledge Base is a two-pane Explorer: a",
+      "summary": "The Knowledge Base is a two-pane Explorer: a navigator plus a detail pane with walkable connections.",
+      "type": "architecture",
+      "tier": "leaf",
+      "tags": [
+        "pane",
+        "knowledge",
+        "base"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "adc6ebccf2e2a96bd577d31a41765b030c4e32f39e22d909c6bf8aaea333b5c2",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.494364+00:00",
+      "source_episode_id": "f353e482-36f1-46f3-8165-15f654ca4fb9",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.494378+00:00",
+      "updated_at": "2026-06-17T16:40:10.494380+00:00"
+    },
+    {
+      "id": "410806d7-ffd6-4510-ae6d-ecbb2b1c4d3f",
+      "raw_content": "Retrieval pulls a fact's connected (extends) facts so agents get the whole picture, not fragments.",
+      "title": "Retrieval pulls a fact's connected (extends) facts so",
+      "summary": "Retrieval pulls a fact's connected (extends) facts so agents get the whole picture, not fragments.",
+      "type": "architecture",
+      "tier": "leaf",
+      "tags": [
+        "retrieval",
+        "pulls",
+        "fact"
+      ],
+      "source": "session-log",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "377fb1c5e2585f36df911ae6c59db7e10826e40a480c9cb3759ced586fde66ef",
+      "version": 1,
+      "promoted_at": "2026-06-17T16:40:10.425124+00:00",
+      "source_episode_id": "88354a30-329d-4881-bd51-b228014d7e48",
+      "locator": null,
+      "captured_at": "2026-06-17T16:40:10.425138+00:00",
+      "updated_at": "2026-06-17T16:40:10.425140+00:00"
+    },
+    {
       "id": "fece0bff-ed93-428e-aa1b-8ea702a21095",
       "raw_content": "Agents log decisions via the MCP 'log_work' tool; they land in Review.",
       "title": "Agents log decisions via the MCP 'log_work' tool",
@@ -22,10 +204,10 @@
       "content_hash": "2101c612e83440a5241054055b4358f37479b000a7ce87b62aff8d97a9e96d3f",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.423814+00:00",
-      "source_episode_id": "ceb70030-2fa1-48b2-95fb-26242bfff902",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.423831+00:00",
-      "updated_at": "2026-06-17T16:17:29.423835+00:00"
+      "updated_at": "2026-06-17T16:40:10.335421+00:00"
     },
     {
       "id": "0779c432-e680-47e6-8f75-caf27a27301e",
@@ -48,10 +230,10 @@
       "content_hash": "7c9ad8c5bfa9b82e39f700d8b695c2d9490877f76c4a1d345b8242d8f730091f",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.418720+00:00",
-      "source_episode_id": "5bd19005-81a3-4b14-8c7c-5d1b1056686a",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.418735+00:00",
-      "updated_at": "2026-06-17T16:17:29.418738+00:00"
+      "updated_at": "2026-06-17T16:40:10.336810+00:00"
     },
     {
       "id": "7456529f-f300-4001-9ffa-d4dcbc1a29ed",
@@ -74,10 +256,10 @@
       "content_hash": "bb73fe367e9515edd89d46cb631f837b1456e8928ecce7392bc51e1729fc7090",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.413123+00:00",
-      "source_episode_id": "5eca486d-0a4c-4d6e-a3d7-4f701e8d13ce",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.413139+00:00",
-      "updated_at": "2026-06-17T16:17:29.413142+00:00"
+      "updated_at": "2026-06-17T16:40:10.337841+00:00"
     },
     {
       "id": "5403c74b-fd85-445d-8b08-c9118b41764d",
@@ -100,10 +282,10 @@
       "content_hash": "8c94320435a99ebda46d24a0a7cb2a69b39ee42fb731e826518b06dc06097d57",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.406941+00:00",
-      "source_episode_id": "9aea6b4c-0943-4b38-b0d2-c6e132e32d81",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.406958+00:00",
-      "updated_at": "2026-06-17T16:17:29.406962+00:00"
+      "updated_at": "2026-06-17T16:40:10.338939+00:00"
     },
     {
       "id": "169e8bff-ca81-4193-8070-fcd955d3bb54",
@@ -126,10 +308,10 @@
       "content_hash": "bb976cc2ae1303a00cddfe567b477cf15320d3b958218f588e9186f863b90a47",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.400939+00:00",
-      "source_episode_id": "cda8f0dc-7fad-460e-a59b-2a6931fd7d3f",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.400956+00:00",
-      "updated_at": "2026-06-17T16:17:29.400960+00:00"
+      "updated_at": "2026-06-17T16:40:10.339880+00:00"
     },
     {
       "id": "251660e6-a110-428d-99dd-ecc63cf7a8b2",
@@ -152,10 +334,10 @@
       "content_hash": "102a60e3f0081f540213b44b5b20766362274c78cf8a5c33e6265c95b01f36dc",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.395394+00:00",
-      "source_episode_id": "1e9fbbe5-5393-4f16-99db-6d088b93d8fc",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.395410+00:00",
-      "updated_at": "2026-06-17T16:17:29.395412+00:00"
+      "updated_at": "2026-06-17T16:40:10.341701+00:00"
     },
     {
       "id": "baa79989-db04-455b-86bd-362a935fb08d",
@@ -178,10 +360,10 @@
       "content_hash": "1601dbf54709c39d60000effa8eccef70b2c323a18b38ac80772718da64a5bc2",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.390993+00:00",
-      "source_episode_id": "7e41a73f-6b50-41d6-9275-6e7e6e6bf53b",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.391005+00:00",
-      "updated_at": "2026-06-17T16:17:29.391007+00:00"
+      "updated_at": "2026-06-17T16:40:10.343368+00:00"
     },
     {
       "id": "0999b0fc-753d-468e-bfc7-a53161db7461",
@@ -204,10 +386,10 @@
       "content_hash": "5a18b5fedfd65fb0222597a15403b3ebd97a6b6f9c09b9388143ac2580360a74",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.387020+00:00",
-      "source_episode_id": "12e06005-53ba-4add-abd6-791cf455e62c",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.387033+00:00",
-      "updated_at": "2026-06-17T16:17:29.387035+00:00"
+      "updated_at": "2026-06-17T16:40:10.345274+00:00"
     },
     {
       "id": "ae12ebdb-73a4-4481-bf9b-e450f510c83f",
@@ -230,10 +412,10 @@
       "content_hash": "800a3b9a01c6275ec17990335e4967fef65e060adc03e5f855e92d6c9a792d03",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.380933+00:00",
-      "source_episode_id": "196b08cf-41f9-4ebd-a262-371f56f248f7",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.380948+00:00",
-      "updated_at": "2026-06-17T16:17:29.380950+00:00"
+      "updated_at": "2026-06-17T16:40:10.348159+00:00"
     },
     {
       "id": "c1c746a0-b2e0-47b4-af73-40c1674e13dc",
@@ -256,10 +438,10 @@
       "content_hash": "9d598db7814bee886ce8954c1d7f242b85dae14dcc5427e7ee9a628327e5e624",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.376089+00:00",
-      "source_episode_id": "70bd7fe2-15a7-42be-9ab0-7e022c59dfee",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.376103+00:00",
-      "updated_at": "2026-06-17T16:17:29.376112+00:00"
+      "updated_at": "2026-06-17T16:40:10.350135+00:00"
     },
     {
       "id": "22557414-0c26-41a7-bb4c-0fb9083011b0",
@@ -282,10 +464,10 @@
       "content_hash": "66f9b90f2db2c4d3b99355911d1a84a04884c389a3cb517ef117ddb49538c1d1",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.370559+00:00",
-      "source_episode_id": "dfc399fb-7018-494f-98fa-9f8a8a7d1795",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.370571+00:00",
-      "updated_at": "2026-06-17T16:17:29.370574+00:00"
+      "updated_at": "2026-06-17T16:40:10.351911+00:00"
     },
     {
       "id": "d39c3b6f-44cc-4501-ab69-d9f2c3211c61",
@@ -308,10 +490,10 @@
       "content_hash": "e46aa8ba24b9614857f58c5f3e184b675f1ae3efee5fd6f0945c298a7d4942ac",
       "version": 1,
       "promoted_at": "2026-06-17T16:17:29.365488+00:00",
-      "source_episode_id": "c64ff363-0c02-4d52-a385-9728d6fc56f0",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.365506+00:00",
-      "updated_at": "2026-06-17T16:17:29.365508+00:00"
+      "updated_at": "2026-06-17T16:40:10.353721+00:00"
     }
   ]
 }
