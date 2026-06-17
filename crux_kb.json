@@ -2,6 +2,195 @@
   "version": 1,
   "items": [
     {
+      "id": "629d6ede-3436-423c-861a-064420db0fe8",
+      "raw_content": "In multi-microservice orgs, a lens per team or service gives cross-team decision visibility.",
+      "title": "In multi-microservice orgs, a lens per team or",
+      "summary": "In multi-microservice orgs, a lens per team or service gives cross-team decision visibility.",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "process",
+      "tags": [
+        "team",
+        "multi",
+        "microservice"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "0c398506bb791c0646b328d554fec9d5ad0399177999ca83c8d552e6d5c532bf",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.415372+00:00",
+      "source_episode_id": "5f82520d-bdbb-4c1c-9772-2daaf4492551",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.415395+00:00",
+      "updated_at": "2026-06-17T19:41:38.415398+00:00"
+    },
+    {
+      "id": "2e35c885-5496-4dcf-a891-8f8bb5c397b1",
+      "raw_content": "CRUX is complementary to Backstage (service catalog) and Pact (contract testing), not a replacement.",
+      "title": "CRUX is complementary to Backstage (service catalog) and",
+      "summary": "CRUX is complementary to Backstage (service catalog) and Pact (contract testing), not a replacement.",
+      "type": "reference",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "crux",
+        "complementary",
+        "backstage"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "bf7c84803d0b6b83d1b63a879a4e0b47bfa47a252fee60aafc9a452f157eaae0",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.341618+00:00",
+      "source_episode_id": "4f4dfb1c-4edd-489f-b7d5-1838097386de",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.341633+00:00",
+      "updated_at": "2026-06-17T19:41:38.341637+00:00"
+    },
+    {
+      "id": "cb4baa10-22f0-403f-9758-578c45e4230a",
+      "raw_content": "Out of scope: service catalog, contract testing, auth/payments/service-mesh — CRUX stays the decision/intent layer.",
+      "title": "Out of scope: service catalog, contract testing, auth/payments/service-mesh",
+      "summary": "Out of scope: service catalog, contract testing, auth/payments/service-mesh — CRUX stays the decision/intent layer.",
+      "type": "constraint",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "service",
+        "scope",
+        "catalog"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "76f9043fe555782e89054ba4eb9107b3cf1bd88e00702f9c1a5d59999a2ac457",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.250662+00:00",
+      "source_episode_id": "8e3b4891-35fb-489b-b19e-605e38a83cda",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.250676+00:00",
+      "updated_at": "2026-06-17T19:41:38.250678+00:00"
+    },
+    {
+      "id": "e35fd91f-ec70-4d5c-9cdf-349678818c33",
+      "raw_content": "Position CRUX as living, AI-native ADRs: searchable, auto-injected, conflict-checked, graph-connected.",
+      "title": "Position CRUX as living, AI-native ADRs: searchable, auto-injected",
+      "summary": "Position CRUX as living, AI-native ADRs: searchable, auto-injected, conflict-checked, graph-connected.",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "position",
+        "crux",
+        "living"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "4b680fd6cc3d9db0b99559468c0abb4db2da04fdf7554f44138a750167f438b1",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.171752+00:00",
+      "source_episode_id": "98063051-94b6-44c0-896a-f4948c7f7cbc",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.171775+00:00",
+      "updated_at": "2026-06-17T19:41:38.171778+00:00"
+    },
+    {
+      "id": "6a27b3bc-10f3-4c83-ac37-764582f449dc",
+      "raw_content": "Wedge: detect decision-level conflicts before building, upstream of code/contract conflicts.",
+      "title": "Wedge: detect decision-level conflicts before building, upstream of",
+      "summary": "Wedge: detect decision-level conflicts before building, upstream of code/contract conflicts.",
+      "type": "decision",
+      "tier": "leaf",
+      "domain": "technical",
+      "tags": [
+        "conflicts",
+        "wedge",
+        "detect"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "ad7207d695399a61df9efca8ec359988e4c7d74ee83214f3c3a2c69434551d7e",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.096858+00:00",
+      "source_episode_id": "5971e0d2-022b-46f3-914b-a967e8437084",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.096871+00:00",
+      "updated_at": "2026-06-17T19:41:38.096874+00:00"
+    },
+    {
+      "id": "6c03011d-4761-4b1a-9965-2cff377f671b",
+      "raw_content": "Validated pain: developers lack visibility into other teams' decisions; CRUX's shared KB + lenses address it.",
+      "title": "Validated pain: developers lack visibility into other teams'",
+      "summary": "Validated pain: developers lack visibility into other teams' decisions; CRUX's shared KB + lenses address it.",
+      "type": "reference",
+      "tier": "leaf",
+      "domain": "user",
+      "tags": [
+        "validated",
+        "pain",
+        "developers"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "106f6297cf6bcbfbf72b352e6441485d5dcd911573f91301b127e2531aca22db",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:38.019295+00:00",
+      "source_episode_id": "17473a16-7e20-42cc-a0a8-dad4238d0606",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:38.019310+00:00",
+      "updated_at": "2026-06-17T19:41:38.019312+00:00"
+    },
+    {
+      "id": "e941fb08-90e4-4270-8247-16a51e7df6d9",
+      "raw_content": "Validated pain: no system connects decisions and implementation plans across teams — this is CRUX's core job.",
+      "title": "Validated pain: no system connects decisions and implementation",
+      "summary": "Validated pain: no system connects decisions and implementation plans across teams — this is CRUX's core job.",
+      "type": "decision",
+      "tier": "mid",
+      "domain": "user",
+      "tags": [
+        "validated",
+        "pain",
+        "system"
+      ],
+      "source": "field-feedback",
+      "scope": "main",
+      "confidence": 0.7,
+      "superseded_by": null,
+      "archived": false,
+      "embedding_model": "fake-256",
+      "content_hash": "166d22892b5dacdeca1c3108d8bcc0aac8ccfce721f25e0933b2c547f0ed2028",
+      "version": 1,
+      "promoted_at": "2026-06-17T19:41:37.940805+00:00",
+      "source_episode_id": "3389b54e-0375-4037-92b7-5377a1df001c",
+      "locator": null,
+      "captured_at": "2026-06-17T19:41:37.940819+00:00",
+      "updated_at": "2026-06-17T19:41:37.940821+00:00"
+    },
+    {
       "id": "0d4ee98d-2b83-4a36-81c6-241aaf98150c",
       "raw_content": "Auto-linking is similarity-gated so only genuinely-related facts connect, not everything to everything.",
       "title": "Auto-linking is similarity-gated so only genuinely-related facts connect",
@@ -23,10 +212,10 @@
       "content_hash": "ced5fca128f58f6b6bb93041479f97c804d058a20ac7aa5f8bf8c0126da60e71",
       "version": 1,
       "promoted_at": "2026-06-17T17:15:43.959964+00:00",
-      "source_episode_id": "64315d36-b59f-4dfd-b12d-2dbd43ad3bd6",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.959976+00:00",
-      "updated_at": "2026-06-17T17:15:43.959978+00:00"
+      "updated_at": "2026-06-17T19:41:37.824634+00:00"
     },
     {
       "id": "3bac1a85-6004-4fe4-9884-1dde29bc0ed9",
@@ -50,10 +239,10 @@
       "content_hash": "1bb4724606b26827b8658e8b01bc5095e87eadcd964265840c2eddde6a667074",
       "version": 1,
       "promoted_at": "2026-06-17T17:15:43.890299+00:00",
-      "source_episode_id": "4f58f114-d722-4b2f-96da-5e1a212da8eb",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.890314+00:00",
-      "updated_at": "2026-06-17T17:15:43.890316+00:00"
+      "updated_at": "2026-06-17T19:41:37.827084+00:00"
     },
     {
       "id": "57dea7c0-f62e-42f2-b467-d9f3f99248a2",
@@ -77,10 +266,10 @@
       "content_hash": "24824292fa835ebf936b79e5eecb72af1abc5cdcad313c14388363da6781345d",
       "version": 1,
       "promoted_at": "2026-06-17T17:15:43.817136+00:00",
-      "source_episode_id": "960a6db5-f0b7-44c0-b908-77f2339b5520",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.817149+00:00",
-      "updated_at": "2026-06-17T17:15:43.817151+00:00"
+      "updated_at": "2026-06-17T19:41:37.828973+00:00"
     },
     {
       "id": "d943c473-2add-4be5-9f5c-0afccade529f",
@@ -104,10 +293,10 @@
       "content_hash": "00576aae5714cbefb0cc4dc80c3a1517bf3b988155f691699aa87bf4f61b6505",
       "version": 1,
       "promoted_at": "2026-06-17T17:15:43.749685+00:00",
-      "source_episode_id": "e7e420d8-35ab-4bd7-8d61-d4bf126b92fb",
+      "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.749700+00:00",
-      "updated_at": "2026-06-17T17:15:43.749702+00:00"
+      "updated_at": "2026-06-17T19:41:37.831098+00:00"
     },
     {
       "id": "0c25763f-a58b-4b9a-a7f2-ec6dbba9e610",
@@ -134,7 +323,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.842606+00:00",
-      "updated_at": "2026-06-17T17:15:43.654903+00:00"
+      "updated_at": "2026-06-17T19:41:37.833102+00:00"
     },
     {
       "id": "7c64c1d9-29f0-418e-9ab1-557df9b0aa9a",
@@ -161,7 +350,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.771532+00:00",
-      "updated_at": "2026-06-17T17:15:43.655981+00:00"
+      "updated_at": "2026-06-17T19:41:37.835157+00:00"
     },
     {
       "id": "2fa43b94-a90e-43cb-aee2-322968463379",
@@ -188,7 +377,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.700452+00:00",
-      "updated_at": "2026-06-17T17:15:43.656948+00:00"
+      "updated_at": "2026-06-17T19:41:37.837006+00:00"
     },
     {
       "id": "bff50c17-9d83-42fd-b3ab-6312a774ccc4",
@@ -215,7 +404,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.632385+00:00",
-      "updated_at": "2026-06-17T17:15:43.657979+00:00"
+      "updated_at": "2026-06-17T19:41:37.838877+00:00"
     },
     {
       "id": "74f292b5-dc14-46f9-b012-4d4186185827",
@@ -242,7 +431,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.562802+00:00",
-      "updated_at": "2026-06-17T17:15:43.659142+00:00"
+      "updated_at": "2026-06-17T19:41:37.840712+00:00"
     },
     {
       "id": "fe53994d-074e-4331-82fb-8ae081be4030",
@@ -269,7 +458,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.494378+00:00",
-      "updated_at": "2026-06-17T17:15:43.660141+00:00"
+      "updated_at": "2026-06-17T19:41:37.842622+00:00"
     },
     {
       "id": "410806d7-ffd6-4510-ae6d-ecbb2b1c4d3f",
@@ -296,7 +485,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.425138+00:00",
-      "updated_at": "2026-06-17T17:15:43.661096+00:00"
+      "updated_at": "2026-06-17T19:41:37.844421+00:00"
     },
     {
       "id": "fece0bff-ed93-428e-aa1b-8ea702a21095",
@@ -323,7 +512,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.423831+00:00",
-      "updated_at": "2026-06-17T17:15:43.662148+00:00"
+      "updated_at": "2026-06-17T19:41:37.846243+00:00"
     },
     {
       "id": "0779c432-e680-47e6-8f75-caf27a27301e",
@@ -350,7 +539,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.418735+00:00",
-      "updated_at": "2026-06-17T17:15:43.663788+00:00"
+      "updated_at": "2026-06-17T19:41:37.847974+00:00"
     },
     {
       "id": "7456529f-f300-4001-9ffa-d4dcbc1a29ed",
@@ -377,7 +566,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.413139+00:00",
-      "updated_at": "2026-06-17T17:15:43.665432+00:00"
+      "updated_at": "2026-06-17T19:41:37.849676+00:00"
     },
     {
       "id": "5403c74b-fd85-445d-8b08-c9118b41764d",
@@ -404,7 +593,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.406958+00:00",
-      "updated_at": "2026-06-17T17:15:43.667040+00:00"
+      "updated_at": "2026-06-17T19:41:37.851467+00:00"
     },
     {
       "id": "169e8bff-ca81-4193-8070-fcd955d3bb54",
@@ -431,7 +620,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.400956+00:00",
-      "updated_at": "2026-06-17T17:15:43.668614+00:00"
+      "updated_at": "2026-06-17T19:41:37.853367+00:00"
     },
     {
       "id": "251660e6-a110-428d-99dd-ecc63cf7a8b2",
@@ -458,7 +647,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.395410+00:00",
-      "updated_at": "2026-06-17T17:15:43.670135+00:00"
+      "updated_at": "2026-06-17T19:41:37.855272+00:00"
     },
     {
       "id": "baa79989-db04-455b-86bd-362a935fb08d",
@@ -485,7 +674,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.391005+00:00",
-      "updated_at": "2026-06-17T17:15:43.671713+00:00"
+      "updated_at": "2026-06-17T19:41:37.857118+00:00"
     },
     {
       "id": "0999b0fc-753d-468e-bfc7-a53161db7461",
@@ -512,7 +701,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.387033+00:00",
-      "updated_at": "2026-06-17T17:15:43.673251+00:00"
+      "updated_at": "2026-06-17T19:41:37.858969+00:00"
     },
     {
       "id": "ae12ebdb-73a4-4481-bf9b-e450f510c83f",
@@ -539,7 +728,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.380948+00:00",
-      "updated_at": "2026-06-17T17:15:43.674921+00:00"
+      "updated_at": "2026-06-17T19:41:37.861125+00:00"
     },
     {
       "id": "c1c746a0-b2e0-47b4-af73-40c1674e13dc",
@@ -566,7 +755,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.376103+00:00",
-      "updated_at": "2026-06-17T17:15:43.676711+00:00"
+      "updated_at": "2026-06-17T19:41:37.862999+00:00"
     },
     {
       "id": "22557414-0c26-41a7-bb4c-0fb9083011b0",
@@ -593,7 +782,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.370571+00:00",
-      "updated_at": "2026-06-17T17:15:43.678475+00:00"
+      "updated_at": "2026-06-17T19:41:37.864822+00:00"
     },
     {
       "id": "d39c3b6f-44cc-4501-ab69-d9f2c3211c61",
@@ -620,7 +809,7 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.365506+00:00",
-      "updated_at": "2026-06-17T17:15:43.680099+00:00"
+      "updated_at": "2026-06-17T19:41:37.866526+00:00"
     }
   ]
 }
