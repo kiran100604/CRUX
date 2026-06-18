@@ -45,7 +45,8 @@ def cmd_add(args):
             print(f"   … and {len(facts)-12} more")
     else:
         content = args.text or sys.stdin.read()
-        item = store.capture(content, source=args.source, type_hint=args.type, scope=scope)
+        item = store.capture(content, source=args.source, type_hint=args.type, scope=scope,
+                             owner=Config.load().user)
         print(f"✓ captured: {item.title}  (id={item.id[:8]}, type={item.type}, scope={item.scope})")
     store.close()
 
@@ -278,7 +279,7 @@ def _retrieve_brief(task, limit):
     from .hooks import _format
     store = _store()
     try:
-        results, links = store.retrieve(task, limit=limit)
+        results, links = store.retrieve(task, limit=limit, user=cfg.user)
         if not results:
             return ""
         ids = [r.item.id for r in results] + [it.id for _, it in links]
@@ -404,6 +405,15 @@ def cmd_seed_demo(args):
         print(f"  + [{typ}] {txt}")
     store.close()
     print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base.")
+
+
+def cmd_tidy(args):
+    """Archive private working memory older than --days (keeps the backlog clean;
+    nominations and verified facts are never touched)."""
+    store = _store()
+    n = store.expire_working_memory(days=args.days)
+    store.close()
+    print(f"✓ archived {n} stale working-memory item(s) (older than {args.days}d)")
 
 
 def cmd_export(args):
@@ -608,6 +618,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
     sub.add_parser("seed-demo", help="load CRUX's own product knowledge into the KB (cross-platform)").set_defaults(func=cmd_seed_demo)
+
+    td = sub.add_parser("tidy", help="archive stale private working memory (backlog hygiene)")
+    td.add_argument("--days", type=int, default=7)
+    td.set_defaults(func=cmd_tidy)
 
     ex = sub.add_parser("export", help="export the KB to JSON (commit it so the KB travels via git)")
     ex.add_argument("path", nargs="?", default="crux_kb.json")

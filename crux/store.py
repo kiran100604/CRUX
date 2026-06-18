@@ -54,7 +54,8 @@ class Store:
 
     def _store_fact(self, *, raw: str, enr: Enrichment, episode_id: str,
                     locator: str | None, source: str | None, scope: str,
-                    confidence: float) -> ContextItem:
+                    confidence: float, owner: str | None = None,
+                    proposed: bool = True) -> ContextItem:
         h = _hash(f"{enr.title}\n{enr.summary}")
         existing = self.db.get_by_hash(h)
         if existing:
@@ -63,7 +64,7 @@ class Store:
             id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
             type=enr.type, tier=getattr(enr, "tier", "leaf"),
             domain=getattr(enr, "domain", "other"), tags=enr.tags, source=source,
-            scope=scope, confidence=confidence,
+            scope=scope, owner=owner, proposed=proposed, confidence=confidence,
             promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model, content_hash=h,
             source_episode_id=episode_id, locator=locator or None)
@@ -74,9 +75,11 @@ class Store:
 
     def capture(self, content: str, *, source: str | None = None,
                 type_hint: str | None = None, scope: str = "individual",
-                confidence: float = 0.7, source_type: str = "note") -> ContextItem:
-        """Capture a single note → one Episode, one Fact. (Used by quick add,
-        hotkey, agent.) For documents that should yield many facts, use ingest()."""
+                confidence: float = 0.7, source_type: str = "note",
+                owner: str | None = None, proposed: bool = True) -> ContextItem:
+        """Capture a single note → one Episode, one Fact. `proposed=True` sends it
+        to the leader's Review; `proposed=False` keeps it as private working memory
+        (the owner's scratch — never reviewed, expires)."""
         content = content.strip()
         if not content:
             raise ValueError("cannot capture empty content")
@@ -86,7 +89,8 @@ class Store:
             enr.type = type_hint
         return self._store_fact(raw=content, enr=enr, episode_id=ep.id, locator=None,
                                 source=source or _extract_url(content),
-                                scope=scope, confidence=confidence)
+                                scope=scope, confidence=confidence,
+                                owner=owner, proposed=proposed)
 
     def ingest(self, content: str, *, source_type: str = "file",
                source_ref: str | None = None, title: str | None = None,
@@ -171,6 +175,8 @@ class Store:
                 tags=d.get("tags", []),
                 source=d.get("source"),
                 scope=d.get("scope", "individual"),
+                owner=d.get("owner"),
+                proposed=d.get("proposed", True),
                 confidence=d.get("confidence", 0.7),
                 embedding_model=self.embedder.model,
                 content_hash=h,
@@ -184,6 +190,25 @@ class Store:
             n += 1
         return n
 
+    def expire_working_memory(self, days: int = 7) -> int:
+        """Archive private working memory older than `days` (never nominations or
+        verified facts) — keeps the backlog from piling up; nothing is deleted."""
+        from datetime import datetime, timezone
+        n = 0
+        for i in self.db.list(scope="individual", archived=False, limit=100000):
+            if i.proposed or i.superseded_by:   # nominations wait for the leader
+                continue
+            try:
+                ts = datetime.fromisoformat(i.captured_at)
+            except ValueError:
+                continue
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - ts).days >= days:
+                self.archive(i.id)
+                n += 1
+        return n
+
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
         qvec = self.embedder.embed(query)
@@ -191,12 +216,19 @@ class Store:
                       include_archived=include_archived, scope=scope)
 
     def retrieve(self, query: str, limit: int = 5, *, expand: bool = True,
-                 max_links: int = 4, scope: str | None = None):
-        """Search + graph expansion — the retrieval payoff. For each top hit, pull
-        its extension neighbors (extends / extended-by) so an agent gets the whole
-        connected picture, not an isolated fragment. Returns (results, links),
-        where links = [(parent_item_id, ContextItem)] for the connected facts."""
-        results = self.search(query, limit=limit, scope=scope)
+                 max_links: int = 4, scope: str | None = None, user: str | None = None):
+        """Search + graph expansion — the retrieval payoff. Returns (results, links).
+
+        When `user` is given, retrieval = the shared KB (verified, everyone) PLUS
+        that user's OWN private working memory — so an agent gets team truth plus
+        the user's session context, but never other people's unverified scratch."""
+        if user is not None:
+            main_r = self.search(query, limit=limit, scope="main")
+            mine_r = [r for r in self.search(query, limit=limit, scope="individual")
+                      if r.item.owner == user]
+            results = sorted(main_r + mine_r, key=lambda r: r.score, reverse=True)[:limit]
+        else:
+            results = self.search(query, limit=limit, scope=scope)
         links: list[tuple[str, ContextItem]] = []
         if expand and results:
             seen = {r.item.id for r in results}
@@ -294,8 +326,9 @@ class Store:
         clean ones are bulk-promotable; flagged ones force a conscious choice."""
         from .embeddings import cosine
 
-        working = [i for i in self.db.list(scope="individual", archived=False, limit=200)
-                   if not i.superseded_by]
+        # Only NOMINATED items reach Review — private working memory stays out of it.
+        working = [i for i in self.db.list(scope="individual", archived=False, limit=500)
+                   if not i.superseded_by and i.proposed]
         # prefetch all live items once (avoid per-candidate DB hits)
         live = {i.id: i for i in self.db.list(archived=False, limit=100000)
                 if not i.superseded_by}

@@ -77,6 +77,8 @@ def create_app(cfg: Config):
         type: str | None = None
         source: str | None = None
         scope: str = "individual"
+        user: str | None = None
+        proposed: bool = True   # True → leader's Review; False → private working memory
 
     class PromoteIn(BaseModel):
         title: str | None = None
@@ -197,7 +199,8 @@ def create_app(cfg: Config):
     @app.post("/capture")
     def capture(body: CaptureIn):
         item = store.capture(body.content, source=body.source,
-                             type_hint=body.type, scope=body.scope)
+                             type_hint=body.type, scope=body.scope,
+                             owner=body.user or cfg.user, proposed=body.proposed)
         return _enrich([item])[0]
 
     @app.post("/ingest")
@@ -268,7 +271,7 @@ def create_app(cfg: Config):
         """Team-mode entrypoint: a client's hook/CLI sends a prompt; we retrieve,
         build the directive brief, record usage (tagged by user), return the brief."""
         from .hooks import _format
-        results, links = store.retrieve(body.prompt, limit=body.limit)
+        results, links = store.retrieve(body.prompt, limit=body.limit, user=body.user or None)
         if not results:
             return {"context": "", "count": 0}
         ids = [r.item.id for r in results] + [it.id for _, it in links]

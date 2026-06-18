@@ -653,7 +653,7 @@ function inboxRow(it){
         <div class="ititle">${esc(it.title||it.summary||'')}</div>
         <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Leaf')}</span><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
       </div>
-      <span class="iwhen mono">${rel(it.captured_at)}</span>
+      <span class="iwhen mono">${it.owner?'by '+esc(it.owner)+' · ':''}${rel(it.captured_at)}</span>
       ${it.status==='clean'?`<button class="btn sm teal" onclick="event.stopPropagation();promote('${it.id}')">Promote</button>`:''}
       <span class="chev">${open?'▴':'▾'}</span>
     </div>

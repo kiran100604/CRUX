@@ -82,7 +82,7 @@ def hook_inject() -> int:
             print(json.dumps({"additionalContext": ctx}) if ctx else "{}")
             return 0
         store = Store(cfg)
-        results, links = store.retrieve(prompt, limit=MAX_ITEMS)
+        results, links = store.retrieve(prompt, limit=MAX_ITEMS, user=cfg.user)
         if results:
             # record the payoff: these items (and their connected facts) just helped
             ids = [r.item.id for r in results] + [it.id for _, it in links]

@@ -26,15 +26,17 @@ def run() -> None:
     store = None if cfg.server else Store(cfg)
     mcp = FastMCP("crux")
 
-    def _stage(content: str, type_hint: str | None, session: str) -> dict:
-        """Stage one proposal into the working layer (never the trusted KB)."""
+    def _stage(content: str, type_hint: str | None, proposed: bool) -> dict:
+        """Stage one item. proposed=True → the leader's Review; proposed=False →
+        the user's PRIVATE working memory (never reviewed, expires)."""
         if cfg.server:
             from . import client
             r = client.capture(cfg.server, content, type=type_hint,
-                               source="agent", user=cfg.user)
+                               source="agent", user=cfg.user, proposed=proposed)
             return {"title": r.get("title", content[:48])}
         item = store.capture(content, type_hint=type_hint, scope="individual",
-                             confidence=0.4, source="agent", source_type="agent")
+                             confidence=0.4, source="agent", source_type="agent",
+                             owner=cfg.user, proposed=proposed)
         return {"title": item.title}
 
     @mcp.tool()
@@ -51,7 +53,7 @@ def run() -> None:
             r = client.retrieve(cfg.server, task, user=cfg.user, limit=limit)
             return {"context": r.get("context", ""), "count": r.get("count", 0)}
         from .hooks import _format
-        results, links = store.retrieve(task, limit=limit)
+        results, links = store.retrieve(task, limit=limit, user=cfg.user)
         if not results:
             return {"context": "", "count": 0}
         ids = [r.item.id for r in results] + [it.id for _, it in links]
@@ -76,14 +78,27 @@ def run() -> None:
         staged, titles = 0, []
         for c in decisions:
             if c and c.strip():
-                titles.append(_stage(c, "decision", session)["title"]); staged += 1
+                titles.append(_stage(c, "decision", True)["title"]); staged += 1
         for c in constraints:
             if c and c.strip():
-                titles.append(_stage(c, "constraint", session)["title"]); staged += 1
+                titles.append(_stage(c, "constraint", True)["title"]); staged += 1
         for c in knowledge:
             if c and c.strip():
-                titles.append(_stage(c, "context", session)["title"]); staged += 1
+                titles.append(_stage(c, "context", True)["title"]); staged += 1
         return {"staged": staged, "titles": titles,
                 "note": "Proposed to Review — a human will validate before it's trusted."}
+
+    @mcp.tool()
+    def remember(notes: list[str] = []) -> dict:
+        """Save private working memory for THIS user — your session scratch so you
+        don't have to re-explain context next time (what you explored, errors hit,
+        current state, half-formed ideas). This is NOT reviewed and NOT shared; it's
+        private, and it expires. Use log_work (not this) for durable team knowledge.
+        """
+        n = 0
+        for c in notes:
+            if c and c.strip():
+                _stage(c, None, False); n += 1
+        return {"remembered": n, "note": "Private working memory (not reviewed, expires)."}
 
     mcp.run()

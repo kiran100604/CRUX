@@ -95,6 +95,8 @@ class ContextItem:
     tags: list[str] = field(default_factory=list)
     source: str | None = None
     scope: str = "individual"  # everything starts in the working layer
+    owner: str | None = None   # who captured it (private working memory is per-owner)
+    proposed: bool = True       # individual + proposed → the leader's Review; else private WM
     confidence: float = 0.7  # working capture is provisional; promotion raises it
     superseded_by: str | None = None
     archived: bool = False
@@ -124,6 +126,8 @@ class ContextItem:
             tags=json.loads(row["tags"] or "[]"),
             source=row["source"],
             scope=row["scope"],
+            owner=(row["owner"] if "owner" in row.keys() else None),
+            proposed=bool(row["proposed"]) if "proposed" in row.keys() and row["proposed"] is not None else True,
             confidence=row["confidence"],
             superseded_by=row["superseded_by"],
             archived=bool(row["archived"]),

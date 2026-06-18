@@ -275,6 +275,27 @@ def test_extend_creates_linked_edge_and_promotes(store):
     assert store.relations_of(a.id)["extended_by"] == []
 
 
+def test_private_working_memory_and_nominations(store):
+    # private working memory (proposed=False) — not reviewed, owner-scoped
+    store.capture("Exploring auth; token expires fast.", owner="alice", proposed=False)
+    store.capture("Trying Redis for cache.", owner="bob", proposed=False)
+    # a nomination (proposed=True) — reaches Review
+    store.capture("Use JWT with 15-minute expiry.", type_hint="decision",
+                  owner="alice", proposed=True)
+    review = [i["title"] for i in store.triage()]
+    assert any("JWT" in t for t in review)             # nomination shown
+    assert not any("Exploring auth" in t for t in review)  # private WM hidden
+    # retrieval is per-user: alice sees her own WM, bob does not
+    ra, _ = store.retrieve("auth token", limit=5, user="alice")
+    rb, _ = store.retrieve("auth token", limit=5, user="bob")
+    assert any("Exploring auth" in r.item.title for r in ra)
+    assert not any("Exploring auth" in r.item.title for r in rb)
+    # expiry archives private WM (not nominations)
+    # (force-old by editing captured_at would need DB; just assert it runs)
+    assert store.expire_working_memory(days=0) >= 2     # both private notes archived
+    assert any("JWT" in i["title"] for i in store.triage())  # nomination survives
+
+
 def test_lens_gathers_relevant_facts(store):
     for t in ["Pricing moves to usage-based billing.",
               "The payment screen must show saved cards.",
