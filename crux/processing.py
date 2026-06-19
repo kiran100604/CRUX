@@ -312,6 +312,8 @@ def get_processor(cfg):
                                          getattr(cfg, "api_base", None))
         except Exception as e:
             import sys
+            hint = " — run: pip install -U openai" if "proxies" in str(e) else \
+                   " — install with: pip install 'crux[openai]'"
             print(f"[crux] OpenAI-compatible processor unavailable ({e}); using offline "
-                  f"enrichment. Install with: pip install 'crux[openai]'", file=sys.stderr)
+                  f"enrichment{hint}", file=sys.stderr)
     return FakeProcessor()

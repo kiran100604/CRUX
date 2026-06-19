@@ -86,7 +86,9 @@ def get_embedding_provider(cfg) -> EmbeddingProvider:
             return OpenAIEmbedding(cfg.embedding_model, cfg.openai_api_key, getattr(cfg, "api_base", None))
         except Exception as e:  # missing package / bad key — never break the tool
             import sys
+            hint = "run: pip install -U openai" if "proxies" in str(e) else \
+                   "install with: pip install 'crux[openai]'"
             print(f"[crux] OpenAI embeddings unavailable ({e}); using offline embeddings. "
-                  f"Install with: pip install 'crux[openai]'", file=sys.stderr)
+                  f"{hint}", file=sys.stderr)
     # voyage could be added here the same way.
     return FakeEmbedding()

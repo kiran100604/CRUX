@@ -9,7 +9,8 @@ dependencies = []
 [project.optional-dependencies]
 # Real providers / surfaces are optional so the core loop runs fully offline.
 anthropic = ["anthropic>=0.40"]
-openai = ["openai>=1.0"]
+# openai>=1.57 avoids the httpx>=0.28 'proxies' TypeError on client init.
+openai = ["openai>=1.57"]
 server = ["fastapi>=0.110", "uvicorn>=0.27"]
 mcp = ["mcp>=1.0"]
 app = ["pystray>=0.19", "pynput>=1.7", "pillow>=10.0", "fastapi>=0.110", "uvicorn>=0.27"]
