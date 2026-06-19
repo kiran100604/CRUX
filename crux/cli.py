@@ -333,6 +333,11 @@ def cmd_serve(args):
     print("Team setup:")
     print(f"  • Members:        crux connect http://<this-host>:{cfg.port} --user <name>")
     print(f"  • Leader (remote): open  http://<this-host>:{cfg.port}/?token={tok}")
+    if sys.platform == "linux":
+        print("Capture hotkey: run `crux bind` once (registers an OS shortcut).")
+    else:
+        print("Capture hotkey: this is dashboard-only — run `crux app` instead "
+              "(dashboard + hotkey + tray).")
     run(cfg)
 
 
