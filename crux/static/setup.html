@@ -99,6 +99,8 @@ function validateChord(mods,key){
     return {ok:false,msg:"Use a letter, number, Space, or F-key — punctuation/sequences aren't portable."};
   if(!mods.some(m=>["ctrl","alt","cmd"].includes(m)))
     return {ok:false,msg:"Add Ctrl, Alt, or Super — a bare key would fire all the time."};
+  if(S.platform!=="darwin" && mods.includes("cmd"))
+    return {ok:false,msg:"Super/Win shortcuts get grabbed by your desktop — use Ctrl or Alt instead."};
   const order=["ctrl","alt","shift","cmd"];
   const id=order.filter(m=>mods.includes(m)).join("+")+"+"+key;
   if(RESERVED[id]) return {ok:false,msg:`Reserved for ${RESERVED[id]} — pick another.`};

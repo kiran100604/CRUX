@@ -42,6 +42,8 @@ def valid_chord(mods, key) -> tuple[bool, str]:
         return False, "key must be a letter, number, space, or F-key"
     if not any(m in ("ctrl", "alt", "cmd", "win") for m in mods):
         return False, "needs a Ctrl/Alt/Super modifier"
+    if sys.platform != "darwin" and any(m in ("cmd", "win") for m in mods):
+        return False, "Super/Win shortcuts are reserved by the desktop — use Ctrl/Alt"
     cid = "+".join(m for m in ("ctrl", "alt", "shift", "cmd") if m in mods) + "+" + key
     if cid in _RESERVED:
         return False, f"reserved for {_RESERVED[cid]}"
