@@ -79,6 +79,14 @@
   .btn.out{background:var(--canvas); border:1px solid var(--hair); color:var(--ink)}
   .btn.danger{background:transparent; color:var(--coral); border:1px solid var(--coral-line)}
 
+  .seedbox{width:100%; min-height:120px; border:1px solid var(--hair); background:var(--canvas);
+    border-radius:var(--r-md); padding:14px 16px; font-size:15px; color:var(--ink); outline:none;
+    font-family:var(--sans); resize:vertical; line-height:1.5}
+  .seedbox:focus{border-color:var(--ink)}
+  .invite{display:flex; gap:8px; align-items:center; margin-top:14px}
+  .invite code{flex:1; font-family:var(--mono); font-size:12px; background:var(--soft); color:var(--ink);
+    border:1px solid var(--hair); border-radius:var(--r-sm); padding:9px 11px; overflow:auto; white-space:nowrap}
+
   /* capture */
   .capture{display:flex; gap:10px; margin-top:24px}
   .capture input{flex:1; height:50px; border:1px solid var(--hair); background:var(--canvas);
@@ -400,8 +408,20 @@ function vOverview(){
     : `<h1 class="display">You're all clear.</h1>
        <p>Nothing to review. Everything captured is either verified or settling in your working layer. Capture something below whenever a decision or constraint comes up.</p>`;
   const proposeWord = state.leader ? "Capture" : "Propose";
+  const firstRun = state.leader && (state.stats.crystals||0)===0 && state.inbox.length===0;
+  const origin = location.origin.replace(/\/$/,'');
+  const inviteCmd = `crux connect ${origin} --user <your-name> && crux install-mcp`;
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> OVERVIEW</div>
+    ${firstRun?`
+    <div class="hero">
+      <div class="kicker">GET STARTED · YOU'RE THE LEADER</div>
+      <h1 class="display">Seed your knowledge base.</h1>
+      <p>Paste what your team already knows — a product spec, key decisions, a README, meeting notes. CRUX extracts the facts so your agents have context from day one. (You'll review what it pulls before it's trusted.)</p>
+      <textarea id="seedbox" class="seedbox" placeholder="Paste a doc, spec, or your key decisions here…"></textarea>
+      <div class="row" style="margin-top:12px"><button class="btn primary" onclick="doSeed()">Extract knowledge →</button>
+        <span class="muted2" style="font-size:13px">or capture one note at a time below</span></div>
+    </div>`:`
     <div class="hero">
       <div class="kicker">${date} · LOCAL-FIRST</div>
       ${hero}
@@ -410,13 +430,16 @@ function vOverview(){
         <button class="btn primary" onclick="doCapture()">${proposeWord}</button>
         <div id="res"></div>
       </div>
-    </div>
+    </div>`}
     <div class="cols">
       ${state.leader&&attn.length?attn.map(renderAttn).join(""):`<div class="card" style="grid-column:span 2"><div class="tagline teal">VERIFIED KNOWLEDGE</div><h3>${state.stats.crystals||0} facts your agents trust</h3><div class="desc">${state.leader?'Captured notes you promote become verified knowledge your agents prioritize.':'Browse the Knowledge Base to see what the team has verified.'}</div></div>`}
-      <div class="card act">
+      ${state.leader?`<div class="card"><div class="tagline peach">INVITE YOUR TEAM</div>
+        <h3>One line for each teammate</h3>
+        <div class="desc">Run this on their machine — their agent then pulls this KB and proposes back to you. (Share your server's public URL, not localhost.)</div>
+        <div class="invite"><code id="invitecmd">${esc(inviteCmd)}</code><button class="btn sm out" onclick="copyInvite()">Copy</button></div></div>`
+      :`<div class="card act">
         <h4>Recent activity <span class="live">LIVE</span></h4>
-        ${feedHTML(state.feed.slice(0,5)) || '<div class="muted2" style="font-size:13px">No injections yet. When an agent pulls your context, it shows here.</div>'}
-      </div>
+        ${feedHTML(state.feed.slice(0,5)) || '<div class="muted2" style="font-size:13px">No injections yet.</div>'}</div>`}
     </div>
     <div class="strip">
       <div class="stat"><div class="l">Knowledge base</div><div class="v">${state.stats.crystals||0} verified</div></div>
@@ -755,6 +778,14 @@ async function doCapture(){const i=document.getElementById("cap");const v=i.valu
 function wireCapture(){const i=document.getElementById("cap"); if(!i)return;
   i.addEventListener("keydown",e=>{if(e.key==="Enter")doCapture();});
   wireSearch();}
+async function doSeed(){
+  const t=document.getElementById("seedbox"); const v=(t.value||"").trim(); if(!v){toast("Paste something first");return;}
+  t.value=""; await post("/ingest",{content:v,source_type:"paste"});
+  toast("● Extracting knowledge — review it in a moment…"); setView("decisions");
+  for(let k=0;k<6;k++){await new Promise(r=>setTimeout(r,1200)); await load();}}
+function copyInvite(){const c=document.getElementById("invitecmd");
+  navigator.clipboard.writeText(c.textContent).then(()=>toast("✓ Copied — share with your team")).catch(()=>{});}
+window.doSeed=doSeed; window.copyInvite=copyInvite;
 let stmr; function wireSearch(){const i=document.getElementById("cap"); if(!i)return;
   i.addEventListener("input",e=>{clearTimeout(stmr);const q=e.target.value.trim();const box=document.getElementById("res");
     if(q.length<3){box.classList.remove("on");return;}
