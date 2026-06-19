@@ -325,6 +325,38 @@ def cmd_connect(args):
         print(f"Saved {url} as {who}, but couldn't reach it — is `crux serve` running there?")
 
 
+def cmd_start(args):
+    """One command, everywhere: starts the dashboard AND makes the capture hotkey
+    work using whatever the OS needs — no modes to think about.
+      • Windows/macOS: in-app global hotkey + tray (+ dashboard).
+      • Linux: registers an OS-level shortcut (works under Wayland) + dashboard.
+    Capture is always: copy text (Ctrl+C) → press your chord.
+    """
+    cfg = Config.load()
+    if sys.platform == "linux":
+        import threading
+        import webbrowser
+        from .hotkey import bind_gnome, chord_label
+        from .server import run as serve_run
+        chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
+        ok, info = bind_gnome(cfg.hotkey_mods, cfg.hotkey_key,
+                              f"{sys.executable} -m crux.cli capture")
+        base = f"http://{cfg.host}:{cfg.port}"
+        url = base if cfg.is_configured() else base + "/setup"
+        print(f"CRUX is running at {base}")
+        if ok:
+            print(f"Capture: copy text (Ctrl+C), then press {chord}.")
+        else:
+            print(f"Capture hotkey couldn't auto-register ({info}). "
+                  f"Bind '{sys.executable} -m crux.cli capture' to {chord} in your OS settings.")
+        if not args.no_open:
+            threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+        serve_run(cfg)
+    else:
+        from .app import run as app_run
+        app_run(open_dashboard=not args.no_open)
+
+
 def cmd_serve(args):
     from .server import _admin_token, run
     cfg = Config.load()
@@ -643,6 +675,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("hook-inject").set_defaults(func=cmd_hook_inject)
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)
+    sp = sub.add_parser("start", help="START HERE — dashboard + capture hotkey, works on every OS")
+    sp.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
+    sp.set_defaults(func=cmd_start)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)

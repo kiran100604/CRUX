@@ -36,9 +36,14 @@ curl -fsSL https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bel
 ```powershell
 irm https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bell-jj7bqr/install/install.ps1 | iex
 ```
-This installs CRUX with the tray app, puts `crux` on your PATH, and configures it
-offline. To wire API keys up front, set `CRUX_ANTHROPIC_KEY` / `CRUX_OPENAI_KEY`
-(env vars) before running. Then open a new terminal and run `crux serve`.
+This installs CRUX, puts `crux` on your PATH, and configures it offline. Then:
+
+```bash
+crux start      # ONE command, every OS — dashboard + capture hotkey
+```
+`crux start` does the right thing per-OS automatically (in-app hotkey on
+Windows/macOS, OS-level shortcut on Linux). **Capture is always the same: copy
+text (Ctrl+C), then press your chord.** No modes to think about.
 
 ## Quickstart (offline, zero keys)
 ```bash
