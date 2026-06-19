@@ -65,6 +65,9 @@ class Config:
 
     anthropic_api_key: str | None
     openai_api_key: str | None
+    # OpenAI-compatible base URL (NVIDIA NIM, Groq, Together, Ollama, …). When set
+    # with provider=openai, chat + embeddings go through this endpoint.
+    api_base: str | None
 
     # HTTP server (dashboard backend) — one port; SPA served from the same app.
     host: str
@@ -95,6 +98,7 @@ class Config:
             processing_model=env.get("CRUX_PROCESSING_MODEL", "claude-haiku-4-5"),
             anthropic_api_key=env.get("ANTHROPIC_API_KEY"),
             openai_api_key=env.get("OPENAI_API_KEY"),
+            api_base=(env.get("CRUX_OPENAI_BASE_URL") or env.get("CRUX_API_BASE") or None),
             host=env.get("CRUX_HOST", "127.0.0.1"),
             port=int(env.get("CRUX_PORT", "7432")),
             hotkey_mods=tuple(

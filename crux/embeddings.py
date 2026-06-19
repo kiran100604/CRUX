@@ -62,14 +62,17 @@ class FakeEmbedding:
 
 
 class OpenAIEmbedding:
-    def __init__(self, model: str, api_key: str | None):
+    def __init__(self, model: str, api_key: str | None, base_url: str | None = None):
         from openai import OpenAI  # imported lazily; optional dependency
 
         self.model = model
-        self._client = OpenAI(api_key=api_key)
+        self._base = base_url
+        self._client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
     def embed(self, text: str) -> list[float]:
-        resp = self._client.embeddings.create(model=self.model, input=text)
+        # NVIDIA NIM embed models require an input_type; harmless to omit elsewhere.
+        extra = {"extra_body": {"input_type": "passage"}} if self._base and "nvidia" in self._base else {}
+        resp = self._client.embeddings.create(model=self.model, input=text, **extra)
         return resp.data[0].embedding
 
 
@@ -80,7 +83,7 @@ def _tokens(text: str) -> list[str]:
 def get_embedding_provider(cfg) -> EmbeddingProvider:
     if cfg.embedding_provider == "openai":
         try:
-            return OpenAIEmbedding(cfg.embedding_model, cfg.openai_api_key)
+            return OpenAIEmbedding(cfg.embedding_model, cfg.openai_api_key, getattr(cfg, "api_base", None))
         except Exception as e:  # missing package / bad key — never break the tool
             import sys
             print(f"[crux] OpenAI embeddings unavailable ({e}); using offline embeddings. "

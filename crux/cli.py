@@ -407,6 +407,30 @@ def cmd_seed_demo(args):
     print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base.")
 
 
+def cmd_use_nvidia(args):
+    """Point CRUX at NVIDIA NIM's free OpenAI-compatible API (build.nvidia.com).
+    Enables real enrichment/tier/domain/conflict judgment with a free key."""
+    from .config import save_env_file
+    cfg = Config.load()
+    vals = {
+        "CRUX_PROCESSING_PROVIDER": "openai",
+        "OPENAI_API_KEY": args.key.strip(),
+        "CRUX_OPENAI_BASE_URL": "https://integrate.api.nvidia.com/v1",
+        "CRUX_PROCESSING_MODEL": args.model,
+    }
+    if args.embeddings:
+        vals["CRUX_EMBEDDING_PROVIDER"] = "openai"
+        vals["CRUX_EMBEDDING_MODEL"] = args.embed_model
+    save_env_file(cfg.home, vals)
+    print(f"✓ CRUX now uses NVIDIA NIM for enrichment (model: {args.model}).")
+    if args.embeddings:
+        print(f"  Embeddings: {args.embed_model}.  ⚠ different vector size than before —")
+        print("  start fresh or re-capture so old/new embeddings don't mix.")
+    else:
+        print("  Embeddings stay offline (fine for testing). Add --embeddings to use NVIDIA's too.")
+    print("  Test it:  crux add \"We chose Stripe over Razorpay for fees.\" --type decision  →  crux query stripe")
+
+
 def cmd_tidy(args):
     """Archive private working memory older than --days (keeps the backlog clean;
     nominations and verified facts are never touched)."""
@@ -618,6 +642,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
     sub.add_parser("seed-demo", help="load CRUX's own product knowledge into the KB (cross-platform)").set_defaults(func=cmd_seed_demo)
+
+    nv = sub.add_parser("use-nvidia", help="use NVIDIA NIM's free OpenAI-compatible API for enrichment")
+    nv.add_argument("key", help="your NVIDIA API key from build.nvidia.com")
+    nv.add_argument("--model", default="meta/llama-3.3-70b-instruct", help="chat model id")
+    nv.add_argument("--embeddings", action="store_true", help="also use NVIDIA embeddings (changes vector size)")
+    nv.add_argument("--embed-model", default="nvidia/nv-embedqa-e5-v5")
+    nv.set_defaults(func=cmd_use_nvidia)
 
     td = sub.add_parser("tidy", help="archive stale private working memory (backlog hygiene)")
     td.add_argument("--days", type=int, default=7)

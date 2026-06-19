@@ -85,6 +85,20 @@ code changes, same flow:
 crux setup            # paste Anthropic (enrichment/judge) and/or OpenAI (embeddings)
 ```
 
+**No paid key? Use NVIDIA NIM's free tier** (free key at build.nvidia.com — no card,
+~1,000 credits, OpenAI-compatible). Enables real enrichment/tier/domain/conflict
+judgment for testing:
+
+```bash
+pip install 'crux[openai]'
+crux use-nvidia <your-nvidia-key>     # chat enrichment via Llama 3.3 70B (free)
+# add --embeddings to also use NVIDIA embeddings (note: changes vector size)
+```
+
+Works with any OpenAI-compatible endpoint (Groq, Together, Ollama) too — set
+`CRUX_PROCESSING_PROVIDER=openai`, `OPENAI_API_KEY`, `CRUX_OPENAI_BASE_URL`,
+`CRUX_PROCESSING_MODEL`.
+
 ## Try it on CRUX itself (dogfood)
 
 Seed a CRUX instance with CRUX's own product knowledge and explore it:

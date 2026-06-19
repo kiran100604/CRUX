@@ -162,6 +162,22 @@ class AnthropicProcessor:
             return None, ""
 
 
+class OpenAICompatProcessor(AnthropicProcessor):
+    """Chat enrichment via any OpenAI-compatible endpoint (NVIDIA NIM, Groq,
+    Together, Ollama…). Reuses all the prompts/parsers — only the call differs."""
+    def __init__(self, model: str, api_key: str | None, base_url: str | None):
+        from openai import OpenAI  # lazy, optional
+        self.model = model
+        self._client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+    def _call(self, prompt: str, max_tokens: int) -> str:
+        msg = self._client.chat.completions.create(
+            model=self.model, max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.choices[0].message.content or ""
+
+
 def _parse(text: str, content: str) -> Enrichment:
     try:
         m = re.search(r"\{.*\}", text, re.DOTALL)
@@ -290,4 +306,12 @@ def get_processor(cfg):
             import sys
             print(f"[crux] Anthropic unavailable ({e}); using offline enrichment. "
                   f"Install with: pip install 'crux[anthropic]'", file=sys.stderr)
+    elif cfg.processing_provider in ("openai", "openai_compat", "nvidia"):
+        try:
+            return OpenAICompatProcessor(cfg.processing_model, cfg.openai_api_key,
+                                         getattr(cfg, "api_base", None))
+        except Exception as e:
+            import sys
+            print(f"[crux] OpenAI-compatible processor unavailable ({e}); using offline "
+                  f"enrichment. Install with: pip install 'crux[openai]'", file=sys.stderr)
     return FakeProcessor()
