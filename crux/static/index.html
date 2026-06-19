@@ -324,6 +324,7 @@
   <div class="tabs" id="tabs">
     <button class="tab on" data-v="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Overview</button>
     <button class="tab" data-v="kb"><svg viewBox="0 0 24 24"><path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5 12 21l9-4.5"/></svg> Knowledge Base <span class="badge" id="t-kb">0</span></button>
+    <button class="tab" data-v="working"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Working <span class="badge" id="t-wm">0</span></button>
     <button class="tab" data-v="decisions"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Review <span class="badge" id="t-dec">0</span></button>
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z"/></svg> Activity</button>
   </div>
@@ -354,18 +355,19 @@ const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["refe
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
   kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}, leader:true,
-  lenses:[], kbLens:null, lensIds:null};
+  lenses:[], kbLens:null, lensIds:null, workmem:[]};
 
 async function load(){
-  const [it,rv,st,fd,ln]=await Promise.all([
-    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses")]);
+  const [it,rv,st,fd,ln,wm]=await Promise.all([
+    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses"), api("/working")]);
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
-  state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[];
+  state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[]; state.workmem=(wm&&wm.items)||[];
   _sig=`${st.crystals}|${st.fluid}|${st.injections}`;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
   const need=state.inbox.length;
   const td=document.getElementById("t-dec"); td.textContent=need;
+  const tw=document.getElementById("t-wm"); if(tw) tw.textContent=state.workmem.length;
   document.querySelector('[data-v="decisions"]').classList.toggle("alert", (state.counts.conflict||0)>0);
   render();
 }
@@ -388,7 +390,51 @@ function setView(v){state.view=v;
   render(); window.scrollTo(0,0);}
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)setView(b.dataset.v);});
 
-function render(){({overview:vOverview,kb:vKB,decisions:vDecisions,activity:vActivity}[state.view])();}
+function render(){({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();}
+
+/* ---------------- WORKING MEMORY (private) ---------------- */
+function vWorking(){
+  const items=state.workmem;
+  app(`
+    <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> WORKING MEMORY</div>
+    <h1 class="head display">Working memory</h1>
+    <p class="sub">Your private scratch — what you and your agent explored this session. It's not shared and not in Review, and it auto-expires. Edit it, delete it, or <b>nominate</b> the keepers into Review.</p>
+    ${items.length?items.map(wmCard).join(""):`<div class="empty"><div class="big">Nothing here</div>Your agent's <span class="mono">remember()</span> notes and low-trust captures land here. They stay private and fade.</div>`}`);
+}
+function wmCard(w){
+  const open=!!state.expanded['wm-'+w.id];
+  return `<div class="irow s-clean ${open?'open':''}">
+    <div class="ihead" onclick="toggleRow('wm-${w.id}')">
+      <span class="cdot c-attention"></span>
+      <div class="imain">
+        <div class="ititle">${esc(w.title||w.summary||'')}</div>
+        <div class="imeta"><span class="ipill">${esc(w.type||'note')}</span><span class="ipill">${DOMAIN_LABEL[w.domain||'other']}</span>${esc(w.summary||'')}</div>
+      </div>
+      <span class="iwhen mono">${rel(w.captured_at)}</span>
+      <button class="btn sm teal" onclick="event.stopPropagation();nominate('${w.id}')">Nominate →</button>
+      <span class="chev">${open?'▴':'▾'}</span>
+    </div>
+    ${open?`<div class="ideep">
+      <div class="kv"><div class="pl">EDIT</div>
+        <div class="refine">
+          <input id="wt-${w.id}" value="${esc(w.title||'')}" placeholder="Title…"/>
+          <input id="ws-${w.id}" value="${esc(w.summary||'')}" placeholder="Summary…"/>
+        </div></div>
+      <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${w.id.slice(0,8)} · private</span>
+        <div class="dactions">
+          <button class="btn sm danger" onclick="archive('${w.id}')">Delete</button>
+          <button class="btn sm out" onclick="editWorking('${w.id}')">Save edit</button>
+          <button class="btn sm teal" onclick="nominate('${w.id}')">Nominate to Review →</button>
+        </div></div>
+    </div>`:''}
+  </div>`;
+}
+async function nominate(id){await post(`/items/${id}/nominate`,{}); toast("✓ Nominated → in Review for the leader"); await load();}
+async function editWorking(id){
+  const t=document.getElementById('wt-'+id), s=document.getElementById('ws-'+id);
+  await post(`/items/${id}/edit`,{title:(t&&t.value.trim())||null, summary:(s&&s.value.trim())||null});
+  toast("✓ Updated"); await load();}
+window.nominate=nominate; window.editWorking=editWorking;
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){
@@ -861,6 +907,9 @@ function applyRole(){
   // role chip reflects it. (The server enforces this regardless of the UI.)
   const dec=document.querySelector('[data-v="decisions"]');
   if(dec) dec.style.display = state.leader ? "" : "none";
+  const wmt=document.querySelector('[data-v="working"]');
+  if(wmt) wmt.style.display = state.leader ? "" : "none";
+  if(!state.leader && state.view==="working") state.view="overview";
   const st=document.querySelector(".status");
   if(st) st.innerHTML = state.leader ? 'Leader · <b>VALIDATES KB</b>' : 'Member · <b>PROPOSE &amp; USE</b>';
   if(!state.leader && state.view==="decisions") state.view="overview";

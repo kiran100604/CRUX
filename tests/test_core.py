@@ -275,6 +275,18 @@ def test_extend_creates_linked_edge_and_promotes(store):
     assert store.relations_of(a.id)["extended_by"] == []
 
 
+def test_working_memory_view_and_nominate(store):
+    a = store.capture("Exploring auth; token short-lived.", owner="me", proposed=False)
+    store.capture("Use JWT 15-min expiry.", type_hint="decision", owner="me", proposed=True)
+    # working memory shows only the private item; Review shows only the nomination
+    assert [i["id"] for i in store.working_memory(owner="me")] == [a.id]
+    assert all("Exploring auth" not in i["title"] for i in store.triage())
+    # nominate moves the private item into Review
+    assert store.nominate(a.id)
+    assert store.working_memory(owner="me") == []
+    assert any("Exploring auth" in i["title"] for i in store.triage())
+
+
 def test_private_working_memory_and_nominations(store):
     # private working memory (proposed=False) — not reviewed, owner-scoped
     store.capture("Exploring auth; token expires fast.", owner="alice", proposed=False)

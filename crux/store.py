@@ -190,6 +190,24 @@ class Store:
             n += 1
         return n
 
+    def nominate(self, item_id: str) -> bool:
+        """Push a private working-memory item into Review (proposed=True)."""
+        full = self.db.resolve_id(item_id)
+        if not full:
+            return False
+        return self.db.update(full, {"proposed": 1}, now_iso())
+
+    def working_memory(self, owner: str | None = None) -> list[dict]:
+        """A user's private working memory: individual + not proposed + not archived."""
+        out = []
+        for i in self.db.list(scope="individual", archived=False, limit=1000):
+            if i.proposed or i.superseded_by:
+                continue
+            if owner and i.owner not in (owner, None):
+                continue
+            out.append(i.to_public_dict())
+        return out
+
     def expire_working_memory(self, days: int = 7) -> int:
         """Archive private working memory older than `days` (never nominations or
         verified facts) — keeps the backlog from piling up; nothing is deleted."""

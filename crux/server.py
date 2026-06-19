@@ -237,6 +237,16 @@ def create_app(cfg: Config):
     def related(id: str, limit: int = 6):
         return {"items": store.related(id, limit)}
 
+    @app.get("/working")
+    def working():
+        # this machine's private working memory (the person running the dashboard)
+        return {"items": store.working_memory(owner=cfg.user), "user": cfg.user}
+
+    @app.post("/items/{item_id}/nominate")
+    def nominate(item_id: str):
+        # owner pushing their own scratch to Review — promotion is still leader-gated
+        return {"ok": store.nominate(item_id)}
+
     class LensIn(BaseModel):
         name: str
         intent: str | None = None
