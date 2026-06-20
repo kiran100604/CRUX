@@ -296,10 +296,10 @@
   .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
-  .dumprow{display:flex; gap:10px; margin:6px 0 8px}
-  .hotkeyhint{font-size:12.5px; color:var(--muted); background:var(--soft); border:1px solid var(--hair);
-    border-radius:var(--r-sm); padding:8px 12px; margin-bottom:16px}
-  .hotkeyhint b{color:var(--ink)}
+  .dumprow{display:flex; gap:10px; margin:6px 0 6px}
+  .hotkeyhint{font-size:11.5px; color:var(--muted2); padding:0 2px; margin:0 0 18px}
+  .hotkeyhint b{color:var(--muted); font-weight:600; font-family:var(--mono)}
+  .hotkeyhint .resum{color:var(--teal); cursor:pointer}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
   .dumplist{display:flex; flex-direction:column; gap:9px}
   .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--card,#fff); background:#fff; border:1px solid var(--hair);
@@ -670,7 +670,7 @@ function vThread(t){
       <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
       <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
     </div>
-    <div class="hotkeyhint">⌨ ${state.hotkey?`Press <b>${esc(state.hotkey)}</b> anywhere`:'Set your capture hotkey'} to dump into <b>this</b> thread — copied text goes straight here, never to Review.${state.hotkey?'':' <span class="resum" onclick="setView(\'overview\')">how →</span>'}</div>`:''}
+    <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>`:''}
 
     <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}</div>
     ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
