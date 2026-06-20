@@ -396,57 +396,54 @@ def test_quickcapture_save(store):
     assert store.db.unsorted_steps(), "the capture should be an unsorted working step"
 
 
-def test_hotkey_step_attaches_to_current_thread(store):
-    # with an active thread, a dumped card attaches to it, gets routed into an
-    # approach, and that approach grows a living summary
+def test_dump_feeds_living_context(store):
+    # with an active thread, a dumped card attaches to it, gets a kind tag, and
+    # the thread's single living context refines to include it
     t = store.create_thread("Website hero image", "make a brand-cream hero image")
     assert store.current_thread_id() == t["id"]
     res = store.add_step("Tried DALL-E, colors off", source="hotkey", route=True)
     assert res["thread_id"] == t["id"]
     view = store.thread_view(t["id"])
     assert view["card_count"] == 1
-    ap = view["approaches"][0]
-    assert ap["card_count"] == 1
-    assert ap["summary"], "approach auto-summary should be generated on view"
+    assert view["cards"][0]["kind"]  # classified
+    assert view["context"], "the living context should be generated on view"
     assert "DALL-E" in store.thread_brief(t["id"]) or "hero image" in store.thread_brief(t["id"])
 
 
-def test_approach_summary_ownership(store):
-    # hand-editing a direction's state makes it the user's; new cards don't
-    # overwrite it, until they explicitly re-summarize
+def test_context_ownership(store):
+    # hand-editing the context makes it the user's; new dumps don't overwrite it,
+    # until they explicitly refine
     t = store.create_thread("Refactor auth", "")
     store.add_step("looked at session handling", source="note", route=True)
-    a = store.db.list_approaches(t["id"])[0]
-    store.set_approach_summary(a["id"], "MY STATE")
+    store.set_thread_context(t["id"], "MY VISION")
     store.add_step("checked token refresh", source="note", route=True)
-    assert store.db.get_approach(a["id"])["summary"] == "MY STATE"
-    store.resummarize_approach(a["id"])
-    assert store.db.get_approach(a["id"])["summary"] != "MY STATE"
+    assert store.thread_view(t["id"])["context"] == "MY VISION"
+    store.refine_context_now(t["id"])
+    assert store.thread_view(t["id"])["context"] != "MY VISION"
 
 
-def test_router_sorts_dumped_cards(store):
-    # dump-and-it-sorts: a reference/guideline becomes a thread-level guide; a
-    # prompt becomes a card tagged 'prompt' inside an approach
+def test_dump_classifies_kind(store):
+    # dumps are tagged by kind (the only per-card metadata)
     t = store.create_thread("Poster", "poster representing fragmentation")
-    store.add_step("https://x.com/design-principles — brand guideline to follow",
-                   source="note", route=True)
-    store.add_step("Prompt: generate tangled wires resolving into a lens",
-                   source="note", route=True)
-    v = store.thread_view(t["id"])
-    assert any(g["kind"] == "reference" for g in v["guides"])
-    kinds = [c["kind"] for a in v["approaches"] for c in a["cards"]]
-    assert "prompt" in kinds
+    store.add_step("https://x.com/design-principles — brand guideline", source="note", route=True)
+    store.add_step("Prompt: generate tangled wires resolving into a lens", source="note", route=True)
+    kinds = [c["kind"] for c in store.thread_view(t["id"])["cards"]]
+    assert "reference" in kinds and "prompt" in kinds
 
 
-def test_move_card_corrects_filing(store):
-    # drag-and-drop: the user can re-file a card the router misplaced
+def test_exclude_card_steers_context(store):
+    # excluding a card removes it from the context; deleting drops it entirely
     t = store.create_thread("X", "do x")
-    res = store.add_step("some note", source="note", route=True)
-    cid = res["card_id"]
-    assert store.move_card(cid, "guide")
-    assert any(g["id"] == cid for g in store.thread_view(t["id"])["guides"])
-    assert store.move_card(cid, "unsorted")
-    assert any(c["id"] == cid for c in store.thread_view(t["id"])["unsorted"])
+    keep = store.add_step("keep this idea", source="note", route=True)["card_id"]
+    drop = store.add_step("ignore this tangent", source="note", route=True)["card_id"]
+    assert store.set_card_included(drop, False)
+    cards = {c["id"]: c["included"] for c in store.thread_view(t["id"])["cards"]}
+    assert cards[keep] is True and cards[drop] is False
+    # excluded text is not fed into a freshly refined context
+    ctx = store.refine_context_now(t["id"])["summary"]
+    assert "tangent" not in ctx
+    assert store.delete_card(drop)
+    assert all(c["id"] != drop for c in store.thread_view(t["id"])["cards"])
 
 
 def test_route_parser_is_defensive():
@@ -454,14 +451,10 @@ def test_route_parser_is_defensive():
     from crux.processing import _parse_route
     d = _parse_route('{"kind":"insight","target":"new","new_title":"Lens idea",'
                      '"confidence":0.8,"reason":"different direction"}', set())
-    assert d["kind"] == "insight" and d["target"] == "new"
-    assert d["new_title"] == "Lens idea" and d["confidence"] == 0.8
-    # garbage degrades to a safe, low-confidence note (→ stays unsorted)
+    assert d["kind"] == "insight" and d["confidence"] == 0.8
+    # garbage degrades to a safe, low-confidence note
     g = _parse_route("not json at all", set())
     assert g["kind"] == "note" and g["confidence"] < 0.45
-    # an unknown approach id falls back to 'current'
-    u = _parse_route('{"kind":"note","target":"bogus-id"}', set())
-    assert u["target"] == "current"
 
 
 def test_valid_chord():

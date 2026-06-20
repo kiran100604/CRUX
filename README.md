@@ -98,27 +98,28 @@ pip install -e ".[mcp]"
 crux mcp                 # exposes get_context / add_context
 ```
 
-## Working threads — dump, and it sorts itself
-Working memory is organized as **threads** — a unit of active work ("what I'm
-doing now"). Start a thread with your **intent**; CRUX **seeds it with the
-background** from your knowledge base. Then you just **dump** things in — a prompt
-you gave an AI, a link, a result, an idea, an insight — by hotkey, popup, or the
-dashboard. You never file anything: a model **routes each card** to its place:
+## Working threads — an intent + a living context
+Working memory is organized as **threads** — a unit of active work. A thread is
+just two things: your **intent** (what you're trying to do) and a single living
+**context** (a refined statement of where you're headed). Start a thread with the
+intent; CRUX seeds the context from your knowledge base. Then you just **dump**
+things in as you work — a prompt, a link, a result, a chunk of chat, an idea —
+and CRUX continuously **re-refines the context** so any AI instantly knows your
+direction. You never organize approaches or document what you tried; if you pivot,
+the context follows.
 
-- **Guides** — references/specs that steer the whole thread (e.g. "use these design
-  principles"). Pinned at the top, included in every brief.
-- **Approaches** — the different directions you try, created automatically (like
-  git branches, but you don't manage them). Each keeps its own living summary.
-- **Unsorted** — when the router isn't confident, it sets a card aside instead of
-  guessing wrong. One drag puts it right.
+- The **context box** is what gets pasted into any tool — it captures the vision,
+  requirements, constraints, and what you've learned (incl. what *not* to do).
+- Below it, your **dumps** are a simple list (summary → expand for the full thing),
+  each tagged by **kind** (reference / prompt / result / insight / …).
+- The only control is **scope**: toggle a card out of the context (or delete it)
+  and the context stops talking about it. The context is AI-maintained but yours
+  to edit — your edits stick until you hit **↻ refine**.
 
-Every card is tagged by **kind** (reference / prompt / suggestion / result /
-insight / question). The only management gesture is **drag-and-drop** to correct a
-miss. > This routing needs an API key to be good — set `CRUX_PROCESSING_PROVIDER=anthropic`
-and `ANTHROPIC_API_KEY`. Offline it falls back to keyword sorting so the loop still runs.
+> The refinement needs an API key to be good — set `CRUX_PROCESSING_PROVIDER=anthropic`
+> and `ANTHROPIC_API_KEY`. Offline it falls back to a plain synthesis so the loop still runs.
 
-The payoff is the **portable brief** = guides + seeded background + the current
-approach's live state, so you can switch AI tools mid-task without re-explaining:
+Switch AI tools mid-task without re-explaining:
 ```bash
 crux brief               # prints the current thread's context — paste into any tool
 ```

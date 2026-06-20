@@ -275,39 +275,48 @@
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
     font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
   .promote{margin-top:22px; padding-top:18px; border-top:1px solid var(--hair)}
-  /* thread board: dump → guides + approaches + unsorted */
-  .dumprow{display:flex; gap:10px; margin:4px 0 18px}
-  .guides{border:1px dashed var(--hair); border-radius:var(--r-md); padding:12px 14px; margin-bottom:16px; background:var(--soft)}
-  .gtitle{font-family:var(--mono); font-size:10px; letter-spacing:.06em; color:var(--muted2); text-transform:uppercase; margin-bottom:9px}
-  .gtitle .muted2{text-transform:none; letter-spacing:0}
-  .gcards{display:flex; flex-wrap:wrap; gap:8px}
-  .guides .dcard, .unsorted .dcard{width:240px}
-  .board{display:flex; gap:14px; overflow-x:auto; padding-bottom:8px; align-items:flex-start}
-  .lane{flex:0 0 290px; background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-lg); padding:12px}
-  .lane.cur{border-color:var(--teal-line); background:var(--teal-bg)}
-  .lane.addlane{flex:0 0 200px; background:transparent; border-style:dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:160px}
-  .lanehd{display:flex; align-items:center; gap:8px; margin-bottom:8px}
-  .lanetitle{font-weight:600; font-size:15px; color:var(--ink); flex:1; min-width:0}
-  .setcur{font-family:var(--mono); font-size:10px; color:var(--muted2); cursor:pointer; border:1px solid var(--hair); border-radius:var(--pill); padding:2px 8px; background:var(--canvas)}
-  .setcur:hover{color:var(--ink); border-color:var(--muted2)}
-  .lanestate{margin-bottom:10px}
-  .statehd{font-family:var(--mono); font-size:10px; color:var(--muted2); text-transform:uppercase; margin-bottom:5px}
-  .ministate{width:100%; min-height:60px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-sm);
-    padding:8px 10px; font-size:12.5px; line-height:1.45; color:var(--ink); outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
-  .ministate:focus{border-color:var(--ink)}
-  .lanecards{display:flex; flex-direction:column; gap:8px; min-height:30px}
-  .dcard{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-sm); padding:9px 11px; cursor:grab}
-  .dcard:hover{border-color:var(--muted2)}
-  .dcard.sorting{opacity:.65; border-style:dashed}
-  .dctop{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px}
-  .dctext{font-size:13px; color:var(--body); line-height:1.4; word-break:break-word}
-  .kind{font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:var(--pill); background:var(--card); color:var(--muted)}
+  /* thread = living CONTEXT + a list of dumps */
+  .ctxpanel{background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-lg); padding:16px 18px; margin-bottom:18px}
+  .ctxhd{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+  .ctxlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--teal); flex:1; min-width:0}
+  .ctxbox{width:100%; min-height:120px; border:1px solid var(--teal-line); background:var(--canvas);
+    border-radius:var(--r-md); padding:14px 16px; font-size:14.5px; line-height:1.6; color:var(--ink);
+    outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
+  .ctxbox:focus{border-color:var(--teal)}
+  .ownedtag,.autotag{font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:var(--pill)}
+  .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--canvas); color:var(--teal)}
+  .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
+  .resum:hover{text-decoration:underline}
+  .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
+  .dumprow{display:flex; gap:10px; margin:6px 0 14px}
+  .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
+  .dumplist{display:flex; flex-direction:column; gap:9px}
+  .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--card,#fff); background:#fff; border:1px solid var(--hair);
+    border-radius:var(--r-md); padding:12px 12px 11px 12px; box-shadow:0 1px 2px rgba(20,16,8,.04)}
+  .dumpcard.sorting{opacity:.7; border-style:dashed}
+  .dumpcard.excluded{background:var(--soft); opacity:.62}
+  .dcside{flex:none; padding-top:1px}
+  .incl{width:26px; height:26px; border-radius:50%; border:1px solid var(--hair); background:var(--canvas);
+    color:var(--muted2); font-size:13px; line-height:1; display:grid; place-items:center}
+  .incl.on{background:var(--teal); border-color:var(--teal); color:#fff}
+  .incl:hover{border-color:var(--muted2)}
+  .dcmain{flex:1; min-width:0; cursor:pointer}
+  .dctop{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+  .dctop .iwhen{margin-left:auto}
+  .exctag{font-family:var(--mono); font-size:9px; text-transform:uppercase; color:var(--muted2); border:1px solid var(--hair); border-radius:var(--pill); padding:2px 7px}
+  .dctext{font-size:13.5px; color:var(--body); line-height:1.5; word-break:break-word; white-space:pre-wrap}
+  .dctext:not(.full){display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  .more-link{display:inline-block; margin-top:6px; color:var(--teal); font-size:12px; cursor:pointer}
+  .dcdel{flex:none; background:none; color:var(--muted2); font-size:18px; line-height:1; padding:0 2px}
+  .dcdel:hover{color:var(--coral)}
+  .kind{font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:var(--pill); background:var(--soft); color:var(--muted); font-weight:600}
   .k-reference{background:var(--teal-bg); color:var(--teal)} .k-prompt{background:#eae3f5; color:#5b3fa0}
   .k-suggestion{background:var(--peach-bg); color:var(--peach)} .k-result{background:#e6efe0; color:#3d6b2a}
   .k-insight{background:#fbf0d0; color:#8a6a17} .k-question{background:var(--coral-bg); color:var(--coral)}
-  .unsorted{border:1px dashed var(--peach-line); background:var(--peach-bg); border-radius:var(--r-md); padding:12px 14px; margin-top:16px}
   .bgwrap{margin-top:20px} .bgwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
   .bgwrap .bgbox{margin-top:10px}
+  .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
+    font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -494,7 +503,7 @@ function vWorking(){
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> WORKING</div>
     <h1 class="head display">Working</h1>
-    <p class="sub">What you're doing right now. Start a thread with your goal — CRUX seeds it with the background from your knowledge base, then everything you capture builds the story. Grab the brief and paste it into any tool, no re-explaining.</p>
+    <p class="sub">What you're doing right now. Start a thread with your intent — then just dump things in as you work. CRUX keeps one refined <b>context</b> of where you're headed, so any AI instantly gets it. You never organize; you only choose what stays in scope.</p>
     <div class="newthread">
       <input id="ntintent" class="ntinput" placeholder="What are you working on? e.g. “a hero image representing context fragmentation, brand warm-cream”"/>
       <button class="btn teal" onclick="startThread()">Start thread →</button>
@@ -513,7 +522,7 @@ function threadCard(t){
       <div class="tctitle">${esc(t.title)} ${cur?'<span class="curpill">current</span>':''}</div>
       <div class="tcsub">${esc((t.intent||'No goal set').split('\\n')[0])}</div>
     </div>
-    <div class="tcmeta"><span class="nbadge">${t.card_count!=null?t.card_count:t.step_count} card${(t.card_count!=null?t.card_count:t.step_count)!==1?'s':''} · ${t.approach_count||1} approach${(t.approach_count||1)!==1?'es':''}</span><span class="iwhen mono">${rel(t.last_step)}</span></div>
+    <div class="tcmeta"><span class="nbadge">${t.card_count||0} dump${(t.card_count||0)!==1?'s':''}</span><span class="iwhen mono">${rel(t.last_step)}</span></div>
   </div>`;
 }
 function unsortedRow(e){
@@ -526,6 +535,9 @@ function unsortedRow(e){
 const CARD_KIND_LABELS={reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",insight:"Insight",question:"Question",note:"Note"};
 function vThread(t){
   const active=t.status==='active';
+  const owned=t.context_owned;
+  const cards=t.cards||[];
+  const incl=cards.filter(c=>c.included).length;
   app(`
     <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
     <div class="threadhd">
@@ -536,26 +548,25 @@ function vThread(t){
         ${active?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
       </div>
     </div>
+
+    <div class="ctxpanel">
+      <div class="ctxhd">
+        <span class="ctxlbl">◆ CONTEXT — what CRUX understands you're going for</span>
+        <span class="ctxtag">${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}</span>
+        <span class="resum" onclick="refineContext('${t.id}')" title="Re-refine from your cards">↻ refine</span>
+      </div>
+      <textarea id="ctxbox" class="ctxbox" oninput="ctxDirty()" placeholder="As you dump things, CRUX keeps a refined picture of your direction here — what you want, what matters, what you've learned. It's what any AI tool gets. Edit it anytime; once you do, it's yours until you hit ↻ refine.">${esc(t.context||'')}</textarea>
+      <div id="ctxsave" class="savedrow"><button class="btn sm teal" onclick="saveContext('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-refine pauses until you hit ↻</span></div>
+    </div>
+
     ${active?`<div class="dumprow">
-      <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, an idea… CRUX files it for you" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
+      <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
       <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
     </div>`:''}
 
-    <div class="guides" ondragover="allowDrop(event)" ondrop="dropCard(event,'guide')">
-      <div class="gtitle">⊹ GUIDES <span class="muted2">— references that steer the whole thread · drag a card here to pin</span></div>
-      <div class="gcards">${t.guides.length?t.guides.map(card).join(""):`<span class="muted2" style="font-size:12px">Nothing pinned yet. Drop a reference, spec, or principle here.</span>`}</div>
-    </div>
-
-    <div class="board">
-      ${t.approaches.map(a=>approachLane(a,t)).join("")}
-      ${active?`<div class="lane addlane"><button class="btn out sm" onclick="newApproach('${t.id}')">+ Approach</button>
-        <div class="muted2" style="font-size:12px;margin-top:10px;text-align:center">A different direction.<br>CRUX also creates these on its own.</div></div>`:''}
-    </div>
-
-    ${t.unsorted.length?`<div class="unsorted" ondragover="allowDrop(event)" ondrop="dropCard(event,'unsorted')">
-      <div class="gtitle">⌂ UNSORTED <span class="muted2">— CRUX wasn't sure (or is still sorting) · drag into an approach</span></div>
-      <div class="gcards">${t.unsorted.map(card).join("")}</div>
-    </div>`:''}
+    <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}</div>
+    ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
+      :`<div class="empty"><div class="big">Nothing dumped yet</div>Drop in a prompt, a link, a result, an idea — CRUX folds it into the context above.</div>`}
 
     <details class="bgwrap"><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
       ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
@@ -563,29 +574,24 @@ function vThread(t){
     ${active?`<div class="promote"><button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
       <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}`);
 }
-function approachLane(a,t){
-  const owned=a.summary_owned;
-  return `<div class="lane ${a.is_current?'cur':''}" ondragover="allowDrop(event)" ondrop="dropCard(event,'${a.id}')">
-    <div class="lanehd">
-      <div class="lanetitle">${esc(a.title)}</div>
-      ${a.is_current?'<span class="curpill">current</span>':`<span class="setcur" onclick="setCurrentApproach('${t.id}','${a.id}')">set current</span>`}
-    </div>
-    <div class="lanestate">
-      <div class="statehd">state ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}<span class="resum" onclick="resummarize('${a.id}')">↻</span></div>
-      <textarea class="ministate" id="sum-${a.id}" oninput="markDirty('${a.id}')" placeholder="CRUX keeps a summary of this direction here…">${esc(a.summary||'')}</textarea>
-      <div class="savedrow" id="save-${a.id}"><button class="btn sm teal" onclick="saveSummary('${a.id}')">Save</button></div>
-    </div>
-    <div class="lanecards">
-      ${a.cards.length?a.cards.slice().reverse().map(card).join(""):`<div class="muted2" style="font-size:12px;padding:6px">Empty. Dump something and it sorts in here.</div>`}
-    </div>
-  </div>`;
-}
-function card(c){
+function dumpCard(c){
   const sorting=!c.routed;
   const label=sorting?'sorting…':(CARD_KIND_LABELS[c.kind]||c.kind);
-  return `<div class="dcard ${sorting?'sorting':''}" draggable="true" ondragstart="cardDrag(event,'${c.id}')">
-    <div class="dctop"><span class="kind k-${esc(c.kind)}">${label}</span><span class="iwhen mono">${rel(c.created_at)}</span></div>
-    <div class="dctext">${esc((c.raw_content||'').slice(0,400))}</div>
+  const open=!!state.expanded['dc-'+c.id];
+  const full=(c.raw_content||'');
+  const text=open?full:full.slice(0,200);
+  return `<div class="dumpcard ${c.included?'':'excluded'} ${sorting?'sorting':''}">
+    <div class="dcside">
+      <button class="incl ${c.included?'on':''}" title="${c.included?'In context — click to exclude':'Excluded — click to include'}" onclick="toggleInclude('${c.id}',${c.included?0:1})">${c.included?'✓':'○'}</button>
+    </div>
+    <div class="dcmain" onclick="toggleCard('${c.id}')">
+      <div class="dctop"><span class="kind k-${esc(c.kind)}">${label}</span>
+        ${c.included?'':'<span class="exctag">not in context</span>'}
+        <span class="iwhen mono">${rel(c.created_at)}</span></div>
+      <div class="dctext ${open?'full':''}">${esc(text)}${(!open&&full.length>200)?'…':''}</div>
+      ${full.length>200?`<span class="more-link">${open?'show less':'show more'}</span>`:''}
+    </div>
+    <button class="dcdel" title="Delete" onclick="deleteCard('${c.id}')">×</button>
   </div>`;
 }
 async function startThread(){
@@ -597,24 +603,21 @@ async function startThread(){
 function openThread(id){ state.openThread=id; render(); api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}}); }
 function closeThread(){ state.openThread=null; state.threadView=null; render(); }
 async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();} }
-let _drag=null;
-function cardDrag(ev,id){ _drag=id; try{ev.dataTransfer.setData('text/plain',id);ev.dataTransfer.effectAllowed='move';}catch(e){} }
-function allowDrop(ev){ ev.preventDefault(); }
-async function dropCard(ev,target){ ev.preventDefault(); const id=_drag||(ev.dataTransfer&&ev.dataTransfer.getData('text/plain')); _drag=null; if(!id) return; await post(`/cards/${id}/move`,{target}); toast("✓ Moved"); await refreshThread(); }
+function toggleCard(id){ state.expanded['dc-'+id]=!state.expanded['dc-'+id]; render(); }
 async function dump(id){
   const el=document.getElementById('dumpin'); const txt=(el&&el.value.trim())||'';
   if(!txt) return; el.value='';
   await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
-  await refreshThread(); setTimeout(refreshThread,1400);  // show it land once the router files it
+  await refreshThread(); setTimeout(refreshThread,1500);  // context re-refines in the background
 }
-async function saveSummary(aid){
-  const el=document.getElementById('sum-'+aid);
-  await post(`/approaches/${aid}/summary`,{summary:(el&&el.value)||''});
-  toast("✓ Saved — this state is yours now"); await refreshThread();
+async function toggleInclude(id,inc){ await post(`/cards/${id}/include`,{included:!!inc}); await refreshThread(); }
+async function deleteCard(id){ if(!confirm("Delete this dump? (nothing else is affected)")) return; await fetch(`/cards/${id}`,{method:"DELETE",headers:_token?{"x-crux-token":_token}:{}}); toast("Deleted"); await refreshThread(); }
+async function saveContext(id){
+  const el=document.getElementById('ctxbox');
+  await post(`/threads/${id}/context`,{context:(el&&el.value)||''});
+  toast("✓ Saved — this context is yours now"); await refreshThread();
 }
-async function resummarize(aid){ toast("Re-summarizing…"); await post(`/approaches/${aid}/resummarize`,{}); await refreshThread(); }
-async function setCurrentApproach(tid,aid){ await post(`/threads/${tid}/current-approach`,{approach_id:aid}); await refreshThread(); }
-async function newApproach(tid){ const name=prompt("Name this approach (a new direction):"); if(!name) return; await post(`/threads/${tid}/approaches`,{title:name}); toast("✓ Approach added"); await refreshThread(); }
+async function refineContext(id){ toast("Refining from your dumps…"); await post(`/threads/${id}/refine`,{}); await refreshThread(); }
 async function finishThread(id){
   if(!confirm("Finish this thread? It moves to Finished; nothing is deleted.")) return;
   await post(`/threads/${id}/finish`,{}); toast("✓ Finished"); state.openThread=null; state.threadView=null; await load();
@@ -625,15 +628,14 @@ async function promoteThread(id){
 }
 async function copyBrief(id){
   const r=await api(`/threads/${id}/brief`);
-  try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Brief copied — paste it into any tool"); }
-  catch(e){ prompt("Copy this brief:", r.brief||""); }
+  try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Context copied — paste it into any tool"); }
+  catch(e){ prompt("Copy this context:", r.brief||""); }
 }
-function markDirty(aid){ const r=document.getElementById('save-'+aid); if(r) r.style.display='flex'; }
+function ctxDirty(){ const r=document.getElementById('ctxsave'); if(r) r.style.display='flex'; }
 window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
-window.cardDrag=cardDrag; window.allowDrop=allowDrop; window.dropCard=dropCard; window.dump=dump;
-window.saveSummary=saveSummary; window.resummarize=resummarize; window.setCurrentApproach=setCurrentApproach;
-window.newApproach=newApproach; window.finishThread=finishThread; window.promoteThread=promoteThread;
-window.copyBrief=copyBrief; window.markDirty=markDirty;
+window.toggleCard=toggleCard; window.dump=dump; window.toggleInclude=toggleInclude; window.deleteCard=deleteCard;
+window.saveContext=saveContext; window.refineContext=refineContext;
+window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.ctxDirty=ctxDirty;
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){

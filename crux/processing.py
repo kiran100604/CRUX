@@ -150,6 +150,28 @@ def _parse_route(text: str, approach_ids: set[str]) -> dict:
     return out
 
 
+_CONTEXT_PROMPT = """You maintain a single living CONTEXT for a piece of work, so
+any AI tool instantly understands the direction for whatever prompt the person
+gives next. It is NOT a list of what they did — it's a refined statement of the
+vision: what they're going for, the requirements/constraints/preferences that
+matter, and what's been learned (including what NOT to do).
+
+INTENT: {intent}
+
+PRIOR CONTEXT (refine this; keep what's still true):
+{prior}
+
+ITEMS they've dumped so far (oldest first — references, prompts, results, ideas,
+learnings). Synthesize, don't list:
+{items}
+
+Rewrite the CONTEXT now:
+- Capture the CURRENT direction. If the latest items show a pivot, follow the new
+  direction and drop the abandoned one.
+- Fold in requirements, constraints, style/preferences, and concrete learnings.
+- Tight and concrete. No preamble, no headings like "Context:", just the text."""
+
+
 @dataclass
 class Enrichment:
     title: str
@@ -223,6 +245,18 @@ class FakeProcessor:
             re.search(r"\b(principle|prd|spec|guideline|according to|brand|style guide)\b", t))
         return {"kind": kind, "target": "guide" if is_guide else "current",
                 "new_title": None, "confidence": 0.55, "reason": "offline heuristic"}
+
+    def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
+        # Offline: no model to synthesize a vision, so present an honest working
+        # context = the goal + the things kept in scope. Still useful & paste-able.
+        lines = []
+        if intent:
+            lines.append(f"Goal: {intent.strip()}")
+        kept = [i.strip().replace("\n", " ") for i in items if i.strip()]
+        if kept:
+            lines.append("In scope:")
+            lines.extend(f"- {i[:200]}" for i in kept[-12:])
+        return "\n".join(lines) if lines else (intent or "")
 
 
 class AnthropicProcessor:
@@ -303,6 +337,17 @@ class AnthropicProcessor:
         except Exception:
             return FakeProcessor.route(self, item, intent=intent,
                                        approaches=approaches, recent=recent)
+
+    def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
+        """Re-synthesize the thread's living context (vision/direction) from the
+        items still in scope — the heart of 'just keep dumping, AI keeps it sharp'."""
+        joined = "\n".join(f"- {i.strip()}" for i in items if i.strip())[:8000] or "(nothing yet)"
+        try:
+            return self._call(_CONTEXT_PROMPT.format(
+                intent=intent or "(unspecified)", prior=(prior or "(none yet)")[:3000],
+                items=joined), 600).strip()
+        except Exception:
+            return FakeProcessor.refine_context(self, intent, items, prior)
 
 
 class OpenAICompatProcessor(AnthropicProcessor):

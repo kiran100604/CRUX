@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS episodes (
     is_guide     INTEGER NOT NULL DEFAULT 0,     -- thread-level governing reference
     routed       INTEGER NOT NULL DEFAULT 0,     -- has the router filed it yet?
     route_reason TEXT,
+    included     INTEGER NOT NULL DEFAULT 1,     -- does this card feed the thread context?
     created_at   TEXT NOT NULL
 );
 
@@ -242,6 +243,8 @@ class Database:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN routed INTEGER NOT NULL DEFAULT 0")
         if "route_reason" not in ecols:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN route_reason TEXT")
+        if "included" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN included INTEGER NOT NULL DEFAULT 1")
         # index lives here, not in SCHEMA: on an upgraded db the column only exists
         # after the ALTER above (SCHEMA runs before _migrate).
         self.conn.execute(
@@ -264,19 +267,20 @@ class Database:
         self.conn.execute(
             """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
                    added_by, thread_id, kind, approach_id, is_guide, routed,
-                   route_reason, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   route_reason, included, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
              ep.added_by, ep.thread_id, ep.kind, ep.approach_id, int(ep.is_guide),
-             int(ep.routed), ep.route_reason, ep.created_at),
+             int(ep.routed), ep.route_reason, int(ep.included), ep.created_at),
         )
         self.conn.commit()
         return ep
 
     def update_card(self, card_id: str, fields: dict) -> bool:
-        """Update a card's (episode's) filing: kind / approach_id / is_guide / routed."""
-        allowed = {"kind", "approach_id", "is_guide", "routed", "route_reason", "thread_id"}
-        cols = {k: (int(v) if k in ("is_guide", "routed") and v is not None else v)
+        """Update a card's (episode's) state: kind / routed / included / approach_id."""
+        allowed = {"kind", "approach_id", "is_guide", "routed", "route_reason",
+                   "thread_id", "included"}
+        cols = {k: (int(v) if k in ("is_guide", "routed", "included") and v is not None else v)
                 for k, v in fields.items() if k in allowed}
         if not cols:
             return False
@@ -285,6 +289,10 @@ class Database:
             f"UPDATE episodes SET {assignment} WHERE id=?", (*cols.values(), card_id))
         self.conn.commit()
         return cur.rowcount > 0
+
+    def delete_episode(self, ep_id: str) -> None:
+        self.conn.execute("DELETE FROM episodes WHERE id=?", (ep_id,))
+        self.conn.commit()
 
     # --- approaches (directions within a thread) ----------------------------
 

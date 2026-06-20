@@ -232,16 +232,13 @@ class Store:
                 n += 1
         return n
 
-    # --- threads + approaches: "what I'm doing now", auto-sorted ------------
+    # --- threads: "what I'm doing now" = an intent + a living context --------
     #
-    # A thread is a piece of work (intent). You DUMP cards (raw captures); the
-    # router files each one into a place so you never have to:
-    #   • a GUIDE   — a reference/spec that governs the whole thread
-    #   • an APPROACH — one of the directions you're trying (auto-created, git-like)
-    #   • UNSORTED  — when the router isn't confident enough to guess
-    # The only management gesture is drag-and-drop (move_card) to correct a miss.
-
-    ROUTE_MIN_CONF = 0.45  # below this we set a card aside rather than misfile it
+    # A thread is a piece of work (an INTENT). You just DUMP things in (prompts,
+    # links, results, snippets, ideas). CRUX maintains ONE living CONTEXT — a
+    # refined statement of the direction, so any AI instantly knows what you want.
+    # You never organize: every included dump refines the context. The only control
+    # is whether a card is IN the context — exclude one and the context forgets it.
 
     def _seed_background(self, intent: str) -> str:
         """Assemble the starting context for a thread from the verified KB, so the
@@ -253,41 +250,16 @@ class Store:
         results, links = self.retrieve(intent, limit=6, scope="main")
         return _format(results, links) if results else ""
 
-    def _new_approach(self, thread_id: str, title: str) -> dict:
-        ts = now_iso()
-        a = {"id": str(uuid.uuid4()), "thread_id": thread_id,
-             "title": (title or "").strip()[:60] or "New approach", "summary": "",
-             "summary_owned": 0, "summary_stale": 0, "status": "active",
-             "created_at": ts, "updated_at": ts}
-        return self.db.insert_approach(a)
-
-    def _current_approach(self, thread_id: str) -> dict | None:
-        t = self.db.get_thread(thread_id)
-        if not t:
-            return None
-        cid = t.get("current_approach_id")
-        if cid:
-            a = self.db.get_approach(cid)
-            if a:
-                return a
-        aps = self.db.list_approaches(thread_id)
-        active = [a for a in aps if a["status"] == "active"]
-        a = (active or aps or [None])[0]
-        if a is None:
-            a = self._new_approach(thread_id, "First pass")
-        self.db.update_thread(thread_id, {"current_approach_id": a["id"]}, now_iso())
-        return a
-
     def create_thread(self, title: str, intent: str = "", *, seed: bool = True) -> dict:
         title = (title or "").strip() or (intent.strip()[:60] or "Untitled thread")
         ts = now_iso()
+        # `summary` holds the living CONTEXT (the refined vision); summary_owned/stale
+        # track whether the user has taken the pen / whether it needs re-refining.
         t = {"id": str(uuid.uuid4()), "title": title, "intent": intent.strip(),
              "background": self._seed_background(intent) if seed else "",
              "summary": "", "summary_owned": 0, "summary_stale": 0,
              "status": "active", "created_at": ts, "updated_at": ts}
         self.db.insert_thread(t)
-        a = self._new_approach(t["id"], "First pass")  # every thread starts with one direction
-        self.db.update_thread(t["id"], {"current_approach_id": a["id"]}, now_iso())
         self.db.set_meta("current_thread", t["id"])  # newest thread becomes current
         return self.db.get_thread(t["id"])
 
@@ -295,8 +267,9 @@ class Store:
                  thread_id: str | None = None, route: bool = False) -> dict:
         """Dump a card. Lands on the given thread (or the current one); with no
         thread it's a global unsorted capture. Kept raw — never atomized into facts.
-        It arrives UNROUTED ('sorting…'); route_card files it. Set route=True to
-        classify inline (CLI/offline); the server routes in the background instead."""
+        It arrives UNCLASSIFIED ('sorting…'); route_card tags its kind and marks the
+        context stale. route=True classifies inline (CLI/offline); the server does
+        it in the background so capture stays instant."""
         content = content.strip()
         if not content:
             raise ValueError("cannot capture empty step")
@@ -306,7 +279,7 @@ class Store:
             thread_id = None
         ep = self.db.insert_episode(Episode(
             id=str(uuid.uuid4()), raw_content=content, source_type=source,
-            source_ref=None, thread_id=thread_id, routed=False))
+            source_ref=None, thread_id=thread_id, routed=False, included=True))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
             if route:
@@ -315,82 +288,55 @@ class Store:
                 "thread_id": thread_id, "card_id": ep.id}
 
     def route_card(self, card_id: str) -> dict | None:
-        """The brain: classify a dumped card and file it (guide / an approach /
-        unsorted). Conservative — when the router isn't confident it stays unsorted
-        rather than risk a wrong home."""
+        """Tag a dumped card's KIND (reference/prompt/result/…) and mark the thread's
+        context stale so it re-refines. No lanes to file into — the dump just feeds
+        the one living context."""
         ep = self.db.get_episode(card_id)
         if not ep or not ep.thread_id:
             return None
         t = self.db.get_thread(ep.thread_id)
-        approaches = self.db.list_approaches(ep.thread_id)
-        recent = [c.raw_content for c in self.db.thread_steps(ep.thread_id)
-                  if c.id != card_id][-5:]
         d = self.processor.route(ep.raw_content, intent=(t["intent"] if t else "") or "",
-                                 approaches=approaches, recent=recent)
-        fields = {"routed": 1, "kind": d["kind"], "route_reason": d.get("reason"),
-                  "is_guide": 0, "approach_id": None}
-        target_approach = None
-        if d["target"] == "guide":
-            fields["is_guide"] = 1
-        elif d["confidence"] < self.ROUTE_MIN_CONF:
-            pass  # not sure → leave unsorted (approach_id stays None)
-        elif d["target"] == "new" and d.get("new_title"):
-            target_approach = self._new_approach(ep.thread_id, d["new_title"])["id"]
-        elif d["target"] in {a["id"] for a in approaches}:
-            target_approach = d["target"]
-        elif d["target"] == "current":
-            cur = self._current_approach(ep.thread_id)
-            target_approach = cur["id"] if cur else None
-        fields["approach_id"] = target_approach
-        self.db.update_card(card_id, fields)
-        if target_approach:
-            self.db.update_approach(target_approach, {"summary_stale": 1}, now_iso())
+                                 approaches=[], recent=[])
+        self.db.update_card(card_id, {"routed": 1, "kind": d["kind"],
+                                      "route_reason": d.get("reason")})
+        self._mark_context_stale(ep.thread_id)
         return d
 
-    def ensure_approach_summary(self, approach_id: str) -> dict | None:
-        """Lazily refresh an approach's living summary when its cards changed and
-        the user hasn't taken the pen. Keeps capture fast — work happens on view."""
-        a = self.db.get_approach(approach_id)
-        if not a:
-            return None
-        if not a["summary_owned"] and (a["summary_stale"] or not a["summary"]):
-            cards = [c.raw_content for c in self.db.approach_cards(approach_id)]
-            if cards:
-                t = self.db.get_thread(a["thread_id"])
-                summary = self.processor.summarize((t["intent"] if t else "") or "", cards)
-                self.db.update_approach(approach_id, {"summary": summary, "summary_stale": 0},
-                                        now_iso())
-                a = self.db.get_approach(approach_id)
-        return a
+    def _mark_context_stale(self, thread_id: str) -> None:
+        t = self.db.get_thread(thread_id)
+        if t and not t["summary_owned"]:
+            self.db.update_thread(thread_id, {"summary_stale": 1}, now_iso())
 
-    def _card(self, ep: Episode) -> dict:
-        return ep.to_public_dict()
-
-    def thread_view(self, thread_id: str) -> dict | None:
+    def ensure_context(self, thread_id: str) -> dict | None:
+        """Lazily re-refine the living context from the cards still in scope, when
+        it's gone stale and the user hasn't taken the pen. Work happens on view so
+        capture stays instant."""
         t = self.db.get_thread(thread_id)
         if not t:
             return None
-        cur_id = t.get("current_approach_id")
-        guides = [self._card(c) for c in self.db.thread_guides(thread_id)]
-        approaches = []
-        for a in self.db.list_approaches(thread_id):
-            a = self.ensure_approach_summary(a["id"]) or a
-            cards = [self._card(c) for c in self.db.approach_cards(a["id"])]
-            approaches.append({**a, "summary_owned": bool(a["summary_owned"]),
-                               "is_current": a["id"] == cur_id,
-                               "cards": cards, "card_count": len(cards)})
-        unsorted = [self._card(c) for c in self.db.thread_unsorted_cards(thread_id)]
-        total = sum(a["card_count"] for a in approaches) + len(guides) + len(unsorted)
-        return {**t, "guides": guides, "approaches": approaches, "unsorted": unsorted,
-                "current_approach_id": cur_id, "card_count": total}
+        if not t["summary_owned"] and (t["summary_stale"] or not t["summary"]):
+            items = [c.raw_content for c in self.db.thread_steps(thread_id) if c.included]
+            if items:
+                ctx = self.processor.refine_context(t["intent"] or "", items, t["summary"] or "")
+                self.db.update_thread(thread_id, {"summary": ctx, "summary_stale": 0}, now_iso())
+                t = self.db.get_thread(thread_id)
+        return t
+
+    def thread_view(self, thread_id: str) -> dict | None:
+        t = self.ensure_context(thread_id)
+        if not t:
+            return None
+        cards = [c.to_public_dict() for c in reversed(self.db.thread_steps(thread_id))]
+        return {**t, "context": t.get("summary") or "",
+                "context_owned": bool(t["summary_owned"]),
+                "cards": cards, "card_count": len(cards)}
 
     def list_threads(self, status: str | None = None) -> list[dict]:
         cur = self.current_thread_id()
         out = []
         for t in self.db.list_threads(status=status):
             steps = self.db.thread_steps(t["id"])
-            out.append({**t, "step_count": len(steps),
-                        "approach_count": len(self.db.list_approaches(t["id"])),
+            out.append({**t, "card_count": len(steps),
                         "is_current": t["id"] == cur,
                         "last_step": steps[-1].created_at if steps else t["created_at"]})
         return out
@@ -406,72 +352,49 @@ class Store:
             return False
         return self.db.update_thread(thread_id, fields, now_iso())
 
-    # --- approaches: management is automatic; these back manual overrides ----
+    # --- the only controls: include/exclude a card, edit/refine the context --
 
-    def new_approach(self, thread_id: str, title: str, *, make_current: bool = True) -> dict:
-        a = self._new_approach(thread_id, title)
-        if make_current:
-            self.db.update_thread(thread_id, {"current_approach_id": a["id"]}, now_iso())
-        return a
-
-    def set_current_approach(self, thread_id: str, approach_id: str) -> bool:
-        if not self.db.get_approach(approach_id):
-            return False
-        return self.db.update_thread(thread_id, {"current_approach_id": approach_id}, now_iso())
-
-    def set_approach_summary(self, approach_id: str, summary: str) -> bool:
-        """User hand-edits this direction's state → they own it; stop auto-overwriting."""
-        return self.db.update_approach(
-            approach_id, {"summary": summary, "summary_owned": 1, "summary_stale": 0}, now_iso())
-
-    def resummarize_approach(self, approach_id: str) -> dict | None:
-        self.db.update_approach(approach_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
-        return self.ensure_approach_summary(approach_id)
-
-    def move_card(self, card_id: str, target: str) -> bool:
-        """Drag-and-drop: re-file a card. target = 'guide' | 'unsorted' | <approach id>.
-        This is the user's correction when the router put something in the wrong place."""
+    def set_card_included(self, card_id: str, included: bool) -> bool:
         ep = self.db.get_episode(card_id)
         if not ep:
             return False
-        old = ep.approach_id
-        if target == "guide":
-            fields = {"is_guide": 1, "approach_id": None, "routed": 1}
-            dest = None
-        elif target == "unsorted":
-            fields = {"is_guide": 0, "approach_id": None, "routed": 1}
-            dest = None
-        else:
-            if not self.db.get_approach(target):
-                return False
-            fields = {"is_guide": 0, "approach_id": target, "routed": 1}
-            dest = target
-        ok = self.db.update_card(card_id, fields)
-        for ap in (old, dest):
-            if ap:
-                self.db.update_approach(ap, {"summary_stale": 1}, now_iso())
+        ok = self.db.update_card(card_id, {"included": int(included)})
+        if ep.thread_id:
+            self._mark_context_stale(ep.thread_id)
         return ok
 
+    def delete_card(self, card_id: str) -> bool:
+        ep = self.db.get_episode(card_id)
+        if not ep:
+            return False
+        self.db.delete_episode(card_id)
+        if ep.thread_id:
+            self._mark_context_stale(ep.thread_id)
+        return True
+
+    def set_thread_context(self, thread_id: str, context: str) -> bool:
+        """The user hand-edits the context → they own it; stop auto-overwriting."""
+        return self.db.update_thread(
+            thread_id, {"summary": context, "summary_owned": 1, "summary_stale": 0}, now_iso())
+
+    def refine_context_now(self, thread_id: str) -> dict | None:
+        """Hand control back to the AI and re-refine the context from scratch."""
+        self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
+        return self.ensure_context(thread_id)
+
     def thread_brief(self, thread_id: str) -> str:
-        """The portable context: governing guides + seeded background + the current
-        approach's live state. Paste into any tool, no re-explaining."""
-        t = self.db.get_thread(thread_id)
+        """The portable context: the living vision + the seeded KB background
+        (agents can pull more). Paste into any tool, no re-explaining."""
+        t = self.ensure_context(thread_id)
         if not t:
             return ""
         parts = []
-        guides = self.db.thread_guides(thread_id)
-        if guides:
-            parts.append("[GUIDES — follow these]\n" +
-                         "\n".join("- " + g.raw_content.strip()[:300] for g in guides))
+        ctx = (t.get("summary") or "").strip() or (t.get("intent") or "").strip()
+        if ctx:
+            parts.append("[CONTEXT — what I'm going for]\n" + ctx)
         if t.get("background"):
-            parts.append(t["background"].strip())
-        cur = self._current_approach(thread_id)
-        if cur:
-            cur = self.ensure_approach_summary(cur["id"]) or cur
-            state = (cur.get("summary") or "").strip() or (t.get("intent") or "").strip()
-            if state:
-                parts.append(f"[WHAT I'M DOING NOW — {cur['title']}]\n" + state)
-        return "\n\n".join(p for p in parts if p)
+            parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
+        return "\n\n".join(parts)
 
     def finish_thread(self, thread_id: str) -> bool:
         if self.current_thread_id() == thread_id:
@@ -481,8 +404,6 @@ class Store:
     def delete_thread(self, thread_id: str) -> None:
         if self.current_thread_id() == thread_id:
             self.db.set_meta("current_thread", None)
-        for a in self.db.list_approaches(thread_id):
-            self.db.delete_approach(a["id"])
         self.db.delete_thread(thread_id)
 
     def promote_thread(self, thread_id: str, *, proposed: bool = True) -> list[ContextItem]:
