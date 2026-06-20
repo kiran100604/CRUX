@@ -435,7 +435,12 @@ def create_app(cfg: Config):
 
     @app.get("/api/whoami")
     def whoami(request: Request):
-        return {"leader": _is_leader(request), "user": cfg.user}
+        from .hotkey import chord_label
+        try:
+            chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
+        except Exception:
+            chord = ""
+        return {"leader": _is_leader(request), "user": cfg.user, "hotkey": chord}
 
     @app.post("/promote-clean")
     def promote_clean(request: Request):

@@ -288,7 +288,10 @@
   .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
-  .dumprow{display:flex; gap:10px; margin:6px 0 14px}
+  .dumprow{display:flex; gap:10px; margin:6px 0 8px}
+  .hotkeyhint{font-size:12.5px; color:var(--muted); background:var(--soft); border:1px solid var(--hair);
+    border-radius:var(--r-sm); padding:8px 12px; margin-bottom:16px}
+  .hotkeyhint b{color:var(--ink)}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
   .dumplist{display:flex; flex-direction:column; gap:9px}
   .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--card,#fff); background:#fff; border:1px solid var(--hair);
@@ -460,7 +463,7 @@ const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["refe
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
   kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
-  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[]};
+  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:""};
 
 async function load(){
   // diagnostic timing: each fetch + total, visible in the browser console (F12)
@@ -569,18 +572,20 @@ function vThread(t){
       <div id="ctxsave" class="savedrow"><button class="btn sm teal" onclick="saveContext('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-refine pauses until you hit ↻</span></div>
     </div>
 
+    <details class="bgwrap"${t.background?'':''}><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
+      ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
+    </details>
+
     ${active?`<div class="dumprow">
       <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
       <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
-    </div>`:''}
+    </div>
+    <div class="hotkeyhint">⌨ ${state.hotkey?`Press <b>${esc(state.hotkey)}</b> anywhere`:'Set your capture hotkey'} to dump into <b>this</b> thread — copied text goes straight here, never to Review.${state.hotkey?'':' <span class="resum" onclick="setView(\'overview\')">how →</span>'}</div>`:''}
 
     <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}</div>
     ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
-      :`<div class="empty"><div class="big">Nothing dumped yet</div>Drop in a prompt, a link, a result, an idea — CRUX folds it into the context above.</div>`}
+      :`<div class="empty"><div class="big">Nothing dumped yet</div>Use your capture hotkey while you work, or drop something in above — CRUX folds it into the context.</div>`}
 
-    <details class="bgwrap"><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
-      ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
-    </details>
     ${active?`<div class="promote"><button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
       <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}`);
 }
@@ -610,7 +615,12 @@ async function startThread(){
   const t=await post('/threads',{intent}); state.openThread=t.id;
   toast("✓ Thread started — background seeded"); await load();
 }
-function openThread(id){ state.openThread=id; render(); api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}}); }
+function openThread(id){
+  state.openThread=id; render();
+  // make the thread you're viewing the hotkey target, so captures land here
+  post(`/threads/${id}/current`,{}).then(()=>{state.currentThread=id;});
+  api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}});
+}
 function closeThread(){ state.openThread=null; state.threadView=null; render(); }
 async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();} }
 function toggleCard(id){ state.expanded['dc-'+id]=!state.expanded['dc-'+id]; render(); }
@@ -1129,7 +1139,7 @@ async function init(){
   // area shows a light loading state while the first fetches resolve.
   const a=document.getElementById('app');
   if(a) a.innerHTML='<div class="booting"><div class="spin"></div>Loading your workspace…</div>';
-  try{ const w=await api("/api/whoami"); state.leader=!!w.leader; }catch(e){ state.leader=true; }
+  try{ const w=await api("/api/whoami"); state.leader=!!w.leader; state.hotkey=w.hotkey||""; }catch(e){ state.leader=true; }
   applyRole();
   try{ await load(); }
   catch(e){
