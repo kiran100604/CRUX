@@ -212,10 +212,18 @@
   .kbwrap{display:grid; grid-template-columns:320px 1fr; gap:18px; align-items:start; margin-top:8px}
   @media(max-width:900px){.kbwrap{grid-template-columns:1fr}}
   .kbnav{position:sticky; top:80px; background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-lg);
-    padding:14px; max-height:calc(100vh - 110px); overflow:auto}
+    padding:14px; max-height:calc(100vh - 110px); display:flex; flex-direction:column; overflow:hidden}
+  .kbnavtop{flex:none}
+  .kblist{flex:1; overflow-y:auto; margin:0 -4px; padding:0 4px}
+  .kbsearchwrap{position:relative; margin-bottom:10px}
+  .kbsi{position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted2); font-size:14px; pointer-events:none}
+  .kbclear{position:absolute; right:9px; top:50%; transform:translateY(-50%); color:var(--muted2); cursor:pointer; font-size:16px; line-height:1; padding:2px 4px}
+  .kbclear:hover{color:var(--ink)}
   .kbsearch{width:100%; height:38px; border:1px solid var(--hair); background:var(--soft); border-radius:var(--r-md);
-    padding:0 12px; font-size:13px; color:var(--ink); outline:none; margin-bottom:10px}
-  .kbsearch:focus{border-color:var(--ink)}
+    padding:0 28px 0 30px; font-size:13px; color:var(--ink); outline:none; box-sizing:border-box}
+  .kbsearch:focus{border-color:var(--teal); background:var(--canvas)}
+  .kbcount{font-family:var(--mono); font-size:10px; color:var(--teal); min-height:13px; margin:-4px 2px 6px}
+  .kbnav.searching .kbgroup{margin-bottom:2px}
   .kbmodes{display:inline-flex; gap:2px; background:var(--card); border-radius:var(--pill); padding:3px; margin-bottom:12px}
   .kbmode{border:none; background:none; color:var(--muted); font-family:var(--mono); font-size:11px; padding:5px 12px; border-radius:var(--pill)}
   .kbmode.on{background:var(--canvas); color:var(--ink)}
@@ -331,7 +339,11 @@
   .kbtoggle{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--hair); border-radius:var(--pill); padding:3px; flex:none}
   .kbtog{border:none; background:none; color:var(--muted); font-size:13px; padding:6px 14px; border-radius:var(--pill)}
   .kbtog.on{background:var(--ink); color:#fff}
-  .askstream{margin:16px 0 12px; min-height:120px}
+  /* chat fills the viewport: header + input pinned, only the stream scrolls */
+  .askview{display:flex; flex-direction:column; height:calc(100vh - 116px); min-height:440px}
+  .askview .crumb,.askview .kbhdrow{flex:none}
+  .askstream{flex:1; overflow-y:auto; margin:16px 0 0; padding:4px 2px 8px; min-height:0}
+  .askfoot{flex:none; padding-top:12px; border-top:1px solid var(--hair); margin-top:4px}
   .qrow{display:flex; justify-content:flex-end; margin-bottom:14px}
   .qbub{background:var(--teal); color:#fff; border-radius:14px 14px 4px 14px; padding:11px 15px; font-size:14.5px; max-width:75%}
   .arow{margin-bottom:24px}
@@ -355,7 +367,7 @@
   .sugg{display:flex; flex-wrap:wrap; gap:8px}
   .schip{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--pill); padding:8px 14px; font-size:13px; color:var(--ink); cursor:pointer}
   .schip:hover{border-color:var(--teal-line)}
-  .askbar{display:flex; gap:10px; position:sticky; bottom:0}
+  .askbar{display:flex; gap:10px}
   .askbar input{flex:1; height:50px; border:1px solid var(--hair); background:var(--canvas); border-radius:13px; padding:0 18px; font-size:15px; color:var(--ink); outline:none}
   .askbar input:focus{border-color:var(--teal)}
   .askbar .btn{height:50px}
@@ -807,26 +819,33 @@ const KB_SUGGEST=["What are our hard constraints?","What have we decided so far?
 function vKBAsk(main){
   const turns=state.ask.history;
   app(`
+   <div class="askview">
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
     <div class="kbhdrow">
       <div><h1 class="head display">Ask your knowledge</h1>
         <p class="sub">Ask anything — CRUX answers from your ${main.length} verified facts and shows its sources.</p></div>
       ${kbToggle('ask')}
     </div>
-    <div class="askstream">
+    <div class="askstream" id="askstream">
       ${turns.map((t,i)=>askTurn(t,i)).join("")}
       ${state.ask.loading?`<div class="askthinking"><span class="spin"></span> reading your knowledge…</div>`:''}
       ${!turns.length?`<div class="srclabel">Try asking</div><div class="sugg">${KB_SUGGEST.map(q=>`<span class="schip" onclick="askSend(${JSON.stringify(q).replace(/"/g,'&quot;')})">${esc(q)}</span>`).join("")}</div>`:''}
     </div>
-    <div class="askbar">
-      <input id="askq" placeholder="Ask anything about what your team knows…" autocomplete="off" onkeydown="if(event.key==='Enter')askSend()"/>
-      <button class="btn teal" onclick="askSend()">Ask →</button>
+    <div class="askfoot">
+      <div class="askbar">
+        <input id="askq" placeholder="Ask anything about what your team knows…" autocomplete="off" onkeydown="if(event.key==='Enter')askSend()"/>
+        ${turns.length?`<button class="btn ghost" onclick="askReset()" title="Start over">Clear</button>`:''}
+        <button class="btn teal" onclick="askSend()">Ask →</button>
+      </div>
+      <div class="askground">Grounded in your verified facts, with sources — if it's not in your knowledge base, CRUX says so.</div>
     </div>
-    <div class="askground">Grounded in your verified facts, with sources — if it's not in your knowledge base, CRUX says so.</div>
+   </div>
     ${state.factPanel?factPanelHTML():''}`);
   const el=document.getElementById('askq'); if(el && !state.factPanel) el.focus();
-  const sc=document.querySelector('.askstream'); if(sc) sc.scrollTop=sc.scrollHeight;
+  const sc=document.getElementById('askstream'); if(sc) sc.scrollTop=sc.scrollHeight;
 }
+function askReset(){ state.ask.history=[]; state.factPanel=null; render(); }
+window.askReset=askReset;
 function askTurn(t,i){
   if(t.role==='user') return `<div class="qrow"><div class="qbub">${esc(t.content)}</div></div>`;
   const srcs=t.sources||[];
@@ -909,11 +928,18 @@ function vKBBrowse(main){
     </div>
     <div class="kbwrap">
       <div class="kbnav">
-        <input class="kbsearch" id="kbq" placeholder="Filter your knowledge…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
-        <div class="kbmodes">
-          <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By topic</button>
-          <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By level</button>
-          <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By tag</button>
+        <div class="kbnavtop">
+          <div class="kbsearchwrap">
+            <span class="kbsi">⌕</span>
+            <input class="kbsearch" id="kbq" placeholder="Search ${shown.length} facts by title, summary or tag…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
+            ${state.kbQuery?`<span class="kbclear" onclick="kbClear()">×</span>`:''}
+          </div>
+          <div class="kbcount" id="kbcount"></div>
+          <div class="kbmodes">
+            <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By topic</button>
+            <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By level</button>
+            <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By tag</button>
+          </div>
         </div>
         <div class="kblist">${shown.length?kbNav(shown):'<div class="muted2" style="font-size:13px;padding:8px">No facts match this lens yet.</div>'}</div>
       </div>
@@ -1038,15 +1064,26 @@ function selectKb(id){
 }
 function setKbMode(m){state.kbMode=m; render();}
 function kbFilter(){
-  const q=(document.getElementById('kbq').value||'').toLowerCase().trim();
+  const box=document.getElementById('kbq'); if(!box) return;
+  const q=(box.value||'').toLowerCase().trim();
   state.kbQuery=q;
+  let hits=0;
   document.querySelectorAll('.kbnav .navitem').forEach(n=>{
-    n.style.display = (!q || n.dataset.text.includes(q)) ? '' : 'none';});
+    const show=(!q || n.dataset.text.includes(q));
+    n.style.display = show ? '' : 'none'; if(show) hits++;});
+  // while searching, collapse the topic/level headers so matches read as one
+  // tight, scannable list instead of being scattered across sections
   document.querySelectorAll('.kbnav .kbgroup').forEach(g=>{
     const any=[...g.querySelectorAll('.navitem')].some(n=>n.style.display!=='none');
     g.style.display = any ? '' : 'none';});
+  document.querySelectorAll('.kbnav .kbglabel').forEach(l=>{ l.style.display=q?'none':''; });
+  const cnt=document.getElementById('kbcount');
+  if(cnt) cnt.textContent = q ? `${hits} match${hits===1?'':'es'}` : '';
+  // toggle a flat-list style while searching
+  const nav=document.querySelector('.kbnav'); if(nav) nav.classList.toggle('searching', !!q);
 }
-window.selectKb=selectKb; window.setKbMode=setKbMode; window.kbFilter=kbFilter;
+function kbClear(){ state.kbQuery=''; const b=document.getElementById('kbq'); if(b){b.value='';} kbFilter(); if(b) b.focus(); }
+window.selectKb=selectKb; window.setKbMode=setKbMode; window.kbFilter=kbFilter; window.kbClear=kbClear;
 
 /* ---------------- REVIEW / DECISIONS ---------------- */
 function vDecisions(){
