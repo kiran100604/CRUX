@@ -122,9 +122,12 @@ class Store:
         return facts
 
     def edit(self, item_id: str, *, title: str | None = None, summary: str | None = None,
-             type: str | None = None, tags: list | None = None) -> bool:
-        """Edit a fact's text. Re-embeds and re-checks contradictions so search
-        and conflict detection never go stale on edited facts."""
+             type: str | None = None, tags: list | None = None,
+             tier: str | None = None, domain: str | None = None) -> bool:
+        """Edit a fact's text or filing. Re-embeds and re-checks contradictions
+        when text changes so search and conflict detection never go stale.
+        tier/domain are filing-only (no re-embed): they move where a fact lives,
+        not what it says — letting the user correct an auto-classification."""
         full = self.db.resolve_id(item_id)
         if not full:
             return False
@@ -134,6 +137,8 @@ class Store:
         if summary is not None: fields["summary"] = summary
         if type is not None: fields["type"] = type
         if tags is not None: fields["tags"] = tags
+        if tier is not None: fields["tier"] = tier
+        if domain is not None: fields["domain"] = domain
         self.db.update(full, fields, now_iso())
         updated = self.db.get(full)
         if title is not None or summary is not None:  # text changed → re-embed

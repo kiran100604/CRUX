@@ -195,6 +195,8 @@ def create_app(cfg: Config):
         title: str | None = None
         summary: str | None = None
         type: str | None = None
+        tier: str | None = None
+        domain: str | None = None
 
     @app.post("/capture")
     def capture(body: CaptureIn):
@@ -217,7 +219,8 @@ def create_app(cfg: Config):
     def edit(item_id: str, body: EditIn, request: Request):
         _leader(request)
         return {"ok": store.edit(item_id, title=body.title,
-                                 summary=body.summary, type=body.type)}
+                                 summary=body.summary, type=body.type,
+                                 tier=body.tier, domain=body.domain)}
 
     @app.get("/search")
     def search(q: str, limit: int = 5, scope: str | None = None):
