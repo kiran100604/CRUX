@@ -9,6 +9,8 @@ Requires the optional `server` extra:  pip install "crux[server]"
 
 import os
 import secrets
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -82,9 +84,24 @@ def create_app(cfg: Config):
             raise HTTPException(status_code=403,
                                 detail="leader only — connect with the admin token to validate the KB")
 
+    _t0 = time.time()
     store = Store(cfg)
+    print(f"[crux] Store init (db + embedder + processor): {time.time()-_t0:.2f}s",
+          file=sys.stderr, flush=True)
     app = FastAPI(title="CRUX")
     app.state.executor = ThreadPoolExecutor(max_workers=1)  # serial background ingest
+
+    @app.middleware("http")
+    async def _timing(request, call_next):
+        # Diagnostic: log every request's wall time so a slow page load points at
+        # the exact endpoint. Local-first app → logs go to the `crux start` terminal.
+        t = time.time()
+        resp = await call_next(request)
+        dt = (time.time() - t) * 1000
+        mark = " <<< SLOW" if dt > 500 else ""
+        print(f"[crux] {request.method} {request.url.path} {dt:.0f}ms{mark}",
+              file=sys.stderr, flush=True)
+        return resp
 
     class CaptureIn(BaseModel):
         content: str
@@ -468,6 +485,12 @@ def create_app(cfg: Config):
 
 
 def run(cfg: Config) -> None:
+    import time as _t
     import uvicorn
 
-    uvicorn.run(create_app(cfg), host=cfg.host, port=cfg.port)
+    t0 = _t.time()
+    print("[crux] importing web stack…", file=sys.stderr, flush=True)
+    app = create_app(cfg)
+    print(f"[crux] app ready in {_t.time()-t0:.2f}s — starting server on "
+          f"http://{cfg.host}:{cfg.port}", file=sys.stderr, flush=True)
+    uvicorn.run(app, host=cfg.host, port=cfg.port)

@@ -463,9 +463,13 @@ let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts
   threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[]};
 
 async function load(){
+  // diagnostic timing: each fetch + total, visible in the browser console (F12)
+  const _t0=performance.now();
+  const timed=(u)=>{const s=performance.now();return api(u).then(r=>{console.log(`[crux] ${u} ${(performance.now()-s).toFixed(0)}ms`);return r;});};
   const [it,rv,st,fd,ln,wm,th,un]=await Promise.all([
-    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses"),
-    api("/working"), api("/threads"), api("/unsorted")]);
+    timed("/items"), timed("/review"), timed("/stats"), timed("/feed?limit=20"), timed("/lenses"),
+    timed("/working"), timed("/threads"), timed("/unsorted")]);
+  console.log(`[crux] all fetches done in ${(performance.now()-_t0).toFixed(0)}ms`);
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
   state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[]; state.workmem=(wm&&wm.items)||[];
