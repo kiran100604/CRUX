@@ -72,6 +72,22 @@ NEW: {a}
 EXISTING: {b}"""
 
 
+_SUMMARIZE_PROMPT = """You maintain a running summary of what someone is working
+on right now, so they (or an AI tool) can pick up the thread without re-explaining.
+Given the GOAL and the STEPS taken so far (oldest first), write a tight status
+brief with exactly these labels, each one line, omit a label if empty:
+Goal: <the objective>
+Tried: <approaches/things explored, comma-separated>
+Now: <what they're focused on at this moment>
+Next: <the obvious next step, if implied>
+No preamble, no markdown, just those lines.
+
+GOAL: {intent}
+
+STEPS:
+{steps}"""
+
+
 @dataclass
 class Enrichment:
     title: str
@@ -109,6 +125,18 @@ class FakeProcessor:
     def classify_relation(self, a: str, b: str):
         # Offline can't reason — signal "no judgment", caller falls back to heuristic.
         return None, ""
+
+    def summarize(self, intent: str, steps: list[str]) -> str:
+        # Offline: no model to abstract with, so present the thread honestly as
+        # Goal + the most recent steps, newest last. Still a usable, paste-able state.
+        lines = []
+        if intent:
+            lines.append(f"Goal: {intent.strip()}")
+        recent = [s.strip().replace("\n", " ") for s in steps if s.strip()][-6:]
+        if recent:
+            lines.append("Steps so far:")
+            lines.extend(f"- {s[:160]}" for s in recent)
+        return "\n".join(lines) if lines else (intent or "")
 
 
 class AnthropicProcessor:
@@ -160,6 +188,16 @@ class AnthropicProcessor:
             return rel, str(d.get("reason", ""))[:120]
         except Exception:
             return None, ""
+
+    def summarize(self, intent: str, steps: list[str]) -> str:
+        """A living Goal/Tried/Now/Next brief over the thread's steps."""
+        joined = "\n".join(f"- {s.strip()}" for s in steps if s.strip())[:6000] or "(none yet)"
+        try:
+            return self._call(_SUMMARIZE_PROMPT.format(intent=intent or "(unspecified)",
+                                                       steps=joined), 320).strip()
+        except Exception:
+            # never let a summary failure break capture/view — fall back to raw
+            return FakeProcessor.summarize(self, intent, steps)
 
 
 class OpenAICompatProcessor(AnthropicProcessor):

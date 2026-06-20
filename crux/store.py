@@ -232,6 +232,154 @@ class Store:
                 n += 1
         return n
 
+    # --- threads: "what I'm doing now" (the working layer, as narrative) ------
+
+    def _seed_background(self, intent: str) -> str:
+        """Assemble the starting context for a thread from the verified KB, so the
+        thread is born with the background you'd otherwise re-type into every tool.
+        Reuses the same directive-brief formatter the agent hook uses."""
+        if not intent.strip():
+            return ""
+        from .hooks import _format  # lazy: hooks imports nothing heavy from store
+        results, links = self.retrieve(intent, limit=6, scope="main")
+        return _format(results, links) if results else ""
+
+    def create_thread(self, title: str, intent: str = "", *, seed: bool = True) -> dict:
+        title = (title or "").strip() or (intent.strip()[:60] or "Untitled thread")
+        ts = now_iso()
+        t = {"id": str(uuid.uuid4()), "title": title, "intent": intent.strip(),
+             "background": self._seed_background(intent) if seed else "",
+             "summary": "", "summary_owned": 0, "summary_stale": 0,
+             "status": "active", "created_at": ts, "updated_at": ts}
+        self.db.insert_thread(t)
+        self.db.set_meta("current_thread", t["id"])  # newest thread becomes current
+        return t
+
+    def add_step(self, content: str, *, source: str = "note",
+                 thread_id: str | None = None) -> dict:
+        """Capture a step. Lands on the given thread (or the current one); if there
+        is no thread it becomes an 'unsorted' step. Kept raw — NEVER atomized into
+        facts (that only happens on promotion). Returns {episode, thread_id}."""
+        content = content.strip()
+        if not content:
+            raise ValueError("cannot capture empty step")
+        if thread_id is None:
+            thread_id = self.current_thread_id()
+        if thread_id and not self.db.get_thread(thread_id):
+            thread_id = None
+        ep = self.db.insert_episode(Episode(
+            id=str(uuid.uuid4()), raw_content=content, source_type=source,
+            source_ref=None, thread_id=thread_id))
+        if thread_id:
+            t = self.db.get_thread(thread_id)
+            fields = {"updated_at": now_iso()}
+            if not t["summary_owned"]:
+                fields["summary_stale"] = 1
+            self.db.update_thread(thread_id, fields, now_iso())
+        return {"episode": ep.to_public_dict(), "thread_id": thread_id}
+
+    def ensure_summary(self, thread_id: str) -> dict | None:
+        """Lazily refresh the auto-summary when steps changed and the user hasn't
+        taken the pen (summary_owned). Keeps capture fast — the work happens on view."""
+        t = self.db.get_thread(thread_id)
+        if not t:
+            return None
+        if not t["summary_owned"] and (t["summary_stale"] or not t["summary"]):
+            steps = [e.raw_content for e in self.db.thread_steps(thread_id)]
+            if steps:
+                summary = self.processor.summarize(t["intent"] or "", steps)
+                self.db.update_thread(thread_id, {"summary": summary, "summary_stale": 0},
+                                      now_iso())
+                t = self.db.get_thread(thread_id)
+        return t
+
+    def thread_view(self, thread_id: str) -> dict | None:
+        t = self.ensure_summary(thread_id)
+        if not t:
+            return None
+        steps = [e.to_public_dict() for e in self.db.thread_steps(thread_id)]
+        return {**t, "summary_owned": bool(t["summary_owned"]),
+                "steps": steps, "step_count": len(steps)}
+
+    def list_threads(self, status: str | None = None) -> list[dict]:
+        cur = self.current_thread_id()
+        out = []
+        for t in self.db.list_threads(status=status):
+            steps = self.db.thread_steps(t["id"])
+            out.append({**t, "summary_owned": bool(t["summary_owned"]),
+                        "step_count": len(steps),
+                        "is_current": t["id"] == cur,
+                        "last_step": steps[-1].created_at if steps else t["created_at"]})
+        return out
+
+    def edit_thread(self, thread_id: str, *, title: str | None = None,
+                    intent: str | None = None, reseed: bool = False) -> bool:
+        fields: dict = {}
+        if title is not None: fields["title"] = title.strip()
+        if intent is not None: fields["intent"] = intent.strip()
+        if reseed and intent is not None:
+            fields["background"] = self._seed_background(intent)
+        if not fields:
+            return False
+        return self.db.update_thread(thread_id, fields, now_iso())
+
+    def set_thread_summary(self, thread_id: str, summary: str) -> bool:
+        """The user hand-edits the story → they now own it; stop auto-overwriting."""
+        return self.db.update_thread(
+            thread_id, {"summary": summary, "summary_owned": 1, "summary_stale": 0},
+            now_iso())
+
+    def resummarize_thread(self, thread_id: str) -> dict | None:
+        """Hand control back to the auto-summary and regenerate from the steps."""
+        self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
+        return self.ensure_summary(thread_id)
+
+    def thread_brief(self, thread_id: str) -> str:
+        """The portable context: seeded background + the living state. Paste anywhere."""
+        t = self.ensure_summary(thread_id)
+        if not t:
+            return ""
+        parts = []
+        if t.get("background"):
+            parts.append(t["background"].strip())
+        state = (t.get("summary") or "").strip() or (t.get("intent") or "").strip()
+        if state:
+            parts.append("[WHAT I'M DOING RIGHT NOW]\n" + state)
+        return "\n\n".join(parts)
+
+    def finish_thread(self, thread_id: str) -> bool:
+        if self.current_thread_id() == thread_id:
+            self.db.set_meta("current_thread", None)
+        return self.db.update_thread(thread_id, {"status": "done"}, now_iso())
+
+    def delete_thread(self, thread_id: str) -> None:
+        if self.current_thread_id() == thread_id:
+            self.db.set_meta("current_thread", None)
+        self.db.delete_thread(thread_id)
+
+    def promote_thread(self, thread_id: str, *, proposed: bool = True) -> list[ContextItem]:
+        """Extract durable facts from a thread's steps and stage them for Review —
+        the sequence's lasting learnings graduate into the knowledge base. The thread
+        narrative itself stays put (and can be finished/expired)."""
+        steps = self.db.thread_steps(thread_id)
+        if not steps:
+            return []
+        combined = "\n\n".join(e.raw_content for e in steps)
+        return self.process_episode(steps[0].id, combined, source_type="thread",
+                                    source_ref=None, scope="individual",
+                                    confidence=0.6)
+
+    def current_thread_id(self) -> str | None:
+        tid = self.db.get_meta("current_thread")
+        if tid and not self.db.get_thread(tid):
+            return None
+        return tid
+
+    def set_current_thread(self, thread_id: str | None) -> None:
+        if thread_id and not self.db.get_thread(thread_id):
+            return
+        self.db.set_meta("current_thread", thread_id)
+
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
         qvec = self.embedder.embed(query)

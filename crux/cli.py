@@ -81,31 +81,25 @@ def cmd_capture(args):
         _feedback("Clipboard empty — copy text first", ok=False)
         return
     cfg = Config.load()
-    if cfg.server:  # team mode: send to the shared graph
+    # Hotkey capture lands in WORKING memory as a raw step on the current thread —
+    # kept as narrative ("what I'm doing"), never atomized into facts up front.
+    if cfg.server:  # team mode: send to the shared graph's working layer
         from . import client
         try:
-            multi = len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines())
-            if multi:
-                client.ingest(cfg.server, text, source_ref="clipboard", user=cfg.user)
-                msg = "Captured to team graph → staged for review"
-            else:
-                r = client.capture(cfg.server, text, source="hotkey", user=cfg.user)
-                msg = f"Captured: {(r.get('title') or text)[:60]}"
+            client.capture(cfg.server, text, source="hotkey", user=cfg.user, as_step=True)
         except Exception as e:
             print(f"error: shared server unreachable ({e})")
             _feedback("Capture failed — server unreachable", ok=False)
             return
+        msg = f"Added to working memory: {text.strip()[:60]}"
         print("✓ " + msg)
         _feedback(msg, ok=True)
         return
     store = _store()
-    if len(text) > 400 or any(ln.lstrip().startswith("#") for ln in text.splitlines()):
-        res = store.ingest(text, source_type="paste", source_ref="clipboard")
-        msg = f"Captured → {len(res['facts'])} fact(s) for review"
-    else:
-        item = store.capture(text, source_type="hotkey")
-        msg = f"Captured: {item.title[:60]}"
+    res = store.add_step(text, source="hotkey")
+    where = "current thread" if res.get("thread_id") else "working memory"
     store.close()
+    msg = f"Added to {where}: {text.strip()[:60]}"
     print("✓ " + msg)
     _feedback(msg, ok=True)  # blocks ~1.5s for the flash fade, then exits
 
@@ -292,6 +286,22 @@ def _retrieve_brief(task, limit):
 def cmd_ctx(args):
     """Print the context block for a task — paste into any tool without the hook."""
     print(_retrieve_brief(args.task, args.limit) or "(no relevant context yet)")
+
+
+def cmd_brief(args):
+    """Print the current thread's portable brief = seeded background + the living
+    state of what you're doing. Paste it into any AI tool — no re-explaining."""
+    store = _store()
+    try:
+        tid = args.thread or store.current_thread_id()
+        if not tid:
+            print("(no active thread — start one in the dashboard's Working tab, "
+                  "or capture something to begin)")
+            return
+        text = store.thread_brief(tid)
+        print(text or "(thread has no context yet)")
+    finally:
+        store.close()
 
 
 def cmd_enhance(args):
@@ -687,6 +697,10 @@ def build_parser() -> argparse.ArgumentParser:
     cx = sub.add_parser("ctx", help="print relevant context for a task (paste into any tool)")
     cx.add_argument("task"); cx.add_argument("--limit", type=int, default=5)
     cx.set_defaults(func=cmd_ctx)
+
+    br = sub.add_parser("brief", help="print the current thread's portable context (paste anywhere)")
+    br.add_argument("thread", nargs="?", default=None, help="thread id (defaults to the current thread)")
+    br.set_defaults(func=cmd_brief)
 
     en = sub.add_parser("enhance", help="enrich a prompt with team intent (task + directive brief)")
     en.add_argument("task"); en.add_argument("--limit", type=int, default=6)

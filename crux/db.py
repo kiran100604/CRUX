@@ -19,7 +19,9 @@ from .embeddings import pack, unpack
 from .models import ContextItem, Episode
 
 SCHEMA = """
--- raw sources of truth; facts (items) are extracted from these and link back
+-- raw sources of truth; facts (items) are extracted from these and link back.
+-- An episode is also a "step" in a work thread when thread_id is set — the
+-- narrative unit of working memory (captured as-is, never atomized into facts).
 CREATE TABLE IF NOT EXISTS episodes (
     id           TEXT PRIMARY KEY,
     raw_content  TEXT NOT NULL,
@@ -27,8 +29,30 @@ CREATE TABLE IF NOT EXISTS episodes (
     source_ref   TEXT,
     title        TEXT,
     added_by     TEXT,
+    thread_id    TEXT,
     created_at   TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_episodes_thread ON episodes(thread_id);
+
+-- threads: a unit of active work ("what I'm doing now"). Seeded with background
+-- context at creation, then steps (episodes) accumulate and a living summary is
+-- auto-maintained until the user hand-edits it (summary_owned). The portable
+-- brief = background + summary, paste-able into any tool.
+CREATE TABLE IF NOT EXISTS threads (
+    id            TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    intent        TEXT,
+    background    TEXT,                          -- seeded from the KB at creation
+    summary       TEXT,                          -- living auto-summary of the steps
+    summary_owned INTEGER NOT NULL DEFAULT 0,    -- 1 once the user edits it by hand
+    summary_stale INTEGER NOT NULL DEFAULT 0,    -- 1 when new steps need re-summarizing
+    status        TEXT NOT NULL DEFAULT 'active', -- active | done
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
+-- tiny key/value for app-level pointers (e.g. the current thread for hotkey capture)
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
 CREATE TABLE IF NOT EXISTS items (
     id              TEXT PRIMARY KEY,
@@ -184,6 +208,9 @@ class Database:
         ucols = {r["name"] for r in self.conn.execute("PRAGMA table_info(usages)")}
         if "user" not in ucols:
             self.conn.execute("ALTER TABLE usages ADD COLUMN user TEXT")
+        ecols = {r["name"] for r in self.conn.execute("PRAGMA table_info(episodes)")}
+        if "thread_id" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN thread_id TEXT")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
@@ -196,9 +223,9 @@ class Database:
     def insert_episode(self, ep: Episode) -> Episode:
         self.conn.execute(
             """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
-                   added_by, created_at) VALUES (?,?,?,?,?,?,?)""",
+                   added_by, thread_id, created_at) VALUES (?,?,?,?,?,?,?,?)""",
             (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
-             ep.added_by, ep.created_at),
+             ep.added_by, ep.thread_id, ep.created_at),
         )
         self.conn.commit()
         return ep
@@ -206,6 +233,79 @@ class Database:
     def get_episode(self, ep_id: str) -> Episode | None:
         row = self.conn.execute("SELECT * FROM episodes WHERE id=?", (ep_id,)).fetchone()
         return Episode.from_row(row) if row else None
+
+    # --- threads (active work) + meta ---------------------------------------
+
+    def insert_thread(self, t: dict) -> dict:
+        self.conn.execute(
+            """INSERT INTO threads (id, title, intent, background, summary,
+                   summary_owned, summary_stale, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (t["id"], t["title"], t.get("intent"), t.get("background"), t.get("summary"),
+             int(t.get("summary_owned", 0)), int(t.get("summary_stale", 0)),
+             t.get("status", "active"), t["created_at"], t["updated_at"]),
+        )
+        self.conn.commit()
+        return t
+
+    def get_thread(self, thread_id: str) -> dict | None:
+        row = self.conn.execute("SELECT * FROM threads WHERE id=?", (thread_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_threads(self, status: str | None = None) -> list[dict]:
+        if status:
+            rows = self.conn.execute(
+                "SELECT * FROM threads WHERE status=? ORDER BY updated_at DESC", (status,))
+        else:
+            rows = self.conn.execute("SELECT * FROM threads ORDER BY updated_at DESC")
+        return [dict(r) for r in rows]
+
+    def update_thread(self, thread_id: str, fields: dict, updated_at: str) -> bool:
+        allowed = {"title", "intent", "background", "summary",
+                   "summary_owned", "summary_stale", "status"}
+        cols = {k: v for k, v in fields.items() if k in allowed}
+        cols["updated_at"] = updated_at
+        assignment = ", ".join(f"{c}=?" for c in cols)
+        cur = self.conn.execute(
+            f"UPDATE threads SET {assignment} WHERE id=?", (*cols.values(), thread_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_thread(self, thread_id: str) -> None:
+        # steps (episodes) survive; just detach them from the thread
+        self.conn.execute("UPDATE episodes SET thread_id=NULL WHERE thread_id=?", (thread_id,))
+        self.conn.execute("DELETE FROM threads WHERE id=?", (thread_id,))
+        self.conn.commit()
+
+    def thread_steps(self, thread_id: str) -> list[Episode]:
+        rows = self.conn.execute(
+            "SELECT * FROM episodes WHERE thread_id=? ORDER BY created_at ASC", (thread_id,))
+        return [Episode.from_row(r) for r in rows]
+
+    def unsorted_steps(self, limit: int = 100) -> list[Episode]:
+        """Captured steps not yet attached to any thread (an inbox of stray notes).
+        Excludes episodes that were turned into facts (those carry a thread_id only
+        when captured as a step), so this is purely human working-memory captures."""
+        rows = self.conn.execute(
+            """SELECT e.* FROM episodes e
+               WHERE e.thread_id IS NULL
+                 AND e.source_type IN ('hotkey','popup','note','paste')
+                 AND NOT EXISTS (SELECT 1 FROM items i WHERE i.source_episode_id = e.id)
+               ORDER BY e.created_at DESC LIMIT ?""", (limit,))
+        return [Episode.from_row(r) for r in rows]
+
+    def get_meta(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str | None) -> None:
+        if value is None:
+            self.conn.execute("DELETE FROM meta WHERE key=?", (key,))
+        else:
+            self.conn.execute(
+                "INSERT INTO meta (key, value) VALUES (?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+        self.conn.commit()
 
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(

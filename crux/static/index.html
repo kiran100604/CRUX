@@ -234,6 +234,47 @@
   .fhint{margin-top:10px; font-size:12.5px; color:var(--muted); line-height:1.5;
     background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-md); padding:10px 13px}
   .fhint b{color:var(--teal)}
+  /* threads / working */
+  .newthread{display:flex; gap:10px; margin:6px 0 24px}
+  .ntinput{flex:1; height:48px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md);
+    padding:0 16px; font-size:15px; color:var(--ink); outline:none; font-family:var(--sans)}
+  .ntinput:focus{border-color:var(--ink)}
+  .tcard{display:flex; align-items:center; gap:14px; background:var(--canvas); border:1px solid var(--hair);
+    border-radius:var(--r-md); padding:16px 18px; margin-bottom:10px; cursor:pointer}
+  .tcard:hover{border-color:var(--muted2)}
+  .tcard.cur{border-color:var(--teal-line); background:var(--teal-bg)}
+  .tcmain{flex:1; min-width:0}
+  .tctitle{font-size:16px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:8px}
+  .tcsub{font-size:13px; color:var(--muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .curpill{font-family:var(--mono); font-size:10px; color:var(--teal); background:var(--canvas);
+    border:1px solid var(--teal-line); border-radius:var(--pill); padding:2px 8px}
+  .tcmeta{display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex:none}
+  .bk{cursor:pointer; color:var(--teal)} .bk:hover{text-decoration:underline}
+  .threadhd{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:22px}
+  .thactions{display:flex; gap:8px; align-items:center; flex:none}
+  .tcols{display:grid; grid-template-columns:1fr 380px; gap:30px; align-items:start}
+  @media(max-width:980px){.tcols{grid-template-columns:1fr}}
+  .ownedtag,.autotag{font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:var(--pill); margin-left:6px}
+  .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--teal-bg); color:var(--teal)}
+  .resum{float:right; cursor:pointer; color:var(--muted2); font-family:var(--sans); text-transform:none;
+    letter-spacing:0; font-size:12px} .resum:hover{color:var(--ink)}
+  .statebox{width:100%; min-height:150px; border:1px solid var(--hair); background:var(--canvas);
+    border-radius:var(--r-md); padding:14px 16px; font-size:14px; line-height:1.55; color:var(--ink);
+    outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
+  .statebox:focus{border-color:var(--ink)}
+  .savedrow{display:none; align-items:center; gap:12px; margin-top:8px}
+  .addstep{display:flex; gap:8px; margin-bottom:14px}
+  .timeline{position:relative; padding-left:6px}
+  .tstep{display:flex; gap:12px; padding:9px 0}
+  .tsdot{width:9px; height:9px; border-radius:50%; background:var(--strong); margin-top:5px; flex:none;
+    box-shadow:0 0 0 4px var(--canvas)}
+  .timeline{border-left:2px solid var(--strong); margin-left:4px; padding-left:16px}
+  .tstep{margin-left:-21px}
+  .tsbody{flex:1} .tstext{font-size:14px; color:var(--body); line-height:1.45}
+  .tsmeta{font-size:11px; color:var(--muted2); margin-top:3px}
+  .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
+    font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
+  .promote{margin-top:22px; padding-top:18px; border-top:1px solid var(--hair)}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -370,19 +411,24 @@ const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["refe
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
   kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
-  lenses:[], kbLens:null, lensIds:null, workmem:[]};
+  lenses:[], kbLens:null, lensIds:null, workmem:[],
+  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[]};
 
 async function load(){
-  const [it,rv,st,fd,ln,wm]=await Promise.all([
-    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses"), api("/working")]);
+  const [it,rv,st,fd,ln,wm,th,un]=await Promise.all([
+    api("/items"), api("/review"), api("/stats"), api("/feed?limit=20"), api("/lenses"),
+    api("/working"), api("/threads"), api("/unsorted")]);
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
   state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[]; state.workmem=(wm&&wm.items)||[];
+  state.threads=(th&&th.threads)||[]; state.currentThread=(th&&th.current)||null;
+  state.unsorted=(un&&un.steps)||[];
+  if(state.openThread){ const tv=await api(`/threads/${state.openThread}`); state.threadView=tv&&tv.id?tv:null; if(!state.threadView) state.openThread=null; }
   _sig=`${st.crystals}|${st.fluid}|${st.injections}`;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
   const need=state.inbox.length;
   const td=document.getElementById("t-dec"); td.textContent=need;
-  const tw=document.getElementById("t-wm"); if(tw) tw.textContent=state.workmem.length;
+  const tw=document.getElementById("t-wm"); if(tw) tw.textContent=state.threads.filter(t=>t.status==='active').length;
   document.querySelector('[data-v="decisions"]').classList.toggle("alert", (state.counts.conflict||0)>0);
   render();
 }
@@ -407,49 +453,130 @@ document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.cl
 
 function render(){({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();}
 
-/* ---------------- WORKING MEMORY (private) ---------------- */
+/* ---------------- WORKING MEMORY = THREADS ("what I'm doing now") ---------- */
 function vWorking(){
-  const items=state.workmem;
+  if(state.openThread && state.threadView){ return vThread(state.threadView); }
+  const active=state.threads.filter(t=>t.status==='active');
+  const done=state.threads.filter(t=>t.status!=='active');
   app(`
-    <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> WORKING MEMORY</div>
-    <h1 class="head display">Working memory</h1>
-    <p class="sub">Your private scratch — what you and your agent explored this session. It's not shared and not in Review, and it auto-expires. Edit it, delete it, or <b>nominate</b> the keepers into Review.</p>
-    ${items.length?items.map(wmCard).join(""):`<div class="empty"><div class="big">Nothing here</div>Your agent's <span class="mono">remember()</span> notes and low-trust captures land here. They stay private and fade.</div>`}`);
-}
-function wmCard(w){
-  const open=!!state.expanded['wm-'+w.id];
-  return `<div class="irow s-clean ${open?'open':''}">
-    <div class="ihead" onclick="toggleRow('wm-${w.id}')">
-      <span class="cdot c-attention"></span>
-      <div class="imain">
-        <div class="ititle">${esc(w.title||w.summary||'')}</div>
-        <div class="imeta"><span class="ipill">${esc(w.type||'note')}</span><span class="ipill">${DOMAIN_LABEL[w.domain||'other']}</span>${esc(w.summary||'')}</div>
-      </div>
-      <span class="iwhen mono">${rel(w.captured_at)}</span>
-      <button class="btn sm teal" onclick="event.stopPropagation();nominate('${w.id}')">Nominate →</button>
-      <span class="chev">${open?'▴':'▾'}</span>
+    <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> WORKING</div>
+    <h1 class="head display">Working</h1>
+    <p class="sub">What you're doing right now. Start a thread with your goal — CRUX seeds it with the background from your knowledge base, then everything you capture builds the story. Grab the brief and paste it into any tool, no re-explaining.</p>
+    <div class="newthread">
+      <input id="ntintent" class="ntinput" placeholder="What are you working on? e.g. “a hero image representing context fragmentation, brand warm-cream”"/>
+      <button class="btn teal" onclick="startThread()">Start thread →</button>
     </div>
-    ${open?`<div class="ideep">
-      <div class="kv"><div class="pl">EDIT</div>
-        <div class="refine">
-          <input id="wt-${w.id}" value="${esc(w.title||'')}" placeholder="Title…"/>
-          <input id="ws-${w.id}" value="${esc(w.summary||'')}" placeholder="Summary…"/>
-        </div></div>
-      <div class="dfoot"><span class="mono" style="font-size:11px;color:var(--muted2)">${w.id.slice(0,8)} · private</span>
-        <div class="dactions">
-          <button class="btn sm danger" onclick="archive('${w.id}')">Delete</button>
-          <button class="btn sm out" onclick="editWorking('${w.id}')">Save edit</button>
-          <button class="btn sm teal" onclick="nominate('${w.id}')">Nominate to Review →</button>
-        </div></div>
-    </div>`:''}
+    ${active.length?`<div class="sectlabel">ACTIVE · ${active.length}</div>${active.map(threadCard).join("")}`:''}
+    ${state.unsorted.length?`<div class="sectlabel">UNSORTED CAPTURES · ${state.unsorted.length}</div>
+      <div class="muted2" style="font-size:13px;margin:-4px 0 10px">Captured with no active thread. Start a thread and new captures attach to it.</div>
+      ${state.unsorted.map(unsortedRow).join("")}`:''}
+    ${!active.length&&!state.unsorted.length?`<div class="empty"><div class="big">No threads yet</div>Start one above, or press your capture hotkey while working — it lands here.</div>`:''}
+    ${done.length?`<div class="sectlabel" style="margin-top:26px">FINISHED · ${done.length}</div>${done.map(threadCard).join("")}`:''}`);
+}
+function threadCard(t){
+  const cur=t.is_current;
+  return `<div class="tcard ${cur?'cur':''}" onclick="openThread('${t.id}')">
+    <div class="tcmain">
+      <div class="tctitle">${esc(t.title)} ${cur?'<span class="curpill">current</span>':''}</div>
+      <div class="tcsub">${esc((t.summary||t.intent||'No context yet').split('\\n')[0])}</div>
+    </div>
+    <div class="tcmeta"><span class="nbadge">${t.step_count} step${t.step_count!==1?'s':''}</span><span class="iwhen mono">${rel(t.last_step)}</span></div>
   </div>`;
 }
-async function nominate(id){await post(`/items/${id}/nominate`,{}); toast("✓ Nominated → in Review for the leader"); await load();}
-async function editWorking(id){
-  const t=document.getElementById('wt-'+id), s=document.getElementById('ws-'+id);
-  await post(`/items/${id}/edit`,{title:(t&&t.value.trim())||null, summary:(s&&s.value.trim())||null});
-  toast("✓ Updated"); await load();}
-window.nominate=nominate; window.editWorking=editWorking;
+function unsortedRow(e){
+  return `<div class="irow s-clean"><div class="ihead">
+    <span class="cdot c-attention"></span>
+    <div class="imain"><div class="ititle" style="font-weight:400">${esc((e.raw_content||'').slice(0,160))}</div></div>
+    <span class="iwhen mono">${rel(e.created_at)}</span>
+  </div></div>`;
+}
+function vThread(t){
+  const owned=t.summary_owned;
+  app(`
+    <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
+    <div class="threadhd">
+      <div>
+        <h1 class="head display" style="font-size:32px">${esc(t.title)}</h1>
+        ${t.intent?`<p class="sub" style="margin:6px 0 0">${esc(t.intent)}</p>`:''}
+      </div>
+      <div class="thactions">
+        ${t.status==='active'?`<button class="btn teal" onclick="copyBrief('${t.id}')">⧉ Copy context</button>`:''}
+        ${t.status==='active'?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
+      </div>
+    </div>
+
+    <div class="tcols">
+      <div>
+        <div class="pl">Current state ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}
+          <span class="resum" onclick="resummarize('${t.id}')">↻ re-summarize</span></div>
+        <textarea id="thsum" class="statebox" placeholder="As you capture steps, CRUX keeps this up to date. Edit it anytime — once you do, it's yours and won't be overwritten." oninput="markDirty()">${esc(t.summary||'')}</textarea>
+        <div id="thsave" class="savedrow"><button class="btn sm teal" onclick="saveSummary('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-updates pause until you re-summarize</span></div>
+
+        <div class="pl" style="margin-top:22px">Steps · the story as it happened</div>
+        <div class="addstep">
+          <input id="stepin" class="ntinput" placeholder="Add a step… (or just use your capture hotkey)" onkeydown="if(event.key==='Enter')addStep('${t.id}')"/>
+          <button class="btn out sm" onclick="addStep('${t.id}')">Add</button>
+        </div>
+        ${t.steps.length?`<div class="timeline">${t.steps.slice().reverse().map(stepRow).join("")}</div>`
+          :`<div class="muted2" style="font-size:13px;padding:8px">No steps yet. Capture as you work — each capture lands here in order.</div>`}
+      </div>
+
+      <div>
+        <div class="pl">Background <span class="muted2" style="text-transform:none;letter-spacing:0">— seeded from your knowledge base</span></div>
+        ${t.background?`<div class="bgbox">${esc(t.background)}</div>`
+          :`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet. As your knowledge base grows, new threads start with more context.</div>`}
+        ${t.status==='active'?`<div class="promote"><div class="pl">Wrap up</div>
+          <button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
+          <div class="muted2" style="font-size:12px;margin-top:6px">Pulls the durable facts out of this thread and stages them for the knowledge base. The story stays here.</div></div>`:''}
+      </div>
+    </div>`);
+}
+function stepRow(e){
+  const src=e.source_type||'note';
+  return `<div class="tstep"><span class="tsdot"></span>
+    <div class="tsbody"><div class="tstext">${esc(e.raw_content||'')}</div>
+      <div class="tsmeta mono">${esc(src)} · ${rel(e.created_at)}</div></div></div>`;
+}
+async function startThread(){
+  const el=document.getElementById('ntintent'); const intent=(el&&el.value.trim())||'';
+  if(!intent){ toast("Type what you're working on first"); return; }
+  const t=await post('/threads',{intent}); state.openThread=t.id;
+  toast("✓ Thread started — background seeded"); await load();
+}
+function openThread(id){ state.openThread=id; render(); api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}}); }
+function closeThread(){ state.openThread=null; state.threadView=null; render(); }
+async function addStep(id){
+  const el=document.getElementById('stepin'); const txt=(el&&el.value.trim())||'';
+  if(!txt) return; el.value='';
+  await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
+  state.threadView=await api(`/threads/${id}`); await load();
+}
+async function saveSummary(id){
+  const el=document.getElementById('thsum');
+  await post(`/threads/${id}/summary`,{summary:(el&&el.value)||''});
+  toast("✓ Saved — this state is yours now"); state.threadView=await api(`/threads/${id}`); render();
+}
+async function resummarize(id){
+  toast("Re-summarizing from steps…");
+  state.threadView=await post(`/threads/${id}/resummarize`,{}); render();
+}
+async function finishThread(id){
+  if(!confirm("Finish this thread? It moves to Finished; nothing is deleted.")) return;
+  await post(`/threads/${id}/finish`,{}); toast("✓ Finished"); state.openThread=null; state.threadView=null; await load();
+}
+async function promoteThread(id){
+  const r=await post(`/threads/${id}/promote`,{});
+  toast(`✓ ${r.staged||0} learning(s) staged in Review`); await load();
+}
+async function copyBrief(id){
+  const r=await api(`/threads/${id}/brief`);
+  try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Brief copied — paste it into any tool"); }
+  catch(e){ prompt("Copy this brief:", r.brief||""); }
+}
+function markDirty(){ const r=document.getElementById('thsave'); if(r) r.style.display='flex'; }
+window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
+window.addStep=addStep; window.saveSummary=saveSummary; window.resummarize=resummarize;
+window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.markDirty=markDirty;
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){

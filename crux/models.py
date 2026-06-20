@@ -69,6 +69,7 @@ class Episode:
     source_ref: str | None = None  # filename, URL, or app name
     title: str | None = None       # document title, if any
     added_by: str | None = None    # nullable now; identity for company/multi-user later
+    thread_id: str | None = None   # the work thread this capture is a step of (if any)
     created_at: str = field(default_factory=now_iso)
 
     def to_public_dict(self) -> dict:
@@ -76,9 +77,11 @@ class Episode:
 
     @staticmethod
     def from_row(row) -> "Episode":
+        keys = row.keys()
         return Episode(
             id=row["id"], raw_content=row["raw_content"], source_type=row["source_type"],
             source_ref=row["source_ref"], title=row["title"], added_by=row["added_by"],
+            thread_id=(row["thread_id"] if "thread_id" in keys else None),
             created_at=row["created_at"],
         )
 
