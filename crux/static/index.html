@@ -317,6 +317,12 @@
   .bgwrap .bgbox{margin-top:10px}
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
     font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
+  /* instant loading state */
+  .booting{display:flex; align-items:center; justify-content:center; gap:12px; padding:80px 0;
+    color:var(--muted2); font-size:14px}
+  .spin{width:18px; height:18px; border:2px solid var(--hair); border-top-color:var(--teal);
+    border-radius:50%; animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -1115,9 +1121,18 @@ window.setView=setView;window.openItem=openItem;window.doCapture=doCapture;windo
 window.promoteRefined=promoteRefined;window.archive=archive;window.demote=demote;window.supersede=supersede;
 window.closeDrawer=closeDrawer;window.toast=toast;
 async function init(){
+  // paint something instantly so the page is never a long blank — the content
+  // area shows a light loading state while the first fetches resolve.
+  const a=document.getElementById('app');
+  if(a) a.innerHTML='<div class="booting"><div class="spin"></div>Loading your workspace…</div>';
   try{ const w=await api("/api/whoami"); state.leader=!!w.leader; }catch(e){ state.leader=true; }
   applyRole();
-  load();
+  try{ await load(); }
+  catch(e){
+    await new Promise(r=>setTimeout(r,700));        // server may still be warming
+    try{ await load(); }
+    catch(e2){ if(a) a.innerHTML='<div class="booting">Couldn\'t reach CRUX — <span class="resum" onclick="location.reload()">retry</span></div>'; }
+  }
 }
 function applyRole(){
   // members propose & use; only the leader validates. Hide the Review tab + the

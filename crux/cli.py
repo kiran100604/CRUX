@@ -397,7 +397,20 @@ def cmd_start(args):
             print(f"      Shortcut: {chord}")
             print(f"  Then: copy text (Ctrl+C) → press {chord}. (Capture itself already works: `crux capture`.)")
         if not args.no_open:
-            threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+            # Open the browser only once the server is actually accepting
+            # connections — a fixed delay opens a blank tab before boot finishes
+            # on slower machines, which looks like a long load.
+            import socket
+            import time
+            def _open_when_ready():
+                for _ in range(80):  # up to ~20s
+                    try:
+                        with socket.create_connection((cfg.host, cfg.port), timeout=0.5):
+                            break
+                    except OSError:
+                        time.sleep(0.25)
+                webbrowser.open(url)
+            threading.Thread(target=_open_when_ready, daemon=True).start()
         serve_run(cfg)
     else:
         from .app import run as app_run
