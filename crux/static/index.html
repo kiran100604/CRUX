@@ -339,8 +339,9 @@
   .kbtoggle{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--hair); border-radius:var(--pill); padding:3px; flex:none}
   .kbtog{border:none; background:none; color:var(--muted); font-size:13px; padding:6px 14px; border-radius:var(--pill)}
   .kbtog.on{background:var(--ink); color:#fff}
-  /* chat fills the viewport: header + input pinned, only the stream scrolls */
-  .askview{display:flex; flex-direction:column; height:calc(100vh - 116px); min-height:440px}
+  /* chat fills the viewport: header + input pinned, only the stream scrolls.
+     In ask mode the body scroll is locked (see body.kb-ask) so nothing drifts. */
+  .askview{display:flex; flex-direction:column; height:calc(100vh - 100px); min-height:440px}
   .askview .crumb,.askview .kbhdrow{flex:none}
   .askstream{flex:1; overflow-y:auto; margin:16px 0 0; padding:4px 2px 8px; min-height:0}
   .askfoot{flex:none; padding-top:12px; border-top:1px solid var(--hair); margin-top:4px}
@@ -354,7 +355,17 @@
   .cite:hover{background:var(--teal); color:#fff}
   .askthinking{display:flex; align-items:center; gap:10px; color:var(--muted2); font-size:13px; padding:8px 2px}
   .srclabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:16px 0 9px}
-  .srcs{display:flex; flex-direction:column; gap:9px}
+  /* sources are collapsed by default — answer first, evidence on demand */
+  .srcwrap{margin-top:14px; border-top:1px solid var(--hair); padding-top:10px}
+  .srcwrap>summary{list-style:none; cursor:pointer; font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted2); user-select:none; display:flex; align-items:center; gap:6px}
+  .srcwrap>summary::-webkit-details-marker{display:none}
+  .srcwrap>summary:hover{color:var(--ink)}
+  .srcwrap .caret{transition:transform .15s; display:inline-block}
+  .srcwrap[open]>summary .caret{transform:rotate(90deg)}
+  .srcwrap .shint{color:var(--muted2); text-transform:none; letter-spacing:0; font-family:var(--sans); font-size:11px}
+  .srcwrap[open] .shint{display:none}
+  .srcs{display:flex; flex-direction:column; gap:9px; margin-top:11px}
   .src{display:flex; gap:12px; background:var(--soft); border:1px solid var(--hair); border-radius:11px; padding:12px 14px; cursor:pointer}
   .src:hover{border-color:var(--muted2)}
   .srcn{width:22px; height:22px; border-radius:50%; background:var(--teal-bg); color:var(--teal); font-family:var(--mono); font-size:11px; display:grid; place-items:center; flex:none; margin-top:1px}
@@ -428,6 +439,10 @@
   .toast.on{opacity:1; transform:translateX(-50%)}
   footer{background:var(--soft); border-top:1px solid var(--hair); padding:34px 28px; text-align:center;
     font-family:var(--mono); font-size:11px; color:var(--muted2); letter-spacing:.08em}
+  /* chat view owns the viewport: no body scroll, no footer pushing it around */
+  body.kb-ask{overflow:hidden}
+  body.kb-ask footer{display:none}
+  body.kb-ask .wrap{padding-bottom:0}
   /* review inbox */
   .inboxbar{display:flex; align-items:center; justify-content:space-between; gap:14px; margin:6px 0 16px}
   .inboxbar .counts{display:flex; align-items:center; gap:16px; font-size:13px; color:var(--muted)}
@@ -566,7 +581,10 @@ function setView(v){state.view=v;
   render(); window.scrollTo(0,0);}
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(b)setView(b.dataset.v);});
 
-function render(){({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();}
+function render(){
+  document.body.classList.toggle('kb-ask', state.view==='kb' && state.kbView==='ask');
+  ({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();
+}
 
 /* ---------------- WORKING MEMORY = THREADS ("what I'm doing now") ---------- */
 function vWorking(){
@@ -852,7 +870,8 @@ function askTurn(t,i){
   const byN={}; srcs.forEach(s=>byN[s.n]=s.id);
   const ans=esc(t.content).replace(/\[(\d+)\]/g,(m,n)=>byN[n]?`<span class="cite" onclick="openFact('${byN[n]}')">${n}</span>`:m);
   return `<div class="arow"><div class="abub">${ans.replace(/\n/g,'<br>')}
-    ${srcs.length?`<div class="srclabel">Sources</div><div class="srcs">${srcs.map(srcCard).join("")}</div>`:''}</div></div>`;
+    ${srcs.length?`<details class="srcwrap"><summary><span class="caret">▸</span> ${srcs.length} source${srcs.length===1?'':'s'} <span class="shint">— tap to view</span></summary>
+      <div class="srcs">${srcs.map(srcCard).join("")}</div></details>`:''}</div></div>`;
 }
 function srcCard(s){
   return `<div class="src" onclick="openFact('${s.id}')">
