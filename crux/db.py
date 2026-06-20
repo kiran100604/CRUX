@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS episodes (
     thread_id    TEXT,
     created_at   TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_episodes_thread ON episodes(thread_id);
 
 -- threads: a unit of active work ("what I'm doing now"). Seeded with background
 -- context at creation, then steps (episodes) accumulate and a living summary is
@@ -211,6 +210,10 @@ class Database:
         ecols = {r["name"] for r in self.conn.execute("PRAGMA table_info(episodes)")}
         if "thread_id" not in ecols:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN thread_id TEXT")
+        # index lives here, not in SCHEMA: on an upgraded db the column only exists
+        # after the ALTER above (SCHEMA runs before _migrate).
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_episodes_thread ON episodes(thread_id)")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
