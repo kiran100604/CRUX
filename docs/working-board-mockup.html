@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>CRUX — Working board (proposed)</title>
+<style>
+  :root{
+    --canvas:#fdf8ec; --soft:#f6efdd; --card:#fff; --hair:#e6dcc4; --hair2:#efe7d2;
+    --ink:#0b0b0b; --body:#2a251e; --muted:#6b6151; --muted2:#9a8f76;
+    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb;
+    --peach:#a8541d; --peach-bg:#fbead8; --coral:#bf3422; --coral-bg:#fbe2dc;
+    --violet:#5b3fa0; --violet-bg:#ece6f7; --green:#3d6b2a; --green-bg:#e8f1e0;
+    --amber:#8a6a17; --amber-bg:#fbf2d4;
+    --pill:9999px; --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --shadow:0 1px 2px rgba(20,16,8,.04),0 4px 16px rgba(20,16,8,.05);
+    --shadow2:0 2px 6px rgba(20,16,8,.07),0 10px 30px rgba(20,16,8,.09);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--canvas);color:var(--body);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  .muted{color:var(--muted)} .muted2{color:var(--muted2)}
+  button{font-family:var(--sans);cursor:pointer;border:none}
+
+  /* top nav */
+  nav{height:60px;display:flex;align-items:center;gap:10px;padding:0 26px;border-bottom:1px solid var(--hair);background:var(--canvas);flex:none}
+  .logo{width:28px;height:28px;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:700}
+  .brand{font-weight:700;letter-spacing:.16em;font-size:13px;margin-right:18px}
+  .tab{background:none;color:var(--muted);font-size:14px;font-weight:500;padding:7px 13px;border-radius:var(--pill)}
+  .tab.on{background:var(--ink);color:#fff}
+  .navright{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .chip{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--hair);border-radius:var(--pill);padding:5px 11px}
+
+  /* thread header */
+  header.th{padding:20px 26px 14px;flex:none}
+  .crumb{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted2);text-transform:uppercase;margin-bottom:12px}
+  .htop{display:flex;align-items:flex-start;gap:16px}
+  .htop h1{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink);margin:0}
+  .htop .intent{color:var(--muted);font-size:14px;margin-top:3px}
+  .hact{margin-left:auto;display:flex;gap:9px;flex:none}
+  .btn{border-radius:10px;font-size:13px;font-weight:600;padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:7px}
+  .btn.primary{background:var(--teal);color:#fff} .btn.primary:hover{filter:brightness(1.12)}
+  .btn.ghost{background:transparent;border:1px solid var(--hair);color:var(--ink)} .btn.ghost:hover{border-color:var(--muted2)}
+  .btn.sm{height:32px;font-size:12px;padding:0 12px;border-radius:8px}
+
+  /* dump bar */
+  .dump{display:flex;gap:10px;margin:14px 26px 12px;flex:none}
+  .dump input{flex:1;height:50px;border:1px solid var(--hair);background:var(--card);border-radius:13px;padding:0 18px;font-size:15px;color:var(--ink);outline:none;box-shadow:var(--shadow)}
+  .dump input:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-bg)}
+  .dump .btn{height:50px}
+
+  /* guides strip */
+  .guides{display:flex;align-items:center;gap:10px;margin:0 26px 8px;padding:9px 14px;border:1px dashed var(--hair);border-radius:12px;background:rgba(246,239,221,.6);flex:none}
+  .guides .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted2);flex:none}
+  .gchip{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--hair);border-radius:var(--pill);padding:6px 12px;font-size:13px;color:var(--ink);box-shadow:var(--shadow);white-space:nowrap}
+  .gchip .gk{width:14px;height:14px;border-radius:4px;background:var(--teal-bg);color:var(--teal);display:grid;place-items:center;font-size:9px}
+
+  /* board */
+  .board{flex:1;display:flex;gap:16px;overflow-x:auto;overflow-y:hidden;padding:8px 26px 22px;align-items:stretch}
+  .lane{flex:0 0 320px;display:flex;flex-direction:column;background:rgba(246,239,221,.55);border:1px solid var(--hair2);border-radius:16px;max-height:100%}
+  .lane.cur{background:var(--teal-bg);border-color:var(--teal-line)}
+  .lane.inbox{background:var(--peach-bg);border-color:#eccba9}
+  .lane.drop{outline:2px dashed var(--teal);outline-offset:-4px}
+  .lh{display:flex;align-items:center;gap:8px;padding:14px 14px 8px;flex:none}
+  .lh .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);flex:none}
+  .lh h3{font-size:15px;font-weight:600;color:var(--ink);margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lh .cnt{font-family:var(--mono);font-size:11px;color:var(--muted2);background:rgba(0,0,0,.04);border-radius:var(--pill);padding:2px 8px}
+  .lh .more{color:var(--muted2);font-size:18px;padding:0 4px;background:none;line-height:1}
+  .curtag{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--teal);background:var(--card);border:1px solid var(--teal-line);border-radius:var(--pill);padding:2px 7px}
+  /* collapsed summary line */
+  .lsum{margin:0 12px 10px;padding:8px 11px;background:rgba(255,255,255,.6);border:1px solid var(--hair2);border-radius:9px;font-size:12.5px;color:var(--muted);line-height:1.45;display:flex;gap:7px;align-items:flex-start;cursor:pointer;flex:none}
+  .lsum .ic{color:var(--teal);flex:none} .lsum:hover{background:#fff}
+  .lsum .chev{margin-left:auto;color:var(--muted2);flex:none}
+  /* card stream */
+  .stream{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:9px}
+  .stream::-webkit-scrollbar{width:8px} .stream::-webkit-scrollbar-thumb{background:var(--hair);border-radius:8px}
+  .dcard{background:var(--card);border:1px solid var(--hair);border-radius:11px;padding:11px 12px 10px;box-shadow:var(--shadow);cursor:grab;transition:box-shadow .12s,transform .12s}
+  .dcard:hover{box-shadow:var(--shadow2);transform:translateY(-1px)}
+  .dctop{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .k{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:var(--pill);font-weight:600}
+  .k-reference{background:var(--teal-bg);color:var(--teal)} .k-prompt{background:var(--violet-bg);color:var(--violet)}
+  .k-suggestion{background:var(--peach-bg);color:var(--peach)} .k-result{background:var(--green-bg);color:var(--green)}
+  .k-insight{background:var(--amber-bg);color:var(--amber)} .k-question{background:var(--coral-bg);color:var(--coral)}
+  .k-sorting{background:#eee;color:#999}
+  .dctop .when{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted2)}
+  .grip{color:var(--muted2);font-size:12px;letter-spacing:-2px;opacity:0;transition:opacity .12s}
+  .dcard:hover .grip{opacity:.6}
+  .dctext{font-size:13.5px;line-height:1.5;color:var(--body);overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+  .dcard.snippet .dctext{-webkit-line-clamp:8;white-space:pre-wrap;background:var(--soft);border-radius:7px;padding:9px 10px;font-size:12.5px}
+  .more-link{color:var(--teal);font-size:12px;margin-top:6px;cursor:pointer}
+  .convo{font-family:var(--mono);font-size:9px;color:var(--muted2);margin-bottom:5px}
+  /* add lane */
+  .addlane{flex:0 0 220px;border:1px dashed var(--hair);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);background:transparent}
+  .addlane .plus{width:40px;height:40px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:22px;color:var(--muted)}
+  .addlane:hover{border-color:var(--muted2)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">◎</div><div class="brand">CRUX</div>
+  <button class="tab">Overview</button>
+  <button class="tab">Knowledge Base</button>
+  <button class="tab on">Working</button>
+  <button class="tab">Review</button>
+  <button class="tab">Activity</button>
+  <div class="navright"><span class="chip">Leader · VALIDATES KB</span></div>
+</nav>
+
+<header class="th">
+  <div class="crumb">← WORKING // MAKING WEBSITE</div>
+  <div class="htop">
+    <div>
+      <h1>Making the website</h1>
+      <div class="intent">Landing page for CRUX — represent “stop re-explaining context”, brand warm-cream</div>
+    </div>
+    <div class="hact">
+      <button class="btn primary">⧉ Copy context</button>
+      <button class="btn ghost">Finish</button>
+    </div>
+  </div>
+</header>
+
+<div class="dump">
+  <input placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea… CRUX files it for you"/>
+  <button class="btn primary">Dump →</button>
+</div>
+
+<div class="guides">
+  <span class="lbl">⊹ Guides</span>
+  <span class="gchip"><span class="gk">▤</span> Apple design principles (HIG)</span>
+  <span class="gchip"><span class="gk">◆</span> Brand palette — warm cream + teal</span>
+  <span class="gchip"><span class="gk">▤</span> PRD v2 — landing goals</span>
+  <span class="muted2" style="font-size:12px;margin-left:auto">drag any card up here to make it a guide</span>
+</div>
+
+<div class="board">
+
+  <!-- INBOX / unsorted lane -->
+  <div class="lane inbox">
+    <div class="lh"><h3>Inbox</h3><span class="cnt">2</span></div>
+    <div class="lsum"><span class="ic">⌂</span><span>CRUX wasn’t sure where these go — drag them into an approach.</span></div>
+    <div class="stream">
+      <div class="dcard">
+        <div class="dctop"><span class="k k-sorting">sorting…</span><span class="when">now</span></div>
+        <div class="dctext">“maybe we lean into the lens metaphor instead of wires?”</div>
+      </div>
+      <div class="dcard">
+        <div class="dctop"><span class="k k-question">Question</span><span class="grip">⠿</span><span class="when">3m</span></div>
+        <div class="dctext">Should the hero be a static image or a short looping animation?</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURRENT approach -->
+  <div class="lane cur">
+    <div class="lh"><span class="dot"></span><h3>Hero visual — “tangled → lens”</h3><span class="curtag">current</span><button class="more">⋯</button></div>
+    <div class="lsum"><span class="ic">✦</span><span><b>Tried:</b> Midjourney (too literal), DALL·E (good comp, off-brand). <b>Now:</b> refining a “wires resolve into a lens” prompt.</span><span class="chev">⌄</span></div>
+    <div class="stream">
+      <div class="dcard">
+        <div class="dctop"><span class="k k-reference">Reference</span><span class="grip">⠿</span><span class="when">22m</span></div>
+        <div class="dctext">moodboard.link/hero-refs — isometric, soft gradients, lots of negative space</div>
+      </div>
+      <div class="dcard snippet">
+        <div class="dctop"><span class="k k-prompt">Prompt</span><span class="grip">⠿</span><span class="when">18m</span></div>
+        <div class="convo">→ given to Midjourney v6</div>
+        <div class="dctext">a tangle of cables in the dark slowly resolving into a single clean glass lens, warm cream background (#fdf8ec), teal accent, isometric, generous negative space, no text --ar 16:9 --style raw</div>
+      </div>
+      <div class="dcard">
+        <div class="dctop"><span class="k k-result">Result</span><span class="grip">⠿</span><span class="when">17m</span></div>
+        <div class="dctext">Came out too literal — reads as “cables”, not “clarity”. Too busy at small sizes.</div>
+      </div>
+      <div class="dcard snippet">
+        <div class="dctop"><span class="k k-suggestion">Suggestion</span><span class="grip">⠿</span><span class="when">12m</span></div>
+        <div class="convo">→ from ChatGPT, when I pasted the brief</div>
+        <div class="dctext">“Try fewer cables — maybe 3 — and let them merge into the lens with light. Negative space will read as ‘calm’. Avoid literal wires; suggest connection with curves.”</div>
+        <div class="more-link">Show full reply ↓</div>
+      </div>
+      <div class="dcard">
+        <div class="dctop"><span class="k k-insight">Insight</span><span class="grip">⠿</span><span class="when">8m</span></div>
+        <div class="dctext">Literal metaphors fail when shrunk. Abstract + lots of space survives the favicon test.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- parked approach -->
+  <div class="lane">
+    <div class="lh"><h3>Color &amp; type system</h3><span class="cnt">3</span><button class="more">⋯</button></div>
+    <div class="lsum"><span class="ic">✦</span><span>Locking the warm-cream palette + a serif/sans pairing for the hero.</span><span class="chev">⌄</span></div>
+    <div class="stream">
+      <div class="dcard">
+        <div class="dctop"><span class="k k-result">Result</span><span class="grip">⠿</span><span class="when">1h</span></div>
+        <div class="dctext">Cream #fdf8ec + teal #143030 passes AA for body text. Peach only for accents.</div>
+      </div>
+      <div class="dcard">
+        <div class="dctop"><span class="k k-reference">Reference</span><span class="grip">⠿</span><span class="when">1h</span></div>
+        <div class="dctext">type-scale.com/ — settled on 1.25 ratio</div>
+      </div>
+      <div class="dcard">
+        <div class="dctop"><span class="k k-prompt">Prompt</span><span class="grip">⠿</span><span class="when">1h</span></div>
+        <div class="dctext">“pair a warm humanist sans with a soft serif for headings, generous line-height”</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="addlane">
+    <div class="plus">+</div>
+    <div style="font-weight:600;color:var(--ink)">New approach</div>
+    <div class="muted2" style="font-size:12px;text-align:center;max-width:160px">A different direction. CRUX also spins these up on its own.</div>
+  </div>
+
+</div>
+
+</body>
+</html>
