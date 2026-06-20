@@ -98,6 +98,22 @@ pip install -e ".[mcp]"
 crux mcp                 # exposes get_context / add_context
 ```
 
+## Working threads ("what I'm doing now")
+Working memory is organized as **threads** — a unit of active work, not a pile of
+loose facts. Start a thread with your goal; CRUX **seeds it with the background**
+from your knowledge base. Then everything you capture (hotkey, popup, dashboard)
+lands on the **current thread as a raw step** — kept as narrative, never atomized
+into facts up front. A **living summary** is auto-maintained until you hand-edit
+it (then it's yours, and won't be overwritten until you re-summarize).
+
+The payoff is the **portable brief** = seeded background + live state, so you can
+switch AI tools mid-task without re-explaining anything:
+```bash
+crux brief               # prints the current thread's context — paste into any tool
+```
+When a thread wraps, promote its durable learnings into the knowledge base for
+Review; the story itself stays in the thread.
+
 ## Dashboard
 ```bash
 pip install -e ".[server]"

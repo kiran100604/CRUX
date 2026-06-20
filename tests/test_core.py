@@ -384,12 +384,41 @@ def test_triage_flags_conflicts_and_bulk_promotes_clean(store):
 
 
 def test_quickcapture_save(store):
-    # the popup's save path: short text -> a note; long/multiline -> ingested doc
+    # the popup's save path now lands captures in WORKING memory as raw steps
+    # (narrative, not atomized into facts up front)
     from crux.config import Config
     from crux.quickcapture import _save
     cfg = Config.load()
-    assert _save(cfg, "Use Stripe for payments.").startswith("Captured:")
-    assert "fact" in _save(cfg, "Payments via Stripe.\nErrors go to Sentry.\nWebhooks signed.")
+    msg = _save(cfg, "Tried Midjourney, too literal.")
+    assert "working memory" in msg or "current thread" in msg
+    # no fact was created; it's a step (episode) instead
+    assert not store.db.list(scope="individual", limit=10)
+    assert store.db.unsorted_steps(), "the capture should be an unsorted working step"
+
+
+def test_hotkey_step_attaches_to_current_thread(store):
+    # with an active thread, a step attaches to it and updates the living summary
+    t = store.create_thread("Website hero image", "make a brand-cream hero image")
+    assert store.current_thread_id() == t["id"]
+    res = store.add_step("Tried DALL-E, colors off", source="hotkey")
+    assert res["thread_id"] == t["id"]
+    view = store.thread_view(t["id"])
+    assert view["step_count"] == 1
+    assert view["summary"], "auto-summary should be generated on view"
+    # the portable brief carries the live state
+    assert "DALL-E" in store.thread_brief(t["id"]) or "hero image" in store.thread_brief(t["id"])
+
+
+def test_thread_summary_ownership(store):
+    # hand-editing the summary makes it the user's; new steps don't overwrite it,
+    # until they explicitly re-summarize
+    t = store.create_thread("Refactor auth", "")
+    store.add_step("looked at session handling", source="note")
+    store.set_thread_summary(t["id"], "MY STATE")
+    store.add_step("checked token refresh", source="note")
+    assert store.thread_view(t["id"])["summary"] == "MY STATE"
+    store.resummarize_thread(t["id"])
+    assert store.thread_view(t["id"])["summary"] != "MY STATE"
 
 
 def test_valid_chord():

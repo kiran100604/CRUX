@@ -45,6 +45,16 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
         worker.close()
 
 
+def _summarize_thread(cfg: Config, thread_id: str) -> None:
+    """Refresh a thread's living summary off the request path (own DB connection),
+    so a capture returns instantly and the new state shows on the next poll."""
+    worker = Store(cfg)
+    try:
+        worker.ensure_summary(thread_id)
+    finally:
+        worker.close()
+
+
 def create_app(cfg: Config):
     try:
         from fastapi import FastAPI, HTTPException, Request
@@ -79,6 +89,8 @@ def create_app(cfg: Config):
         scope: str = "individual"
         user: str | None = None
         proposed: bool = True   # True → leader's Review; False → private working memory
+        as_step: bool = False   # True → land in working memory as a thread step (raw)
+        thread_id: str | None = None
 
     class PromoteIn(BaseModel):
         title: str | None = None
@@ -200,6 +212,15 @@ def create_app(cfg: Config):
 
     @app.post("/capture")
     def capture(body: CaptureIn):
+        # Human captures (hotkey/popup/dashboard) land in working memory as a raw
+        # step on the current thread — kept as narrative, not atomized into facts.
+        if body.as_step or body.thread_id:
+            res = store.add_step(body.content, source=body.source or "note",
+                                 thread_id=body.thread_id)
+            # refresh the summary off the request path so capture stays instant
+            if res.get("thread_id"):
+                app.state.executor.submit(_summarize_thread, cfg, res["thread_id"])
+            return {"step": True, **res}
         item = store.capture(body.content, source=body.source,
                              type_hint=body.type, scope=body.scope,
                              owner=body.user or cfg.user, proposed=body.proposed)
@@ -272,6 +293,71 @@ def create_app(cfg: Config):
     @app.get("/lenses/{lens_id}/items")
     def lens_items(lens_id: int):
         return {"ids": store.lens_item_ids(lens_id)}
+
+    # --- threads: the working layer ("what I'm doing now") -------------------
+    class ThreadIn(BaseModel):
+        title: str | None = None
+        intent: str | None = None
+
+    class SummaryIn(BaseModel):
+        summary: str
+
+    @app.get("/threads")
+    def threads():
+        return {"threads": store.list_threads(), "current": store.current_thread_id()}
+
+    @app.post("/threads")
+    def create_thread(body: ThreadIn):
+        t = store.create_thread(body.title or "", body.intent or "")
+        return store.thread_view(t["id"])
+
+    @app.get("/threads/{thread_id}")
+    def get_thread(thread_id: str):
+        t = store.thread_view(thread_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="no such thread")
+        return t
+
+    @app.post("/threads/{thread_id}/edit")
+    def edit_thread(thread_id: str, body: ThreadIn):
+        store.edit_thread(thread_id, title=body.title, intent=body.intent,
+                          reseed=body.intent is not None)
+        return store.thread_view(thread_id)
+
+    @app.post("/threads/{thread_id}/summary")
+    def set_summary(thread_id: str, body: SummaryIn):
+        return {"ok": store.set_thread_summary(thread_id, body.summary)}
+
+    @app.post("/threads/{thread_id}/resummarize")
+    def resummarize(thread_id: str):
+        return store.thread_view(thread_id) if store.resummarize_thread(thread_id) else {}
+
+    @app.get("/threads/{thread_id}/brief")
+    def thread_brief(thread_id: str):
+        return {"brief": store.thread_brief(thread_id)}
+
+    @app.post("/threads/{thread_id}/current")
+    def make_current(thread_id: str):
+        store.set_current_thread(thread_id)
+        return {"ok": True, "current": store.current_thread_id()}
+
+    @app.post("/threads/{thread_id}/finish")
+    def finish_thread(thread_id: str):
+        return {"ok": store.finish_thread(thread_id)}
+
+    @app.post("/threads/{thread_id}/promote")
+    def promote_thread(thread_id: str, request: Request):
+        facts = store.promote_thread(thread_id)
+        return {"staged": len(facts)}
+
+    @app.delete("/threads/{thread_id}")
+    def delete_thread(thread_id: str):
+        store.delete_thread(thread_id)
+        return {"ok": True}
+
+    @app.get("/unsorted")
+    def unsorted():
+        return {"steps": [e.to_public_dict() for e in store.db.unsorted_steps()]}
 
     class RetrieveIn(BaseModel):
         prompt: str

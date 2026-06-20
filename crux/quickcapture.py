@@ -86,15 +86,14 @@ def build_popup(root, initial: str, on_submit, on_cancel):
 
 
 def _save(cfg, text: str) -> str:
-    """Persist captured text; long/multiline → ingest as a doc, else a note."""
+    """Persist captured text into working memory as a raw step on the current
+    thread (kept as narrative, not atomized into facts)."""
     from .store import Store
     store = Store(cfg)
     try:
-        if len(text) > 400 or "\n" in text:
-            res = store.ingest(text, source_type="paste", source_ref="popup")
-            return f"Captured → {len(res['facts'])} fact(s)"
-        item = store.capture(text, source_type="popup")
-        return f"Captured: {item.title[:48]}"
+        res = store.add_step(text, source="popup")
+        where = "current thread" if res.get("thread_id") else "working memory"
+        return f"Added to {where}: {text.strip()[:44]}"
     finally:
         store.close()
 

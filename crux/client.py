@@ -30,11 +30,13 @@ def retrieve(server: str, prompt: str, *, session: str = "", user: str = "",
 
 
 def capture(server: str, content: str, *, type: str | None = None,
-            source: str = "agent", user: str = "", proposed: bool = True) -> dict:
-    """Capture into the shared graph. proposed=True → Review; False → private WM."""
+            source: str = "agent", user: str = "", proposed: bool = True,
+            as_step: bool = False) -> dict:
+    """Capture into the shared graph. proposed=True → Review; False → private WM.
+    as_step=True → land in working memory as a raw step on the current thread."""
     return _post(server, "/capture",
                  {"content": content, "type": type, "source": source,
-                  "user": user, "proposed": proposed})
+                  "user": user, "proposed": proposed, "as_step": as_step})
 
 
 def ingest(server: str, content: str, *, source_ref: str = "clipboard",
