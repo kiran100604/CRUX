@@ -396,9 +396,21 @@
   .edge{font-size:13px; color:var(--muted)} .el{font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--muted2); margin-right:8px}
   .ep{display:inline-block; background:var(--soft); border:1px solid var(--hair); border-radius:var(--pill); padding:4px 10px; font-size:12.5px; color:var(--ink); margin:0 4px 4px 0; cursor:pointer}
   .ep:hover{border-color:var(--muted2)}
-  .kbgroup{margin-bottom:14px}
-  .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
-  .kbglabel span{color:var(--muted)}
+  /* accordion: topics/levels/tags listed first; a group opens to its facts */
+  .kbgroup{margin-bottom:4px}
+  .kbghead{display:flex; align-items:center; gap:8px; padding:9px 8px; border-radius:var(--r-sm); cursor:pointer; user-select:none}
+  .kbghead:hover{background:var(--soft)}
+  .kbghead .caret{color:var(--muted2); font-size:11px; transition:transform .15s; flex:none}
+  .kbgroup.open .kbghead .caret{transform:rotate(90deg)}
+  .kbglabel{flex:1; font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink); min-width:0}
+  .kbglabel .gsub{color:var(--muted2); text-transform:none; letter-spacing:0; font-family:var(--sans); font-size:11px}
+  .gcount{font-family:var(--mono); font-size:10px; color:var(--muted2); background:var(--soft); border-radius:var(--pill); padding:2px 8px; flex:none}
+  .kbgroup.open .gcount{background:var(--teal-bg); color:var(--teal)}
+  .kbgitems{display:none; padding:2px 0 6px 14px; margin-left:6px; border-left:1px solid var(--hair)}
+  .kbgroup.open .kbgitems{display:block}
+  /* while searching, flatten: hide headers and reveal every matching fact */
+  .kbnav.searching .kbghead{display:none}
+  .kbnav.searching .kbgitems{display:block; padding-left:0; margin-left:0; border-left:none}
   .navitem{padding:9px 11px; border-radius:var(--r-sm); cursor:pointer; border:1px solid transparent}
   .navitem:hover{background:var(--soft)}
   .navitem.sel{background:var(--ink)}
@@ -538,7 +550,7 @@ let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts
   kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
   threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"",
-  kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}};
+  kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}, kbOpen:{}};
 
 async function load(){
   // diagnostic timing: each fetch + total, visible in the browser console (F12)
@@ -998,10 +1010,27 @@ function kbNav(main){
   const groups = state.kbMode==='topic' ? kbTopicGroups(main)
                : state.kbMode==='domain' ? kbDomainGroups(main)
                : kbTierGroups(main);
-  return groups.map(([label,sub,items])=>
-    `<div class="kbgroup"><div class="kbglabel">${esc(label)}${sub?` · <span>${esc(sub)}</span>`:''} · ${items.length}</div>
-     ${items.map(i=>navItem(i,conf)).join("")}</div>`).join("");
+  // accordion: show the list of topics/levels/tags first; a group opens to reveal
+  // its facts. Open state persists in state.kbOpen so selecting a fact won't close it.
+  return groups.map(([label,sub,items])=>{
+    const key=esc(label);
+    const open=!!state.kbOpen[label];
+    return `<div class="kbgroup ${open?'open':''}" data-key="${key}">
+      <div class="kbghead" onclick="toggleGroup(this)">
+        <span class="caret">▸</span>
+        <span class="kbglabel">${esc(label)}${sub?` <span class="gsub">${esc(sub)}</span>`:''}</span>
+        <span class="gcount">${items.length}</span>
+      </div>
+      <div class="kbgitems">${items.map(i=>navItem(i,conf)).join("")}</div>
+    </div>`;}).join("");
 }
+function toggleGroup(el){
+  const g=el.closest('.kbgroup'); if(!g) return;
+  const k=g.dataset.key;
+  state.kbOpen[k]=!state.kbOpen[k];
+  g.classList.toggle('open', state.kbOpen[k]);
+}
+window.toggleGroup=toggleGroup;
 function kbTierGroups(main){
   return TIER_ORDER.map(t=>[TIER_LABEL[t],TIER_DESC[t],main.filter(i=>(i.tier||'leaf')===t)])
     .filter(g=>g[2].length);
@@ -1081,7 +1110,7 @@ function selectKb(id){
     api(`/related?id=${id}`).then(r=>{state.kbRelated[id]=r.items||[]; if(state.view==='kb') render();});
   }
 }
-function setKbMode(m){state.kbMode=m; render();}
+function setKbMode(m){state.kbMode=m; state.kbOpen={}; render();}
 function kbFilter(){
   const box=document.getElementById('kbq'); if(!box) return;
   const q=(box.value||'').toLowerCase().trim();
@@ -1095,7 +1124,6 @@ function kbFilter(){
   document.querySelectorAll('.kbnav .kbgroup').forEach(g=>{
     const any=[...g.querySelectorAll('.navitem')].some(n=>n.style.display!=='none');
     g.style.display = any ? '' : 'none';});
-  document.querySelectorAll('.kbnav .kbglabel').forEach(l=>{ l.style.display=q?'none':''; });
   const cnt=document.getElementById('kbcount');
   if(cnt) cnt.textContent = q ? `${hits} match${hits===1?'':'es'}` : '';
   // toggle a flat-list style while searching
