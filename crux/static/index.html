@@ -219,6 +219,21 @@
   .kbmodes{display:inline-flex; gap:2px; background:var(--card); border-radius:var(--pill); padding:3px; margin-bottom:12px}
   .kbmode{border:none; background:none; color:var(--muted); font-family:var(--mono); font-size:11px; padding:5px 12px; border-radius:var(--pill)}
   .kbmode.on{background:var(--canvas); color:var(--ink)}
+  /* provenance + editable filing in the detail panel */
+  .prov{display:flex; gap:12px; align-items:center; background:var(--soft); border:1px solid var(--hair);
+    border-radius:var(--r-md); padding:13px 15px}
+  .prov .pi{width:32px;height:32px;border-radius:8px;background:var(--card);display:grid;place-items:center;font-size:15px;flex:none}
+  .prov .pmeta{font-size:13px; color:var(--muted); line-height:1.45}
+  .prov .pmeta b{color:var(--ink); font-weight:600}
+  .filing{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .fsel{display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 6px 0 12px;
+    border:1px solid var(--hair); background:var(--soft); border-radius:var(--pill); font-size:13px; color:var(--ink)}
+  .fsel .lbl{color:var(--muted2); font-family:var(--mono); font-size:10px; text-transform:uppercase}
+  .fsel select{border:none; background:none; color:var(--ink); font-family:var(--sans); font-size:13px;
+    font-weight:500; outline:none; cursor:pointer; padding:6px 4px}
+  .fhint{margin-top:10px; font-size:12.5px; color:var(--muted); line-height:1.5;
+    background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-md); padding:10px 13px}
+  .fhint b{color:var(--teal)}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -354,7 +369,7 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
-  kbSel:null, kbMode:"tier", kbQuery:"", kbRelated:{}, leader:true,
+  kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[]};
 
 async function load(){
@@ -506,8 +521,10 @@ function renderAttn(it){
 }
 
 /* ---------------- KNOWLEDGE BASE (explorer) ---------------- */
-const TIER_LABEL={core:"Core Strategy",mid:"Mid Planning",leaf:"Leaf / Operational"};
-const TIER_DESC={core:"company mission, vision & strategy",mid:"product decisions, roadmap & architecture",leaf:"operational facts & day-to-day work"};
+// Plain-language labels: the user shouldn't have to learn "altitude/tier/leaf".
+const TIER_LABEL={core:"Big picture",mid:"Product decision",leaf:"Day-to-day"};
+const TIER_SHORT={core:"Big picture",mid:"Decision",leaf:"Day-to-day"};
+const TIER_DESC={core:"mission, vision & strategy",mid:"product decisions, roadmap & architecture",leaf:"operational facts & day-to-day work"};
 const TIER_ORDER=["core","mid","leaf"];
 const DOMAIN_LABEL={product:"Product",technical:"Technical",user:"Users",market:"Market",competitor:"Competitors",legal:"Legal",process:"Process",other:"Other"};
 const DOMAIN_ORDER=["product","technical","user","market","competitor","legal","process","other"];
@@ -531,19 +548,19 @@ function vKB(){
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
     <h1 class="head display">Knowledge explorer</h1>
-    <p class="sub">Browse your verified knowledge and walk its connections. Lenses gather a relevant slice across domains — a fact appears in every lens it's relevant to.</p>
+    <p class="sub">Everything your team has verified, grouped by what it's about — so related decisions sit together. Filter to find anything, or open a fact to see what it connects to.</p>
     <div class="lensbar">
       <button class="lens ${state.kbLens==null?'on':''}" onclick="selectLens(null)">All</button>
       ${state.lenses.map(l=>`<button class="lens ${state.kbLens===l.id?'on':''}" onclick="selectLens(${l.id})" title="${esc(l.intent||'')}">${esc(l.name)}${state.leader?` <span class="lx" onclick="event.stopPropagation();delLens(${l.id})">×</span>`:''}</button>`).join("")}
-      ${state.leader?`<button class="lens new" onclick="newLens()">+ New lens</button>`:''}
+      ${state.leader?`<button class="lens new" onclick="newLens()">+ New collection</button>`:''}
     </div>
     <div class="kbwrap">
       <div class="kbnav">
-        <input class="kbsearch" id="kbq" placeholder="Filter…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
+        <input class="kbsearch" id="kbq" placeholder="Filter your knowledge…" oninput="kbFilter()" value="${esc(state.kbQuery||'')}"/>
         <div class="kbmodes">
-          <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By tier</button>
-          <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By domain</button>
-          <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By topic</button>
+          <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By topic</button>
+          <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By level</button>
+          <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By tag</button>
         </div>
         <div class="kblist">${shown.length?kbNav(shown):'<div class="muted2" style="font-size:13px;padding:8px">No facts match this lens yet.</div>'}</div>
       </div>
@@ -558,13 +575,13 @@ async function selectLens(id){
   const r=await api(`/lenses/${id}/items`); state.lensIds=r.ids||[]; render();
 }
 async function newLens(){
-  const name=prompt("Lens name (e.g. Offline Sync, Marketing Campaign):"); if(!name) return;
-  const intent=prompt("What is this lens about? (one line — helps it gather the right facts)")||"";
-  await post("/lenses",{name,intent}); toast("✓ Lens created");
+  const name=prompt("Collection name (e.g. Offline Sync, Marketing Campaign):"); if(!name) return;
+  const intent=prompt("What is this collection about? (one line — helps it gather the right facts)")||"";
+  await post("/lenses",{name,intent}); toast("✓ Collection created");
   const ln=await api("/lenses"); state.lenses=ln.lenses||[]; render();
 }
 async function delLens(id){
-  if(!confirm("Delete this lens? (facts are untouched — a lens is just a view)")) return;
+  if(!confirm("Delete this collection? (facts are untouched — a collection is just a view)")) return;
   await fetch(`/lenses/${id}`,{method:"DELETE",headers:_token?{"x-crux-token":_token}:{}});
   if(state.kbLens===id){state.kbLens=null;state.lensIds=null;}
   const ln=await api("/lenses"); state.lenses=ln.lenses||[]; render();
@@ -602,7 +619,7 @@ function navItem(i,conf){
   const txt=((i.title||'')+' '+(i.summary||'')+' '+(i.tags||[]).join(' ')).toLowerCase();
   return `<div class="navitem ${i.id===state.kbSel?'sel':''}" data-text="${esc(txt)}" onclick="selectKb('${i.id}')">
     <div class="nt">${esc(i.title||'')}</div>
-    <div class="ni"><span class="ipill tier-${i.tier||'leaf'}">${TIER_LABEL[i.tier||'leaf'].split(' ')[0]}</span>
+    <div class="ni"><span class="ipill tier-${i.tier||'leaf'}">${TIER_SHORT[i.tier||'leaf']}</span>
       ${conf.has(i.id)?'<span class="cdot c-conflict" title="has a conflict"></span>':''}
       ${edges?`<span class="nbadge">⋯${edges}</span>`:''}
       ${i.usage_count?`<span class="nbadge">⚡${i.usage_count}</span>`:''}</div>
@@ -621,23 +638,32 @@ function kbDetail(it){
   const connBlock = conns.length
     ? `<div class="dsection"><div class="pl">CONNECTIONS</div><div class="edges">${conns.join("")}</div></div>`
     : `<div class="dsection"><div class="pl">CONNECTIONS</div><div class="muted2" style="font-size:13px">No links yet. In Review, use “Extend” to connect related facts.</div></div>`;
+  // Filing (level/topic) — editable for the leader so a wrong auto-classification
+  // is a one-click fix, not a dead end. Read-only pills for members.
+  const filingBlock = state.leader ? `
+    <div class="dsection"><div class="pl">How it's filed — change it anytime</div>
+      <div class="filing">
+        <span class="fsel"><span class="lbl">topic</span><select onchange="saveFiling('${it.id}','domain',this.value)">${DOMAIN_ORDER.map(d=>`<option value="${d}" ${(it.domain||'other')===d?'selected':''}>${DOMAIN_LABEL[d]}</option>`).join("")}</select></span>
+        <span class="fsel"><span class="lbl">level</span><select onchange="saveFiling('${it.id}','tier',this.value)">${TIER_ORDER.map(t=>`<option value="${t}" ${(it.tier||'leaf')===t?'selected':''}>${TIER_LABEL[t]}</option>`).join("")}</select></span>
+      </div>
+      <div class="fhint">🛈 <b>CRUX filed this for you.</b> If it landed in the wrong place, pick the right one above — it sticks right away.</div>
+    </div>`
+    : `<div class="dsection"><div class="pl">How it's filed</div>
+      <div class="filing"><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span></div></div>`;
   return `
     <div class="dhead">
-      <span class="tier teal">◆ VERIFIED · ${esc(it.type)}</span>
-      <span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span>
-      <span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span>
+      <span class="tier teal">◆ VERIFIED · ${esc(it.type)}${it.promoted_at?` · ${it.promoted_at.slice(0,10)}`:''}</span>
     </div>
     <h2 class="dtitle">${esc(it.title||'')}</h2>
     <div class="dstmt">${esc(it.summary||it.title||'')}</div>
     ${it.usage_count?`<div class="usedb">⚡ used ${it.usage_count}× by agents${it.last_used?` · last ${rel(it.last_used)}`:''}</div>`:''}
+    <div class="dsection"><div class="pl">Where this came from</div>
+      <div class="prov"><div class="pi">✎</div><div class="pmeta">Captured${it.source?` from <b>${esc(it.source)}</b>`:''}${it.promoted_at?`, verified <b>${it.promoted_at.slice(0,10)}</b>`:''}. The original text is below.</div></div>
+      <div class="raw" style="margin-top:10px">${esc(it.raw_content||it.summary||it.title)}</div></div>
+    ${filingBlock}
     ${connBlock}
-    <div class="dsection"><div class="pl">ORIGINAL SOURCE${it.source?` · ${esc(it.source)}`:''}</div>
-      <div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></div>
     <div class="dsection"><div class="pl">DETAILS</div>
       <div class="meta"><div><b>id</b> ${it.id.slice(0,8)}</div>
-        <div><b>tier</b> ${TIER_LABEL[it.tier||'leaf']}</div>
-        <div><b>domain</b> ${DOMAIN_LABEL[it.domain||'other']}</div>
-        ${it.promoted_at?`<div><b>verified</b> ${it.promoted_at.slice(0,10)}</div>`:''}
         <div><b>confidence</b> ${Math.round((it.confidence||0)*100)}%</div></div>
       <div class="tags">${(it.tags||[]).map(t=>`<span class="pill">${esc(t)}</span>`).join("")}</div></div>
     ${state.leader?`
@@ -712,7 +738,12 @@ async function saveEdit(id){
   const t=document.getElementById('et').value.trim(), s=document.getElementById('es').value.trim();
   await post(`/items/${id}/edit`,{title:t||null,summary:s||null});
   toast("✓ Edited & re-embedded"); closeDrawer(); await load();}
-window.dismissConflict=dismissConflict; window.saveEdit=saveEdit;
+async function saveFiling(id,field,value){
+  // moves a fact's filing (topic/level) without touching its text or embedding
+  await post(`/items/${id}/edit`,{[field]:value});
+  toast(field==='tier'?"✓ Moved to "+TIER_LABEL[value]:"✓ Filed under "+DOMAIN_LABEL[value]);
+  await load();}
+window.dismissConflict=dismissConflict; window.saveEdit=saveEdit; window.saveFiling=saveFiling;
 function inboxRow(it){
   const open=!!state.expanded[it.id];
   return `<div class="irow s-${it.status} ${open?'open':''}">
@@ -720,7 +751,7 @@ function inboxRow(it){
       <span class="cdot c-${it.status}"></span>
       <div class="imain">
         <div class="ititle">${esc(it.title||it.summary||'')}</div>
-        <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Leaf')}</span><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
+        <div class="imeta"><span class="ipill tier-${it.tier||'leaf'}">${(TIER_LABEL[it.tier||'leaf']||'Day-to-day')}</span><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill">${esc(it.type)}</span>${esc(it.implication||'')}</div>
       </div>
       <span class="iwhen mono">${it.owner?'by '+esc(it.owner)+' · ':''}${rel(it.captured_at)}</span>
       ${it.status==='clean'?`<button class="btn sm teal" onclick="event.stopPropagation();promote('${it.id}')">Promote</button>`:''}
@@ -767,7 +798,7 @@ function inboxDeep(it){
     ${fit}
     <div class="discs">
       <details class="disc"><summary>Show original text</summary><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></details>
-      <details class="disc"><summary>Change tier — currently <b>${TIER_LABEL[tier]}</b></summary>
+      <details class="disc"><summary>Change level — currently <b>${TIER_LABEL[tier]}</b></summary>
         <select id="rtier-${it.id}" class="tiersel">${opt('core')}${opt('mid')}${opt('leaf')}</select></details>
       <details class="disc"><summary>Edit title / summary</summary>
         <div class="refine">

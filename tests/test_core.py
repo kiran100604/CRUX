@@ -143,6 +143,17 @@ def test_edit_reembeds(store):
     assert it.id in titles
 
 
+def test_edit_refiles_tier_and_domain(store):
+    # the user can correct an auto-classification (move where a fact is filed)
+    it = store.capture("We will deploy on AWS.", type_hint="decision")
+    before = store.db.embedding_of(it.id)
+    assert store.edit(it.id, tier="core", domain="technical")
+    refiled = store.db.get(it.id)
+    assert refiled.tier == "core" and refiled.domain == "technical"
+    # filing-only edits must NOT re-embed (text is unchanged)
+    assert store.db.embedding_of(it.id) == before
+
+
 def test_promote_with_refine_reembeds(store):
     it = store.capture("price note", type_hint="exploration")
     before = store.db.embedding_of(it.id)
