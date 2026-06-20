@@ -98,21 +98,32 @@ pip install -e ".[mcp]"
 crux mcp                 # exposes get_context / add_context
 ```
 
-## Working threads ("what I'm doing now")
-Working memory is organized as **threads** — a unit of active work, not a pile of
-loose facts. Start a thread with your goal; CRUX **seeds it with the background**
-from your knowledge base. Then everything you capture (hotkey, popup, dashboard)
-lands on the **current thread as a raw step** — kept as narrative, never atomized
-into facts up front. A **living summary** is auto-maintained until you hand-edit
-it (then it's yours, and won't be overwritten until you re-summarize).
+## Working threads — dump, and it sorts itself
+Working memory is organized as **threads** — a unit of active work ("what I'm
+doing now"). Start a thread with your **intent**; CRUX **seeds it with the
+background** from your knowledge base. Then you just **dump** things in — a prompt
+you gave an AI, a link, a result, an idea, an insight — by hotkey, popup, or the
+dashboard. You never file anything: a model **routes each card** to its place:
 
-The payoff is the **portable brief** = seeded background + live state, so you can
-switch AI tools mid-task without re-explaining anything:
+- **Guides** — references/specs that steer the whole thread (e.g. "use these design
+  principles"). Pinned at the top, included in every brief.
+- **Approaches** — the different directions you try, created automatically (like
+  git branches, but you don't manage them). Each keeps its own living summary.
+- **Unsorted** — when the router isn't confident, it sets a card aside instead of
+  guessing wrong. One drag puts it right.
+
+Every card is tagged by **kind** (reference / prompt / suggestion / result /
+insight / question). The only management gesture is **drag-and-drop** to correct a
+miss. > This routing needs an API key to be good — set `CRUX_PROCESSING_PROVIDER=anthropic`
+and `ANTHROPIC_API_KEY`. Offline it falls back to keyword sorting so the loop still runs.
+
+The payoff is the **portable brief** = guides + seeded background + the current
+approach's live state, so you can switch AI tools mid-task without re-explaining:
 ```bash
 crux brief               # prints the current thread's context — paste into any tool
 ```
 When a thread wraps, promote its durable learnings into the knowledge base for
-Review; the story itself stays in the thread.
+Review; the thread itself stays put.
 
 ## Dashboard
 ```bash

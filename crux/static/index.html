@@ -275,6 +275,39 @@
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
     font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
   .promote{margin-top:22px; padding-top:18px; border-top:1px solid var(--hair)}
+  /* thread board: dump → guides + approaches + unsorted */
+  .dumprow{display:flex; gap:10px; margin:4px 0 18px}
+  .guides{border:1px dashed var(--hair); border-radius:var(--r-md); padding:12px 14px; margin-bottom:16px; background:var(--soft)}
+  .gtitle{font-family:var(--mono); font-size:10px; letter-spacing:.06em; color:var(--muted2); text-transform:uppercase; margin-bottom:9px}
+  .gtitle .muted2{text-transform:none; letter-spacing:0}
+  .gcards{display:flex; flex-wrap:wrap; gap:8px}
+  .guides .dcard, .unsorted .dcard{width:240px}
+  .board{display:flex; gap:14px; overflow-x:auto; padding-bottom:8px; align-items:flex-start}
+  .lane{flex:0 0 290px; background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-lg); padding:12px}
+  .lane.cur{border-color:var(--teal-line); background:var(--teal-bg)}
+  .lane.addlane{flex:0 0 200px; background:transparent; border-style:dashed; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:160px}
+  .lanehd{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .lanetitle{font-weight:600; font-size:15px; color:var(--ink); flex:1; min-width:0}
+  .setcur{font-family:var(--mono); font-size:10px; color:var(--muted2); cursor:pointer; border:1px solid var(--hair); border-radius:var(--pill); padding:2px 8px; background:var(--canvas)}
+  .setcur:hover{color:var(--ink); border-color:var(--muted2)}
+  .lanestate{margin-bottom:10px}
+  .statehd{font-family:var(--mono); font-size:10px; color:var(--muted2); text-transform:uppercase; margin-bottom:5px}
+  .ministate{width:100%; min-height:60px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-sm);
+    padding:8px 10px; font-size:12.5px; line-height:1.45; color:var(--ink); outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
+  .ministate:focus{border-color:var(--ink)}
+  .lanecards{display:flex; flex-direction:column; gap:8px; min-height:30px}
+  .dcard{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-sm); padding:9px 11px; cursor:grab}
+  .dcard:hover{border-color:var(--muted2)}
+  .dcard.sorting{opacity:.65; border-style:dashed}
+  .dctop{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px}
+  .dctext{font-size:13px; color:var(--body); line-height:1.4; word-break:break-word}
+  .kind{font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:var(--pill); background:var(--card); color:var(--muted)}
+  .k-reference{background:var(--teal-bg); color:var(--teal)} .k-prompt{background:#eae3f5; color:#5b3fa0}
+  .k-suggestion{background:var(--peach-bg); color:var(--peach)} .k-result{background:#e6efe0; color:#3d6b2a}
+  .k-insight{background:#fbf0d0; color:#8a6a17} .k-question{background:var(--coral-bg); color:var(--coral)}
+  .unsorted{border:1px dashed var(--peach-line); background:var(--peach-bg); border-radius:var(--r-md); padding:12px 14px; margin-top:16px}
+  .bgwrap{margin-top:20px} .bgwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
+  .bgwrap .bgbox{margin-top:10px}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -478,9 +511,9 @@ function threadCard(t){
   return `<div class="tcard ${cur?'cur':''}" onclick="openThread('${t.id}')">
     <div class="tcmain">
       <div class="tctitle">${esc(t.title)} ${cur?'<span class="curpill">current</span>':''}</div>
-      <div class="tcsub">${esc((t.summary||t.intent||'No context yet').split('\\n')[0])}</div>
+      <div class="tcsub">${esc((t.intent||'No goal set').split('\\n')[0])}</div>
     </div>
-    <div class="tcmeta"><span class="nbadge">${t.step_count} step${t.step_count!==1?'s':''}</span><span class="iwhen mono">${rel(t.last_step)}</span></div>
+    <div class="tcmeta"><span class="nbadge">${t.card_count!=null?t.card_count:t.step_count} card${(t.card_count!=null?t.card_count:t.step_count)!==1?'s':''} · ${t.approach_count||1} approach${(t.approach_count||1)!==1?'es':''}</span><span class="iwhen mono">${rel(t.last_step)}</span></div>
   </div>`;
 }
 function unsortedRow(e){
@@ -490,52 +523,70 @@ function unsortedRow(e){
     <span class="iwhen mono">${rel(e.created_at)}</span>
   </div></div>`;
 }
+const CARD_KIND_LABELS={reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",insight:"Insight",question:"Question",note:"Note"};
 function vThread(t){
-  const owned=t.summary_owned;
+  const active=t.status==='active';
   app(`
     <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
     <div class="threadhd">
-      <div>
-        <h1 class="head display" style="font-size:32px">${esc(t.title)}</h1>
-        ${t.intent?`<p class="sub" style="margin:6px 0 0">${esc(t.intent)}</p>`:''}
-      </div>
+      <div><h1 class="head display" style="font-size:30px">${esc(t.title)}</h1>
+        ${t.intent?`<p class="sub" style="margin:6px 0 0">${esc(t.intent)}</p>`:''}</div>
       <div class="thactions">
-        ${t.status==='active'?`<button class="btn teal" onclick="copyBrief('${t.id}')">⧉ Copy context</button>`:''}
-        ${t.status==='active'?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
+        ${active?`<button class="btn teal" onclick="copyBrief('${t.id}')">⧉ Copy context</button>`:''}
+        ${active?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
       </div>
     </div>
+    ${active?`<div class="dumprow">
+      <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, an idea… CRUX files it for you" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
+      <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
+    </div>`:''}
 
-    <div class="tcols">
-      <div>
-        <div class="pl">Current state ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}
-          <span class="resum" onclick="resummarize('${t.id}')">↻ re-summarize</span></div>
-        <textarea id="thsum" class="statebox" placeholder="As you capture steps, CRUX keeps this up to date. Edit it anytime — once you do, it's yours and won't be overwritten." oninput="markDirty()">${esc(t.summary||'')}</textarea>
-        <div id="thsave" class="savedrow"><button class="btn sm teal" onclick="saveSummary('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-updates pause until you re-summarize</span></div>
+    <div class="guides" ondragover="allowDrop(event)" ondrop="dropCard(event,'guide')">
+      <div class="gtitle">⊹ GUIDES <span class="muted2">— references that steer the whole thread · drag a card here to pin</span></div>
+      <div class="gcards">${t.guides.length?t.guides.map(card).join(""):`<span class="muted2" style="font-size:12px">Nothing pinned yet. Drop a reference, spec, or principle here.</span>`}</div>
+    </div>
 
-        <div class="pl" style="margin-top:22px">Steps · the story as it happened</div>
-        <div class="addstep">
-          <input id="stepin" class="ntinput" placeholder="Add a step… (or just use your capture hotkey)" onkeydown="if(event.key==='Enter')addStep('${t.id}')"/>
-          <button class="btn out sm" onclick="addStep('${t.id}')">Add</button>
-        </div>
-        ${t.steps.length?`<div class="timeline">${t.steps.slice().reverse().map(stepRow).join("")}</div>`
-          :`<div class="muted2" style="font-size:13px;padding:8px">No steps yet. Capture as you work — each capture lands here in order.</div>`}
-      </div>
+    <div class="board">
+      ${t.approaches.map(a=>approachLane(a,t)).join("")}
+      ${active?`<div class="lane addlane"><button class="btn out sm" onclick="newApproach('${t.id}')">+ Approach</button>
+        <div class="muted2" style="font-size:12px;margin-top:10px;text-align:center">A different direction.<br>CRUX also creates these on its own.</div></div>`:''}
+    </div>
 
-      <div>
-        <div class="pl">Background <span class="muted2" style="text-transform:none;letter-spacing:0">— seeded from your knowledge base</span></div>
-        ${t.background?`<div class="bgbox">${esc(t.background)}</div>`
-          :`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet. As your knowledge base grows, new threads start with more context.</div>`}
-        ${t.status==='active'?`<div class="promote"><div class="pl">Wrap up</div>
-          <button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
-          <div class="muted2" style="font-size:12px;margin-top:6px">Pulls the durable facts out of this thread and stages them for the knowledge base. The story stays here.</div></div>`:''}
-      </div>
-    </div>`);
+    ${t.unsorted.length?`<div class="unsorted" ondragover="allowDrop(event)" ondrop="dropCard(event,'unsorted')">
+      <div class="gtitle">⌂ UNSORTED <span class="muted2">— CRUX wasn't sure (or is still sorting) · drag into an approach</span></div>
+      <div class="gcards">${t.unsorted.map(card).join("")}</div>
+    </div>`:''}
+
+    <details class="bgwrap"><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
+      ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
+    </details>
+    ${active?`<div class="promote"><button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
+      <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}`);
 }
-function stepRow(e){
-  const src=e.source_type||'note';
-  return `<div class="tstep"><span class="tsdot"></span>
-    <div class="tsbody"><div class="tstext">${esc(e.raw_content||'')}</div>
-      <div class="tsmeta mono">${esc(src)} · ${rel(e.created_at)}</div></div></div>`;
+function approachLane(a,t){
+  const owned=a.summary_owned;
+  return `<div class="lane ${a.is_current?'cur':''}" ondragover="allowDrop(event)" ondrop="dropCard(event,'${a.id}')">
+    <div class="lanehd">
+      <div class="lanetitle">${esc(a.title)}</div>
+      ${a.is_current?'<span class="curpill">current</span>':`<span class="setcur" onclick="setCurrentApproach('${t.id}','${a.id}')">set current</span>`}
+    </div>
+    <div class="lanestate">
+      <div class="statehd">state ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}<span class="resum" onclick="resummarize('${a.id}')">↻</span></div>
+      <textarea class="ministate" id="sum-${a.id}" oninput="markDirty('${a.id}')" placeholder="CRUX keeps a summary of this direction here…">${esc(a.summary||'')}</textarea>
+      <div class="savedrow" id="save-${a.id}"><button class="btn sm teal" onclick="saveSummary('${a.id}')">Save</button></div>
+    </div>
+    <div class="lanecards">
+      ${a.cards.length?a.cards.slice().reverse().map(card).join(""):`<div class="muted2" style="font-size:12px;padding:6px">Empty. Dump something and it sorts in here.</div>`}
+    </div>
+  </div>`;
+}
+function card(c){
+  const sorting=!c.routed;
+  const label=sorting?'sorting…':(CARD_KIND_LABELS[c.kind]||c.kind);
+  return `<div class="dcard ${sorting?'sorting':''}" draggable="true" ondragstart="cardDrag(event,'${c.id}')">
+    <div class="dctop"><span class="kind k-${esc(c.kind)}">${label}</span><span class="iwhen mono">${rel(c.created_at)}</span></div>
+    <div class="dctext">${esc((c.raw_content||'').slice(0,400))}</div>
+  </div>`;
 }
 async function startThread(){
   const el=document.getElementById('ntintent'); const intent=(el&&el.value.trim())||'';
@@ -545,21 +596,25 @@ async function startThread(){
 }
 function openThread(id){ state.openThread=id; render(); api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}}); }
 function closeThread(){ state.openThread=null; state.threadView=null; render(); }
-async function addStep(id){
-  const el=document.getElementById('stepin'); const txt=(el&&el.value.trim())||'';
+async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();} }
+let _drag=null;
+function cardDrag(ev,id){ _drag=id; try{ev.dataTransfer.setData('text/plain',id);ev.dataTransfer.effectAllowed='move';}catch(e){} }
+function allowDrop(ev){ ev.preventDefault(); }
+async function dropCard(ev,target){ ev.preventDefault(); const id=_drag||(ev.dataTransfer&&ev.dataTransfer.getData('text/plain')); _drag=null; if(!id) return; await post(`/cards/${id}/move`,{target}); toast("✓ Moved"); await refreshThread(); }
+async function dump(id){
+  const el=document.getElementById('dumpin'); const txt=(el&&el.value.trim())||'';
   if(!txt) return; el.value='';
   await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
-  state.threadView=await api(`/threads/${id}`); await load();
+  await refreshThread(); setTimeout(refreshThread,1400);  // show it land once the router files it
 }
-async function saveSummary(id){
-  const el=document.getElementById('thsum');
-  await post(`/threads/${id}/summary`,{summary:(el&&el.value)||''});
-  toast("✓ Saved — this state is yours now"); state.threadView=await api(`/threads/${id}`); render();
+async function saveSummary(aid){
+  const el=document.getElementById('sum-'+aid);
+  await post(`/approaches/${aid}/summary`,{summary:(el&&el.value)||''});
+  toast("✓ Saved — this state is yours now"); await refreshThread();
 }
-async function resummarize(id){
-  toast("Re-summarizing from steps…");
-  state.threadView=await post(`/threads/${id}/resummarize`,{}); render();
-}
+async function resummarize(aid){ toast("Re-summarizing…"); await post(`/approaches/${aid}/resummarize`,{}); await refreshThread(); }
+async function setCurrentApproach(tid,aid){ await post(`/threads/${tid}/current-approach`,{approach_id:aid}); await refreshThread(); }
+async function newApproach(tid){ const name=prompt("Name this approach (a new direction):"); if(!name) return; await post(`/threads/${tid}/approaches`,{title:name}); toast("✓ Approach added"); await refreshThread(); }
 async function finishThread(id){
   if(!confirm("Finish this thread? It moves to Finished; nothing is deleted.")) return;
   await post(`/threads/${id}/finish`,{}); toast("✓ Finished"); state.openThread=null; state.threadView=null; await load();
@@ -573,10 +628,12 @@ async function copyBrief(id){
   try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Brief copied — paste it into any tool"); }
   catch(e){ prompt("Copy this brief:", r.brief||""); }
 }
-function markDirty(){ const r=document.getElementById('thsave'); if(r) r.style.display='flex'; }
+function markDirty(aid){ const r=document.getElementById('save-'+aid); if(r) r.style.display='flex'; }
 window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
-window.addStep=addStep; window.saveSummary=saveSummary; window.resummarize=resummarize;
-window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.markDirty=markDirty;
+window.cardDrag=cardDrag; window.allowDrop=allowDrop; window.dropCard=dropCard; window.dump=dump;
+window.saveSummary=saveSummary; window.resummarize=resummarize; window.setCurrentApproach=setCurrentApproach;
+window.newApproach=newApproach; window.finishThread=finishThread; window.promoteThread=promoteThread;
+window.copyBrief=copyBrief; window.markDirty=markDirty;
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){

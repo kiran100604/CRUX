@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS episodes (
     title        TEXT,
     added_by     TEXT,
     thread_id    TEXT,
+    kind         TEXT NOT NULL DEFAULT 'note',  -- router-assigned: what the card IS
+    approach_id  TEXT,                           -- which approach (direction) it's in
+    is_guide     INTEGER NOT NULL DEFAULT 0,     -- thread-level governing reference
+    routed       INTEGER NOT NULL DEFAULT 0,     -- has the router filed it yet?
+    route_reason TEXT,
     created_at   TEXT NOT NULL
 );
 
@@ -46,9 +51,26 @@ CREATE TABLE IF NOT EXISTS threads (
     summary_owned INTEGER NOT NULL DEFAULT 0,    -- 1 once the user edits it by hand
     summary_stale INTEGER NOT NULL DEFAULT 0,    -- 1 when new steps need re-summarizing
     status        TEXT NOT NULL DEFAULT 'active', -- active | done
+    current_approach_id TEXT,                      -- the direction being worked now
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
 );
+
+-- approaches: the different directions tried within a thread (like git branches,
+-- but the router creates them — the user never has to). Each keeps its own living
+-- summary. status: active (a live direction) | parked (tried, kept for history).
+CREATE TABLE IF NOT EXISTS approaches (
+    id            TEXT PRIMARY KEY,
+    thread_id     TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    summary       TEXT,
+    summary_owned INTEGER NOT NULL DEFAULT 0,
+    summary_stale INTEGER NOT NULL DEFAULT 0,
+    status        TEXT NOT NULL DEFAULT 'active',
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_approaches_thread ON approaches(thread_id);
 
 -- tiny key/value for app-level pointers (e.g. the current thread for hotkey capture)
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
@@ -210,10 +232,25 @@ class Database:
         ecols = {r["name"] for r in self.conn.execute("PRAGMA table_info(episodes)")}
         if "thread_id" not in ecols:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN thread_id TEXT")
+        if "kind" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN kind TEXT NOT NULL DEFAULT 'note'")
+        if "approach_id" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN approach_id TEXT")
+        if "is_guide" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN is_guide INTEGER NOT NULL DEFAULT 0")
+        if "routed" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN routed INTEGER NOT NULL DEFAULT 0")
+        if "route_reason" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN route_reason TEXT")
         # index lives here, not in SCHEMA: on an upgraded db the column only exists
         # after the ALTER above (SCHEMA runs before _migrate).
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_episodes_thread ON episodes(thread_id)")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_episodes_approach ON episodes(approach_id)")
+        tcols = {r["name"] for r in self.conn.execute("PRAGMA table_info(threads)")}
+        if tcols and "current_approach_id" not in tcols:
+            self.conn.execute("ALTER TABLE threads ADD COLUMN current_approach_id TEXT")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
@@ -226,12 +263,86 @@ class Database:
     def insert_episode(self, ep: Episode) -> Episode:
         self.conn.execute(
             """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
-                   added_by, thread_id, created_at) VALUES (?,?,?,?,?,?,?,?)""",
+                   added_by, thread_id, kind, approach_id, is_guide, routed,
+                   route_reason, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
-             ep.added_by, ep.thread_id, ep.created_at),
+             ep.added_by, ep.thread_id, ep.kind, ep.approach_id, int(ep.is_guide),
+             int(ep.routed), ep.route_reason, ep.created_at),
         )
         self.conn.commit()
         return ep
+
+    def update_card(self, card_id: str, fields: dict) -> bool:
+        """Update a card's (episode's) filing: kind / approach_id / is_guide / routed."""
+        allowed = {"kind", "approach_id", "is_guide", "routed", "route_reason", "thread_id"}
+        cols = {k: (int(v) if k in ("is_guide", "routed") and v is not None else v)
+                for k, v in fields.items() if k in allowed}
+        if not cols:
+            return False
+        assignment = ", ".join(f"{c}=?" for c in cols)
+        cur = self.conn.execute(
+            f"UPDATE episodes SET {assignment} WHERE id=?", (*cols.values(), card_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # --- approaches (directions within a thread) ----------------------------
+
+    def insert_approach(self, a: dict) -> dict:
+        self.conn.execute(
+            """INSERT INTO approaches (id, thread_id, title, summary, summary_owned,
+                   summary_stale, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (a["id"], a["thread_id"], a["title"], a.get("summary"),
+             int(a.get("summary_owned", 0)), int(a.get("summary_stale", 0)),
+             a.get("status", "active"), a["created_at"], a["updated_at"]),
+        )
+        self.conn.commit()
+        return a
+
+    def get_approach(self, approach_id: str) -> dict | None:
+        row = self.conn.execute("SELECT * FROM approaches WHERE id=?", (approach_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_approaches(self, thread_id: str) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM approaches WHERE thread_id=? ORDER BY created_at ASC", (thread_id,))
+        return [dict(r) for r in rows]
+
+    def update_approach(self, approach_id: str, fields: dict, updated_at: str) -> bool:
+        allowed = {"title", "summary", "summary_owned", "summary_stale", "status"}
+        cols = {k: v for k, v in fields.items() if k in allowed}
+        cols["updated_at"] = updated_at
+        assignment = ", ".join(f"{c}=?" for c in cols)
+        cur = self.conn.execute(
+            f"UPDATE approaches SET {assignment} WHERE id=?", (*cols.values(), approach_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_approach(self, approach_id: str) -> None:
+        # cards survive; they fall back to Unsorted
+        self.conn.execute("UPDATE episodes SET approach_id=NULL WHERE approach_id=?", (approach_id,))
+        self.conn.execute("DELETE FROM approaches WHERE id=?", (approach_id,))
+        self.conn.commit()
+
+    def approach_cards(self, approach_id: str) -> list[Episode]:
+        rows = self.conn.execute(
+            "SELECT * FROM episodes WHERE approach_id=? ORDER BY created_at ASC", (approach_id,))
+        return [Episode.from_row(r) for r in rows]
+
+    def thread_guides(self, thread_id: str) -> list[Episode]:
+        rows = self.conn.execute(
+            "SELECT * FROM episodes WHERE thread_id=? AND is_guide=1 ORDER BY created_at ASC",
+            (thread_id,))
+        return [Episode.from_row(r) for r in rows]
+
+    def thread_unsorted_cards(self, thread_id: str) -> list[Episode]:
+        """Cards in a thread with no home yet: either the router is still working
+        (routed=0) or it wasn't confident enough to file them (approach_id NULL)."""
+        rows = self.conn.execute(
+            """SELECT * FROM episodes WHERE thread_id=? AND is_guide=0 AND approach_id IS NULL
+               ORDER BY created_at DESC""", (thread_id,))
+        return [Episode.from_row(r) for r in rows]
 
     def get_episode(self, ep_id: str) -> Episode | None:
         row = self.conn.execute("SELECT * FROM episodes WHERE id=?", (ep_id,)).fetchone()
@@ -265,7 +376,7 @@ class Database:
 
     def update_thread(self, thread_id: str, fields: dict, updated_at: str) -> bool:
         allowed = {"title", "intent", "background", "summary",
-                   "summary_owned", "summary_stale", "status"}
+                   "summary_owned", "summary_stale", "status", "current_approach_id"}
         cols = {k: v for k, v in fields.items() if k in allowed}
         cols["updated_at"] = updated_at
         assignment = ", ".join(f"{c}=?" for c in cols)

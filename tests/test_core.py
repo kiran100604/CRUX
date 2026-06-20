@@ -397,28 +397,71 @@ def test_quickcapture_save(store):
 
 
 def test_hotkey_step_attaches_to_current_thread(store):
-    # with an active thread, a step attaches to it and updates the living summary
+    # with an active thread, a dumped card attaches to it, gets routed into an
+    # approach, and that approach grows a living summary
     t = store.create_thread("Website hero image", "make a brand-cream hero image")
     assert store.current_thread_id() == t["id"]
-    res = store.add_step("Tried DALL-E, colors off", source="hotkey")
+    res = store.add_step("Tried DALL-E, colors off", source="hotkey", route=True)
     assert res["thread_id"] == t["id"]
     view = store.thread_view(t["id"])
-    assert view["step_count"] == 1
-    assert view["summary"], "auto-summary should be generated on view"
-    # the portable brief carries the live state
+    assert view["card_count"] == 1
+    ap = view["approaches"][0]
+    assert ap["card_count"] == 1
+    assert ap["summary"], "approach auto-summary should be generated on view"
     assert "DALL-E" in store.thread_brief(t["id"]) or "hero image" in store.thread_brief(t["id"])
 
 
-def test_thread_summary_ownership(store):
-    # hand-editing the summary makes it the user's; new steps don't overwrite it,
-    # until they explicitly re-summarize
+def test_approach_summary_ownership(store):
+    # hand-editing a direction's state makes it the user's; new cards don't
+    # overwrite it, until they explicitly re-summarize
     t = store.create_thread("Refactor auth", "")
-    store.add_step("looked at session handling", source="note")
-    store.set_thread_summary(t["id"], "MY STATE")
-    store.add_step("checked token refresh", source="note")
-    assert store.thread_view(t["id"])["summary"] == "MY STATE"
-    store.resummarize_thread(t["id"])
-    assert store.thread_view(t["id"])["summary"] != "MY STATE"
+    store.add_step("looked at session handling", source="note", route=True)
+    a = store.db.list_approaches(t["id"])[0]
+    store.set_approach_summary(a["id"], "MY STATE")
+    store.add_step("checked token refresh", source="note", route=True)
+    assert store.db.get_approach(a["id"])["summary"] == "MY STATE"
+    store.resummarize_approach(a["id"])
+    assert store.db.get_approach(a["id"])["summary"] != "MY STATE"
+
+
+def test_router_sorts_dumped_cards(store):
+    # dump-and-it-sorts: a reference/guideline becomes a thread-level guide; a
+    # prompt becomes a card tagged 'prompt' inside an approach
+    t = store.create_thread("Poster", "poster representing fragmentation")
+    store.add_step("https://x.com/design-principles — brand guideline to follow",
+                   source="note", route=True)
+    store.add_step("Prompt: generate tangled wires resolving into a lens",
+                   source="note", route=True)
+    v = store.thread_view(t["id"])
+    assert any(g["kind"] == "reference" for g in v["guides"])
+    kinds = [c["kind"] for a in v["approaches"] for c in a["cards"]]
+    assert "prompt" in kinds
+
+
+def test_move_card_corrects_filing(store):
+    # drag-and-drop: the user can re-file a card the router misplaced
+    t = store.create_thread("X", "do x")
+    res = store.add_step("some note", source="note", route=True)
+    cid = res["card_id"]
+    assert store.move_card(cid, "guide")
+    assert any(g["id"] == cid for g in store.thread_view(t["id"])["guides"])
+    assert store.move_card(cid, "unsorted")
+    assert any(c["id"] == cid for c in store.thread_view(t["id"])["unsorted"])
+
+
+def test_route_parser_is_defensive():
+    # the real-model path's JSON parser — verified without a key
+    from crux.processing import _parse_route
+    d = _parse_route('{"kind":"insight","target":"new","new_title":"Lens idea",'
+                     '"confidence":0.8,"reason":"different direction"}', set())
+    assert d["kind"] == "insight" and d["target"] == "new"
+    assert d["new_title"] == "Lens idea" and d["confidence"] == 0.8
+    # garbage degrades to a safe, low-confidence note (→ stays unsorted)
+    g = _parse_route("not json at all", set())
+    assert g["kind"] == "note" and g["confidence"] < 0.45
+    # an unknown approach id falls back to 'current'
+    u = _parse_route('{"kind":"note","target":"bogus-id"}', set())
+    assert u["target"] == "current"
 
 
 def test_valid_chord():

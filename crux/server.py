@@ -45,12 +45,16 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
         worker.close()
 
 
-def _summarize_thread(cfg: Config, thread_id: str) -> None:
-    """Refresh a thread's living summary off the request path (own DB connection),
-    so a capture returns instantly and the new state shows on the next poll."""
+def _route_card(cfg: Config, card_id: str) -> None:
+    """Classify+file a dumped card off the request path (own DB connection), so a
+    capture returns instantly and the card lands in its place on the next poll.
+    Also refreshes the destination approach's living summary."""
     worker = Store(cfg)
     try:
-        worker.ensure_summary(thread_id)
+        worker.route_card(card_id)
+        ep = worker.db.get_episode(card_id)
+        if ep and ep.approach_id:
+            worker.ensure_approach_summary(ep.approach_id)
     finally:
         worker.close()
 
@@ -217,9 +221,10 @@ def create_app(cfg: Config):
         if body.as_step or body.thread_id:
             res = store.add_step(body.content, source=body.source or "note",
                                  thread_id=body.thread_id)
-            # refresh the summary off the request path so capture stays instant
-            if res.get("thread_id"):
-                app.state.executor.submit(_summarize_thread, cfg, res["thread_id"])
+            # route (classify + file) off the request path so capture stays instant;
+            # the card shows as "sorting…" until it lands on the next poll
+            if res.get("thread_id") and res.get("card_id"):
+                app.state.executor.submit(_route_card, cfg, res["card_id"])
             return {"step": True, **res}
         item = store.capture(body.content, source=body.source,
                              type_hint=body.type, scope=body.scope,
@@ -302,6 +307,12 @@ def create_app(cfg: Config):
     class SummaryIn(BaseModel):
         summary: str
 
+    class ApproachRef(BaseModel):
+        approach_id: str
+
+    class MoveIn(BaseModel):
+        target: str   # 'guide' | 'unsorted' | <approach id>
+
     @app.get("/threads")
     def threads():
         return {"threads": store.list_threads(), "current": store.current_thread_id()}
@@ -324,13 +335,28 @@ def create_app(cfg: Config):
                           reseed=body.intent is not None)
         return store.thread_view(thread_id)
 
-    @app.post("/threads/{thread_id}/summary")
-    def set_summary(thread_id: str, body: SummaryIn):
-        return {"ok": store.set_thread_summary(thread_id, body.summary)}
+    @app.post("/threads/{thread_id}/approaches")
+    def new_approach(thread_id: str, body: ThreadIn):
+        a = store.new_approach(thread_id, body.title or "New approach")
+        return store.thread_view(thread_id) | {"new_approach_id": a["id"]}
 
-    @app.post("/threads/{thread_id}/resummarize")
-    def resummarize(thread_id: str):
-        return store.thread_view(thread_id) if store.resummarize_thread(thread_id) else {}
+    @app.post("/threads/{thread_id}/current-approach")
+    def set_current_approach(thread_id: str, body: ApproachRef):
+        return {"ok": store.set_current_approach(thread_id, body.approach_id)}
+
+    @app.post("/approaches/{approach_id}/summary")
+    def set_approach_summary(approach_id: str, body: SummaryIn):
+        return {"ok": store.set_approach_summary(approach_id, body.summary)}
+
+    @app.post("/approaches/{approach_id}/resummarize")
+    def resummarize_approach(approach_id: str):
+        store.resummarize_approach(approach_id)
+        return {"ok": True}
+
+    @app.post("/cards/{card_id}/move")
+    def move_card(card_id: str, body: MoveIn):
+        # drag-and-drop correction: target = 'guide' | 'unsorted' | <approach id>
+        return {"ok": store.move_card(card_id, body.target)}
 
     @app.get("/threads/{thread_id}/brief")
     def thread_brief(thread_id: str):

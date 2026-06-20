@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from .models import DOMAINS, ITEM_TYPES, TIERS
+from .models import CARD_KINDS, DOMAINS, ITEM_TYPES, TIERS
 
 _TIER_GUIDE = """- tier: one of core | mid | leaf — the ALTITUDE of the fact (independent of type)
     core = company mission, vision, philosophy, the core problem & overall strategy
@@ -88,6 +88,68 @@ STEPS:
 {steps}"""
 
 
+_ROUTE_PROMPT = """You organize a working thread for someone doing a task. They
+just DUMP things in; your job is to file each one so they never have to. Decide
+where this NEW ITEM belongs.
+
+THE TASK (intent): {intent}
+
+EXISTING APPROACHES (directions already being tried):
+{approaches}
+
+RECENT ITEMS (most recent last), for continuity:
+{recent}
+
+NEW ITEM:
+\"\"\"{item}\"\"\"
+
+Return ONLY minified JSON:
+{{"kind":"reference|prompt|suggestion|result|insight|question|note",
+ "target":"guide|current|new|<existing approach id>",
+ "new_title":"<=6 words, only when target=new",
+ "confidence":0.0-1.0,
+ "reason":"<=10 words"}}
+
+Rules:
+- target "guide": a reference/spec/principle/PRD meant to steer the WHOLE task,
+  not a step inside one direction (e.g. "use these design principles").
+- target "current": continues the direction they're working on now. This is the
+  DEFAULT — prefer it unless there's a clear reason not to.
+- target "<existing approach id>": clearly belongs to one of the approaches listed.
+- target "new": ONLY if it's clearly a DIFFERENT approach/idea than any listed.
+  Be conservative — do not fragment the thread.
+- If you're genuinely unsure where it goes, lower confidence (< 0.45); it will be
+  set aside for the user rather than misfiled.
+- kind: reference=a link/doc/spec; prompt=an instruction given to an AI;
+  suggestion=an idea from an AI or person; result=an outcome/observation;
+  insight=a learning/takeaway; question=an open question; note=anything else."""
+
+
+def _parse_route(text: str, approach_ids: set[str]) -> dict:
+    """Normalize the router's JSON into an actionable decision. Defensive: any
+    garbage degrades to a low-confidence 'note' so a bad model reply never crashes
+    capture (it just lands in Unsorted)."""
+    out = {"kind": "note", "target": "current", "new_title": None,
+           "confidence": 0.3, "reason": ""}
+    try:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        d = json.loads(m.group(0) if m else text)
+    except Exception:
+        return out
+    kind = str(d.get("kind", "note")).lower().strip()
+    out["kind"] = kind if kind in CARD_KINDS else "note"
+    target = str(d.get("target", "current")).strip()
+    if target in ("guide", "current", "new") or target in approach_ids:
+        out["target"] = target
+    out["new_title"] = (str(d.get("new_title", "")).strip() or None) if target == "new" else None
+    try:
+        out["confidence"] = max(0.0, min(1.0, float(d.get("confidence", 0.3))))
+    except (TypeError, ValueError):
+        out["confidence"] = 0.3
+    out["reason"] = str(d.get("reason", ""))[:80]
+    return out
+
+
 @dataclass
 class Enrichment:
     title: str
@@ -137,6 +199,30 @@ class FakeProcessor:
             lines.append("Steps so far:")
             lines.extend(f"- {s[:160]}" for s in recent)
         return "\n".join(lines) if lines else (intent or "")
+
+    def route(self, item: str, *, intent: str = "", approaches=None, recent=None) -> dict:
+        # Offline stand-in so dumping still visibly SORTS without a key. Keyword
+        # heuristics for kind; never auto-branches (too unreliable without a model)
+        # — everything continues the current approach, the user splits by dragging.
+        t = " ".join(item.split()).lower()
+        if re.search(r"https?://|www\.|\.com|\.md\b|\.pdf\b", t):
+            kind = "reference"
+        elif re.search(r"\b(prompt|generate|create an?|write me|make an?|draw)\b", t) and "?" not in t:
+            kind = "prompt"
+        elif "?" in t:
+            kind = "question"
+        elif re.search(r"\b(learned|realized|takeaway|insight|turns out|lesson)\b", t):
+            kind = "insight"
+        elif re.search(r"\b(result|output|came out|too |worked|failed|broke|error)\b", t):
+            kind = "result"
+        elif re.search(r"\b(suggest|idea|maybe|could|recommend)\b", t):
+            kind = "suggestion"
+        else:
+            kind = "note"
+        is_guide = kind == "reference" and bool(
+            re.search(r"\b(principle|prd|spec|guideline|according to|brand|style guide)\b", t))
+        return {"kind": kind, "target": "guide" if is_guide else "current",
+                "new_title": None, "confidence": 0.55, "reason": "offline heuristic"}
 
 
 class AnthropicProcessor:
@@ -198,6 +284,25 @@ class AnthropicProcessor:
         except Exception:
             # never let a summary failure break capture/view — fall back to raw
             return FakeProcessor.summarize(self, intent, steps)
+
+    def route(self, item: str, *, intent: str = "", approaches=None, recent=None) -> dict:
+        """The brain: decide kind + destination (guide / current / an existing
+        approach / a new approach) for a freshly dumped item. This is what makes
+        'dump and it sorts itself' real."""
+        approaches = approaches or []
+        recent = recent or []
+        ap_text = "\n".join(
+            f"- id={a['id']} | {a.get('title','')}: {(a.get('summary') or '').splitlines()[0] if a.get('summary') else ''}"
+            for a in approaches) or "(none yet — this is the first direction)"
+        rec_text = "\n".join(f"- {r.strip()[:200]}" for r in recent[-5:]) or "(none)"
+        try:
+            text = self._call(_ROUTE_PROMPT.format(
+                intent=intent or "(unspecified)", approaches=ap_text,
+                recent=rec_text, item=item[:2000]), 200)
+            return _parse_route(text, {a["id"] for a in approaches})
+        except Exception:
+            return FakeProcessor.route(self, item, intent=intent,
+                                       approaches=approaches, recent=recent)
 
 
 class OpenAICompatProcessor(AnthropicProcessor):

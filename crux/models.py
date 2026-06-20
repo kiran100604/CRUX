@@ -56,6 +56,15 @@ DOMAIN_LABELS = {
 # This is the foundation that scales from solo notes to company document ingestion.
 SOURCE_TYPES = ("note", "file", "paste", "hotkey", "agent")
 
+# A card (a dumped step in a thread) has a KIND — what it IS — decided by the
+# router at dump time, never filed by hand. Kept short on purpose: there's nothing
+# for the user to learn, and "note" is the catch-all when nothing else fits.
+CARD_KINDS = ("reference", "prompt", "suggestion", "result", "insight", "question", "note")
+CARD_KIND_LABELS = {
+    "reference": "Reference", "prompt": "Prompt", "suggestion": "Suggestion",
+    "result": "Result", "insight": "Insight", "question": "Question", "note": "Note",
+}
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -70,6 +79,11 @@ class Episode:
     title: str | None = None       # document title, if any
     added_by: str | None = None    # nullable now; identity for company/multi-user later
     thread_id: str | None = None   # the work thread this capture is a step of (if any)
+    kind: str = "note"             # router-assigned: reference|prompt|insight|… (what it is)
+    approach_id: str | None = None # which approach (direction) it belongs to, if any
+    is_guide: bool = False         # a thread-level reference that governs the whole thread
+    routed: bool = False           # has the router classified it yet? (else "sorting…")
+    route_reason: str | None = None  # short why, for transparency
     created_at: str = field(default_factory=now_iso)
 
     def to_public_dict(self) -> dict:
@@ -78,10 +92,14 @@ class Episode:
     @staticmethod
     def from_row(row) -> "Episode":
         keys = row.keys()
+        g = lambda k, d=None: (row[k] if k in keys else d)
         return Episode(
             id=row["id"], raw_content=row["raw_content"], source_type=row["source_type"],
             source_ref=row["source_ref"], title=row["title"], added_by=row["added_by"],
-            thread_id=(row["thread_id"] if "thread_id" in keys else None),
+            thread_id=g("thread_id"),
+            kind=g("kind") or "note", approach_id=g("approach_id"),
+            is_guide=bool(g("is_guide", 0)), routed=bool(g("routed", 0)),
+            route_reason=g("route_reason"),
             created_at=row["created_at"],
         )
 
