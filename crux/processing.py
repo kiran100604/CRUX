@@ -264,7 +264,9 @@ class AnthropicProcessor:
         import anthropic  # lazy, optional dependency
 
         self.model = model
-        self._client = anthropic.Anthropic(api_key=api_key)
+        # Bounded timeout + no retries: a missing/blocked key must fail fast, never
+        # hang the app (a misconfigured provider once stalled a request for ~80s).
+        self._client = anthropic.Anthropic(api_key=api_key, timeout=20.0, max_retries=0)
 
     def _call(self, prompt: str, max_tokens: int) -> str:
         msg = self._client.messages.create(
@@ -356,7 +358,11 @@ class OpenAICompatProcessor(AnthropicProcessor):
     def __init__(self, model: str, api_key: str | None, base_url: str | None):
         from openai import OpenAI  # lazy, optional
         self.model = model
-        self._client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        # bounded timeout + no retries — fail fast instead of hanging the app
+        kw = {"api_key": api_key, "timeout": 20.0, "max_retries": 0}
+        if base_url:
+            kw["base_url"] = base_url
+        self._client = OpenAI(**kw)
 
     def _call(self, prompt: str, max_tokens: int) -> str:
         msg = self._client.chat.completions.create(

@@ -592,16 +592,12 @@ class Store:
                 if best and best[0] >= self.REFINE_SIM:
                     s, other = best
                     related = dict(other.to_public_dict(), similarity=round(s, 3))
-                    # LLM classifies the edge; offline → similarity heuristic
-                    rel, why = self.processor.classify_relation(it.summary, other.summary)
-                    if rel is None:
-                        rel = "duplicate" if s >= self.DUP_SIM else "extends"
-                    reason = why
-                    relation = {"updates": "update", "extends": "extend",
-                                "duplicate": "duplicate", "unrelated": "new"}.get(rel, "extend")
-                    status = "clean" if relation == "new" else "attention"
-                    if relation == "new":
-                        related = None
+                    # Similarity heuristic only — NO model call here. /review is a hot
+                    # read path the dashboard polls; a synchronous LLM call would block
+                    # it (and hang for a minute if a provider is set but unreachable).
+                    relation = "duplicate" if s >= self.DUP_SIM else "extend"
+                    reason = f"{int(s * 100)}% similar to an existing fact"
+                    status = "attention"
 
             d["status"] = status
             d["fit"] = {"relation": relation, "related": related, "reason": reason}

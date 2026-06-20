@@ -86,7 +86,8 @@ def create_app(cfg: Config):
 
     _t0 = time.time()
     store = Store(cfg)
-    print(f"[crux] Store init (db + embedder + processor): {time.time()-_t0:.2f}s",
+    print(f"[crux] Store init (db + embedder + processor): {time.time()-_t0:.2f}s "
+          f"| processing={cfg.processing_provider} embedding={cfg.embedding_provider}",
           file=sys.stderr, flush=True)
     app = FastAPI(title="CRUX")
     app.state.executor = ThreadPoolExecutor(max_workers=1)  # serial background ingest
