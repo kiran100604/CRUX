@@ -325,6 +325,34 @@ def cmd_connect(args):
         print(f"Saved {url} as {who}, but couldn't reach it — is `crux serve` running there?")
 
 
+def cmd_doctor(args):
+    """Diagnose capture in one shot: environment, the registered hotkey, the
+    clipboard, and the exact command your OS shortcut runs."""
+    import os
+    import shutil
+    from .hotkey import chord_label, gnome_binding
+    cfg = Config.load()
+    chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
+    print(f"platform: {sys.platform}")
+    print(f"chord:    {chord}")
+    if sys.platform == "linux":
+        print(f"desktop:  {os.environ.get('XDG_CURRENT_DESKTOP','?')} · session {os.environ.get('XDG_SESSION_TYPE','?')}")
+        print(f"gsettings: {'yes' if shutil.which('gsettings') else 'NO — not GNOME, bind manually'}")
+        print(f"clipboard tools: wl-paste={'y' if shutil.which('wl-paste') else 'n'} xclip={'y' if shutil.which('xclip') else 'n'}")
+        if shutil.which("gsettings"):
+            import subprocess
+            path = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/crux/"
+            b = subprocess.run(["gsettings", "get", path, "binding"], capture_output=True, text=True).stdout.strip()
+            c = subprocess.run(["gsettings", "get", path, "command"], capture_output=True, text=True).stdout.strip()
+            print(f"registered binding: {b or '(none)'}  → expected {gnome_binding(cfg.hotkey_mods, cfg.hotkey_key)!r}")
+            print(f"registered command: {c or '(none)'}")
+    clip = read_clipboard()
+    print(f"clipboard now: {repr(clip[:60]) if clip else '(empty)'}")
+    print("\nIsolation test → copy some text, then run:  crux capture")
+    print("  • if that captures, the binding is the only issue (re-bind / pick another chord)")
+    print("  • if that fails, it's clipboard/setup (check the tools above)")
+
+
 def cmd_start(args):
     """One command, everywhere: starts the dashboard AND makes the capture hotkey
     work using whatever the OS needs — no modes to think about.
@@ -679,6 +707,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
     sp.set_defaults(func=cmd_start)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
+    sub.add_parser("doctor", help="diagnose why the capture hotkey isn't firing").set_defaults(func=cmd_doctor)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
     sub.add_parser("seed-demo", help="load CRUX's own product knowledge into the KB (cross-platform)").set_defaults(func=cmd_seed_demo)

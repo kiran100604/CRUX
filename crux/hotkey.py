@@ -86,18 +86,26 @@ def bind_gnome(mods, key, command: str) -> tuple[bool, str]:
     def g(*a):
         return subprocess.run(["gsettings", *a], capture_output=True, text=True)
     try:
-        cur = g("get", base, "custom-keybindings").stdout.strip()
+        cur = g("get", base, "custom-keybindings")
+        if cur.returncode != 0:
+            return False, "GNOME keybinding schema not found (not a GNOME desktop?)"
+        s = cur.stdout.strip()
         try:
-            lst = ast.literal_eval(cur) if cur.startswith("[") else []
+            lst = ast.literal_eval(s) if s.startswith("[") else []
         except Exception:
             lst = []
         if path not in lst:
             lst.append(path)
-        g("set", base, "custom-keybindings", str(lst))
         child = f"{base}.custom-keybinding:{path}"
-        g("set", child, "name", "Capture to CRUX")
-        g("set", child, "command", command)
-        g("set", child, "binding", binding)
+        rs = [g("set", base, "custom-keybindings", str(lst)),
+              g("set", child, "name", "Capture to CRUX"),
+              g("set", child, "command", command),
+              g("set", child, "binding", binding)]
+        if any(r.returncode != 0 for r in rs):
+            return False, "gsettings set failed: " + (next(r.stderr for r in rs if r.returncode).strip()[:120])
+        back = g("get", child, "binding").stdout.strip().strip("'")  # verify it stuck
+        if back != binding:
+            return False, f"binding didn't persist (got {back!r})"
         return True, binding
     except Exception as e:  # pragma: no cover
         return False, str(e)
