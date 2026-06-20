@@ -467,6 +467,26 @@ class Store:
                         return results, links
         return results, links
 
+    def ask(self, question: str, history: list | None = None, limit: int = 6) -> dict:
+        """Chat over the knowledge base: retrieve the top verified facts, synthesize
+        a grounded answer that cites them, and return the ranked sources so the user
+        can open any one. Multi-turn via the conversation history."""
+        question = (question or "").strip()
+        if not question:
+            return {"answer": "", "sources": []}
+        results = self.search(question, limit=limit, scope="main")
+        counts = self.db.usage_counts()
+        facts, sources = [], []
+        for i, r in enumerate(results, 1):
+            f = r.item
+            facts.append((i, f.title, f.summary, f.raw_content))
+            sources.append({"n": i, "id": f.id, "title": f.title, "summary": f.summary,
+                            "tier": f.tier, "domain": f.domain, "raw_content": f.raw_content,
+                            "source": f.source, "promoted_at": f.promoted_at,
+                            "usage_count": counts.get(f.id, 0), "score": round(r.score, 3)})
+        answer = self.processor.answer(question, facts, history or [])
+        return {"answer": answer, "sources": sources}
+
     def record_usage(self, item_ids: list[str], query: str, session: str = "",
                      user: str | None = None) -> None:
         """Log that these items were injected into a live agent session — this is

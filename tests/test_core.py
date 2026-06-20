@@ -446,6 +446,19 @@ def test_exclude_card_steers_context(store):
     assert all(c["id"] != drop for c in store.thread_view(t["id"])["cards"])
 
 
+def test_ask_returns_grounded_sources(store):
+    # chat over the KB: retrieve top verified facts + a grounded answer with sources
+    for t, ty in [("Payments are processed through Stripe.", "decision"),
+                  ("All payment errors must be logged to Sentry.", "constraint")]:
+        store.promote(store.capture(t, type_hint=ty).id)
+    r = store.ask("what do we know about payments?")
+    assert r["sources"], "should surface ranked source facts"
+    assert all("id" in s and "n" in s for s in r["sources"])
+    assert r["answer"]  # offline = extractive; with a key = synthesized prose
+    # empty question is handled
+    assert store.ask("")["sources"] == []
+
+
 def test_route_parser_is_defensive():
     # the real-model path's JSON parser — verified without a key
     from crux.processing import _parse_route

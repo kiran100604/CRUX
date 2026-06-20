@@ -284,6 +284,26 @@ def create_app(cfg: Config):
     def related(id: str, limit: int = 6):
         return {"items": store.related(id, limit)}
 
+    class AskIn(BaseModel):
+        question: str
+        history: list[dict] = []
+
+    @app.post("/ask")
+    def ask(body: AskIn):
+        # chat over the knowledge base: grounded answer + ranked cited sources
+        return store.ask(body.question, history=body.history)
+
+    @app.get("/fact/{fid}")
+    def fact(fid: str):
+        # full detail for a surfaced source: raw text, filing, provenance, links
+        it = store.db.get(store.db.resolve_id(fid) or fid)
+        if not it:
+            raise HTTPException(status_code=404, detail="no such fact")
+        d = _enrich([it])[0]
+        d["edges"] = store.relations_of(it.id)
+        d["related"] = store.related(it.id, 6)
+        return d
+
     @app.get("/working")
     def working():
         # this machine's private working memory (the person running the dashboard)

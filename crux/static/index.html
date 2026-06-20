@@ -326,6 +326,53 @@
   .spin{width:18px; height:18px; border:2px solid var(--hair); border-top-color:var(--teal);
     border-radius:50%; animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* KB: ask (chat) primary + browse secondary */
+  .kbhdrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px}
+  .kbtoggle{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--hair); border-radius:var(--pill); padding:3px; flex:none}
+  .kbtog{border:none; background:none; color:var(--muted); font-size:13px; padding:6px 14px; border-radius:var(--pill)}
+  .kbtog.on{background:var(--ink); color:#fff}
+  .askstream{margin:16px 0 12px; min-height:120px}
+  .qrow{display:flex; justify-content:flex-end; margin-bottom:14px}
+  .qbub{background:var(--teal); color:#fff; border-radius:14px 14px 4px 14px; padding:11px 15px; font-size:14.5px; max-width:75%}
+  .arow{margin-bottom:24px}
+  .abub{background:var(--canvas); border:1px solid var(--hair); border-radius:4px 14px 14px 14px; padding:16px 18px;
+    font-size:14.5px; line-height:1.65; color:var(--body); max-width:820px}
+  .cite{font-family:var(--mono); font-size:10px; background:var(--teal-bg); color:var(--teal); border-radius:5px;
+    padding:1px 5px; vertical-align:super; cursor:pointer; margin:0 1px}
+  .cite:hover{background:var(--teal); color:#fff}
+  .askthinking{display:flex; align-items:center; gap:10px; color:var(--muted2); font-size:13px; padding:8px 2px}
+  .srclabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:16px 0 9px}
+  .srcs{display:flex; flex-direction:column; gap:9px}
+  .src{display:flex; gap:12px; background:var(--soft); border:1px solid var(--hair); border-radius:11px; padding:12px 14px; cursor:pointer}
+  .src:hover{border-color:var(--muted2)}
+  .srcn{width:22px; height:22px; border-radius:50%; background:var(--teal-bg); color:var(--teal); font-family:var(--mono); font-size:11px; display:grid; place-items:center; flex:none; margin-top:1px}
+  .srcb{flex:1; min-width:0}
+  .srct{font-size:14px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:8px}
+  .vchip{font-family:var(--mono); font-size:9px; color:var(--green); background:var(--teal-bg); border-radius:var(--pill); padding:2px 7px}
+  .srcs1{font-size:13px; color:var(--muted); margin-top:3px; line-height:1.45}
+  .srcmeta{display:flex; gap:6px; align-items:center; margin-top:7px}
+  .used{font-family:var(--mono); font-size:10px; color:var(--muted2)}
+  .sugg{display:flex; flex-wrap:wrap; gap:8px}
+  .schip{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--pill); padding:8px 14px; font-size:13px; color:var(--ink); cursor:pointer}
+  .schip:hover{border-color:var(--teal-line)}
+  .askbar{display:flex; gap:10px; position:sticky; bottom:0}
+  .askbar input{flex:1; height:50px; border:1px solid var(--hair); background:var(--canvas); border-radius:13px; padding:0 18px; font-size:15px; color:var(--ink); outline:none}
+  .askbar input:focus{border-color:var(--teal)}
+  .askbar .btn{height:50px}
+  .askground{font-size:11px; color:var(--muted2); text-align:center; margin-top:8px}
+  /* fact detail overlay */
+  .fp-overlay{position:fixed; inset:0; background:rgba(20,16,8,.28); display:flex; justify-content:flex-end; z-index:50}
+  .fp-panel{width:480px; max-width:92vw; background:var(--canvas); height:100%; overflow:auto; padding:30px 30px 60px; position:relative; box-shadow:-8px 0 40px rgba(20,16,8,.15)}
+  .fp-x{position:absolute; top:16px; right:18px; background:none; font-size:24px; color:var(--muted2); line-height:1}
+  .fp-x:hover{color:var(--ink)}
+  .fp-title{font-size:22px; font-weight:600; color:var(--ink); margin:10px 0 12px; line-height:1.2}
+  .fp-stmt{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px; font-size:15px; line-height:1.5}
+  .fp-meta{display:flex; gap:6px; align-items:center; margin:12px 0}
+  .fp-raw{background:var(--card); background:#fff; border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--body); white-space:pre-wrap}
+  .edges{display:flex; flex-direction:column; gap:8px}
+  .edge{font-size:13px; color:var(--muted)} .el{font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--muted2); margin-right:8px}
+  .ep{display:inline-block; background:var(--soft); border:1px solid var(--hair); border-radius:var(--pill); padding:4px 10px; font-size:12.5px; color:var(--ink); margin:0 4px 4px 0; cursor:pointer}
+  .ep:hover{border-color:var(--muted2)}
   .kbgroup{margin-bottom:14px}
   .kbglabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:6px 2px 8px}
   .kbglabel span{color:var(--muted)}
@@ -463,7 +510,8 @@ const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["refe
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
   kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
-  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:""};
+  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"",
+  kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}};
 
 async function load(){
   // diagnostic timing: each fetch + total, visible in the browser console (F12)
@@ -743,6 +791,105 @@ function vKB(){
       <div class="empty"><div class="big">Nothing verified yet</div>Promote working notes in Review to build your knowledge base.</div>`);
     return;
   }
+  if(state.kbView==='browse') return vKBBrowse(main);
+  return vKBAsk(main);
+}
+function kbToggle(active){
+  return `<div class="kbtoggle">
+    <button class="kbtog ${active==='ask'?'on':''}" onclick="setKbView('ask')">⌕ Ask</button>
+    <button class="kbtog ${active==='browse'?'on':''}" onclick="setKbView('browse')">≣ Browse all</button></div>`;
+}
+function setKbView(v){ state.kbView=v; render(); }
+window.setKbView=setKbView;
+
+/* ---- Ask: chat over the knowledge base (primary) ---- */
+const KB_SUGGEST=["What are our hard constraints?","What have we decided so far?","What do we know about our users?","What's still undecided?"];
+function vKBAsk(main){
+  const turns=state.ask.history;
+  app(`
+    <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
+    <div class="kbhdrow">
+      <div><h1 class="head display">Ask your knowledge</h1>
+        <p class="sub">Ask anything — CRUX answers from your ${main.length} verified facts and shows its sources.</p></div>
+      ${kbToggle('ask')}
+    </div>
+    <div class="askstream">
+      ${turns.map((t,i)=>askTurn(t,i)).join("")}
+      ${state.ask.loading?`<div class="askthinking"><span class="spin"></span> reading your knowledge…</div>`:''}
+      ${!turns.length?`<div class="srclabel">Try asking</div><div class="sugg">${KB_SUGGEST.map(q=>`<span class="schip" onclick="askSend(${JSON.stringify(q).replace(/"/g,'&quot;')})">${esc(q)}</span>`).join("")}</div>`:''}
+    </div>
+    <div class="askbar">
+      <input id="askq" placeholder="Ask anything about what your team knows…" autocomplete="off" onkeydown="if(event.key==='Enter')askSend()"/>
+      <button class="btn teal" onclick="askSend()">Ask →</button>
+    </div>
+    <div class="askground">Grounded in your verified facts, with sources — if it's not in your knowledge base, CRUX says so.</div>
+    ${state.factPanel?factPanelHTML():''}`);
+  const el=document.getElementById('askq'); if(el && !state.factPanel) el.focus();
+  const sc=document.querySelector('.askstream'); if(sc) sc.scrollTop=sc.scrollHeight;
+}
+function askTurn(t,i){
+  if(t.role==='user') return `<div class="qrow"><div class="qbub">${esc(t.content)}</div></div>`;
+  const srcs=t.sources||[];
+  const byN={}; srcs.forEach(s=>byN[s.n]=s.id);
+  const ans=esc(t.content).replace(/\[(\d+)\]/g,(m,n)=>byN[n]?`<span class="cite" onclick="openFact('${byN[n]}')">${n}</span>`:m);
+  return `<div class="arow"><div class="abub">${ans.replace(/\n/g,'<br>')}
+    ${srcs.length?`<div class="srclabel">Sources</div><div class="srcs">${srcs.map(srcCard).join("")}</div>`:''}</div></div>`;
+}
+function srcCard(s){
+  return `<div class="src" onclick="openFact('${s.id}')">
+    <div class="srcn">${s.n}</div>
+    <div class="srcb"><div class="srct">${esc(s.title)} <span class="vchip">◆ verified</span></div>
+      <div class="srcs1">${esc(s.summary||'')}</div>
+      <div class="srcmeta"><span class="pill">${DOMAIN_LABEL[s.domain||'other']}</span><span class="pill">${TIER_SHORT[s.tier||'leaf']}</span>${s.usage_count?`<span class="used">⚡ ${s.usage_count}×</span>`:''}</div></div></div>`;
+}
+async function askSend(q){
+  const el=document.getElementById('askq');
+  const question=(typeof q==='string'?q:(el&&el.value||'')).trim();
+  if(!question || state.ask.loading) return;
+  if(el) el.value='';
+  state.ask.history.push({role:'user',content:question});
+  state.ask.loading=true; render();
+  const hist=state.ask.history.filter(t=>t.role==='user'||t.role==='assistant')
+    .map(t=>({role:t.role,content:t.content}));
+  try{
+    const r=await post('/ask',{question,history:hist.slice(0,-1)});
+    state.ask.history.push({role:'assistant',content:r.answer||'',sources:r.sources||[]});
+  }catch(e){ state.ask.history.push({role:'assistant',content:'(couldn’t reach CRUX — try again)',sources:[]}); }
+  state.ask.loading=false; render();
+}
+async function openFact(id){
+  state.factPanel=id; render();
+  if(!state.factData[id]){ try{ state.factData[id]=await api(`/fact/${id}`); render(); }catch(e){} }
+}
+function closeFact(){ state.factPanel=null; render(); }
+function factPanelHTML(){
+  const it=state.factData[state.factPanel];
+  const body=it?`
+    <div class="fp-head"><span class="tier teal">◆ VERIFIED · ${esc(it.type||'')}${it.promoted_at?` · ${it.promoted_at.slice(0,10)}`:''}</span></div>
+    <h2 class="fp-title">${esc(it.title||'')}</h2>
+    <div class="fp-stmt">${esc(it.summary||'')}</div>
+    <div class="fp-meta"><span class="pill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="pill">${TIER_SHORT[it.tier||'leaf']}</span>${it.usage_count?`<span class="used">⚡ used ${it.usage_count}×</span>`:''}</div>
+    <div class="pl">Original text${it.source?` · ${esc(it.source)}`:''}</div>
+    <div class="fp-raw">${esc(it.raw_content||it.summary||'')}</div>
+    ${factConns(it)}`
+    :`<div class="booting"><span class="spin"></span> loading…</div>`;
+  return `<div class="fp-overlay" onclick="if(event.target===this)closeFact()">
+    <div class="fp-panel"><button class="fp-x" onclick="closeFact()">×</button>${body}</div></div>`;
+}
+function factConns(it){
+  const e=it.edges||{extends:[],extended_by:[],related:[]};
+  const see=it.related||[];
+  const chip=x=>`<span class="ep" onclick="openFact('${x.id}')">${esc(x.title)}</span>`;
+  const rows=[];
+  if((e.extends||[]).length) rows.push(`<div class="edge"><span class="el">extends →</span>${e.extends.map(chip).join("")}</div>`);
+  if((e.extended_by||[]).length) rows.push(`<div class="edge"><span class="el">extended by ←</span>${e.extended_by.map(chip).join("")}</div>`);
+  if((e.related||[]).length) rows.push(`<div class="edge"><span class="el">related</span>${e.related.map(chip).join("")}</div>`);
+  if(see.length) rows.push(`<div class="edge"><span class="el">see also</span>${see.map(chip).join("")}</div>`);
+  return `<div class="pl">Related knowledge</div>${rows.length?`<div class="edges">${rows.join("")}</div>`:'<div class="muted2" style="font-size:13px">No links yet.</div>'}`;
+}
+window.askSend=askSend; window.openFact=openFact; window.closeFact=closeFact;
+
+function vKBBrowse(main){
   // a lens gathers the relevant slice of the graph; "All" shows everything
   let shown = main;
   if(state.kbLens!=null && state.lensIds){
@@ -753,8 +900,8 @@ function vKB(){
   state.kbSel = sel ? sel.id : null;
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
-    <h1 class="head display">Knowledge explorer</h1>
-    <p class="sub">Everything your team has verified, grouped by what it's about — so related decisions sit together. Filter to find anything, or open a fact to see what it connects to.</p>
+    <div class="kbhdrow"><h1 class="head display">Browse knowledge</h1>${kbToggle('browse')}</div>
+    <p class="sub">Everything your team has verified, grouped by what it's about. Or switch to Ask to query it in plain language.</p>
     <div class="lensbar">
       <button class="lens ${state.kbLens==null?'on':''}" onclick="selectLens(null)">All</button>
       ${state.lenses.map(l=>`<button class="lens ${state.kbLens===l.id?'on':''}" onclick="selectLens(${l.id})" title="${esc(l.intent||'')}">${esc(l.name)}${state.leader?` <span class="lx" onclick="event.stopPropagation();delLens(${l.id})">×</span>`:''}</button>`).join("")}

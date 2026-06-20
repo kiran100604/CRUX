@@ -126,6 +126,15 @@ crux brief               # prints the current thread's context — paste into an
 When a thread wraps, promote its durable learnings into the knowledge base for
 Review; the thread itself stays put.
 
+## Ask your knowledge (Knowledge Base tab)
+The Knowledge Base is **chat-first**: ask a question in plain language and CRUX
+retrieves your top verified facts, synthesizes a **grounded answer with [n]
+citations**, and surfaces the ranked source facts — click any one to see its raw
+text, filing, provenance, and related knowledge. Multi-turn: follow-ups remember
+the conversation. A **Browse all** mode (by topic/level/tag + collections) is the
+secondary way to wander. Synthesis needs an API key; offline it returns the ranked
+facts with an extractive summary.
+
 ## Dashboard
 ```bash
 pip install -e ".[server]"

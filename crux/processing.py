@@ -172,6 +172,23 @@ Rewrite the CONTEXT now:
 - Tight and concrete. No preamble, no headings like "Context:", just the text."""
 
 
+_ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
+ONLY the numbered FACTS below — they are the team's verified knowledge. Cite the
+facts you rely on inline as [n]. If the facts don't cover the question, say so
+plainly ("I don't have anything verified on that") — never invent. Be concise and
+direct; synthesize across facts rather than listing them.
+
+CONVERSATION SO FAR:
+{history}
+
+FACTS:
+{facts}
+
+QUESTION: {question}
+
+Answer (grounded in the facts, with [n] citations):"""
+
+
 @dataclass
 class Enrichment:
     title: str
@@ -245,6 +262,16 @@ class FakeProcessor:
             re.search(r"\b(principle|prd|spec|guideline|according to|brand|style guide)\b", t))
         return {"kind": kind, "target": "guide" if is_guide else "current",
                 "new_title": None, "confidence": 0.55, "reason": "offline heuristic"}
+
+    def answer(self, question: str, facts: list, history: list | None = None) -> str:
+        # Offline: no model to synthesize prose, so return an honest extractive
+        # answer — the top related facts, cited. Goes to real synthesis with a key.
+        if not facts:
+            return "I don't have anything verified about that yet. Try Browse, or capture it first."
+        lines = ["From your verified knowledge:"]
+        for n, title, summary, _raw in facts:
+            lines.append(f"[{n}] {summary or title}")
+        return "\n".join(lines)
 
     def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
         # Offline: no model to synthesize a vision, so present an honest working
@@ -350,6 +377,22 @@ class AnthropicProcessor:
                 items=joined), 600).strip()
         except Exception:
             return FakeProcessor.refine_context(self, intent, items, prior)
+
+    def answer(self, question: str, facts: list, history: list | None = None) -> str:
+        """Grounded Q&A over the knowledge base: synthesize an answer from the
+        numbered facts, citing [n]. Multi-turn aware via the conversation history."""
+        if not facts:
+            return "I don't have anything verified about that yet."
+        fact_text = "\n".join(
+            f"[{n}] {title}: {summary}\n    {(' '.join((raw or '').split()))[:300]}"
+            for n, title, summary, raw in facts)
+        hist = "\n".join(f"{'User' if m.get('role')=='user' else 'CRUX'}: {m.get('content','')}"
+                         for m in (history or [])[-6:]) or "(start of conversation)"
+        try:
+            return self._call(_ANSWER_PROMPT.format(
+                history=hist, facts=fact_text, question=question[:1000]), 700).strip()
+        except Exception:
+            return FakeProcessor.answer(self, question, facts, history)
 
 
 class OpenAICompatProcessor(AnthropicProcessor):
