@@ -362,21 +362,30 @@ def cmd_start(args):
     """
     cfg = Config.load()
     if sys.platform == "linux":
+        import os
         import threading
         import webbrowser
         from .hotkey import bind_gnome, chord_label
         from .server import run as serve_run
         chord = chord_label(cfg.hotkey_mods, cfg.hotkey_key)
-        ok, info = bind_gnome(cfg.hotkey_mods, cfg.hotkey_key,
-                              f"{sys.executable} -m crux.cli capture")
+        cmd = f"{sys.executable} -m crux.cli capture"
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "")
         base = f"http://{cfg.host}:{cfg.port}"
         url = base if cfg.is_configured() else base + "/setup"
         print(f"CRUX is running at {base}")
+        ok = False
+        if "GNOME" in desktop.upper():
+            ok, info = bind_gnome(cfg.hotkey_mods, cfg.hotkey_key, cmd)
         if ok:
-            print(f"Capture: copy text (Ctrl+C), then press {chord}.")
+            print(f"✓ Hotkey ready. Capture: copy text (Ctrl+C), then press {chord}.")
         else:
-            print(f"Capture hotkey couldn't auto-register ({info}). "
-                  f"Bind '{sys.executable} -m crux.cli capture' to {chord} in your OS settings.")
+            why = f"your desktop ({desktop or 'unknown'}) manages its own shortcuts" \
+                  if "GNOME" not in desktop.upper() else f"auto-bind failed ({info})"
+            print(f"⚠ One-time setup — {why}, so bind the hotkey yourself:")
+            print(f"    Settings → Keyboard → Custom Shortcuts → +")
+            print(f"      Command:  {cmd}")
+            print(f"      Shortcut: {chord}")
+            print(f"  Then: copy text (Ctrl+C) → press {chord}. (Capture itself already works: `crux capture`.)")
         if not args.no_open:
             threading.Timer(1.2, lambda: webbrowser.open(url)).start()
         serve_run(cfg)
