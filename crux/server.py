@@ -108,6 +108,7 @@ def create_app(cfg: Config):
         content: str
         type: str | None = None
         source: str | None = None
+        source_ref: str | None = None  # provenance label (which tool/agent it came from)
         scope: str = "individual"
         user: str | None = None
         proposed: bool = True   # True → leader's Review; False → private working memory
@@ -238,6 +239,7 @@ def create_app(cfg: Config):
         # step on the current thread — kept as narrative, not atomized into facts.
         if body.as_step or body.thread_id:
             res = store.add_step(body.content, source=body.source or "note",
+                                 source_ref=body.source_ref,
                                  thread_id=body.thread_id)
             # route (classify + file) off the request path so capture stays instant;
             # the card shows as "sorting…" until it lands on the next poll

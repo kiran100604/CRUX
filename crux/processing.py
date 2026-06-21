@@ -104,7 +104,7 @@ NEW ITEM:
 \"\"\"{item}\"\"\"
 
 Return ONLY minified JSON:
-{{"kind":"reference|prompt|suggestion|result|insight|question|note",
+{{"kind":"decision|requirement|constraint|insight|question|reference|prompt|suggestion|result|note",
  "target":"guide|current|new|<existing approach id>",
  "new_title":"<=6 words, only when target=new",
  "confidence":0.0-1.0,
@@ -120,9 +120,13 @@ Rules:
   Be conservative — do not fragment the thread.
 - If you're genuinely unsure where it goes, lower confidence (< 0.45); it will be
   set aside for the user rather than misfiled.
-- kind: reference=a link/doc/spec; prompt=an instruction given to an AI;
-  suggestion=an idea from an AI or person; result=an outcome/observation;
-  insight=a learning/takeaway; question=an open question; note=anything else."""
+- kind — prefer a SIGNAL when one fits (these drive the working memory):
+  decision=a choice made or direction settled (incl. what was ruled out);
+  requirement=something that must be true/done; constraint=a limit/rule to respect;
+  insight=a conclusion or learning reached; question=an open/unresolved question.
+  Otherwise supporting material: reference=a link/doc/spec; prompt=an instruction
+  given to an AI; suggestion=an idea not yet acted on; result=an outcome/observation;
+  note=anything else."""
 
 
 def _parse_route(text: str, approach_ids: set[str]) -> dict:
@@ -249,13 +253,19 @@ class FakeProcessor:
         # heuristics for kind; never auto-branches (too unreliable without a model)
         # — everything continues the current approach, the user splits by dragging.
         t = " ".join(item.split()).lower()
-        if re.search(r"https?://|www\.|\.com|\.md\b|\.pdf\b", t):
-            kind = "reference"
-        elif re.search(r"\b(prompt|generate|create an?|write me|make an?|draw)\b", t) and "?" not in t:
-            kind = "prompt"
-        elif "?" in t:
+        if "?" in t and not re.search(r"https?://", t):
             kind = "question"
-        elif re.search(r"\b(learned|realized|takeaway|insight|turns out|lesson)\b", t):
+        elif re.search(r"\b(decided|going with|let'?s go with|we'?ll use|chose|settled on|drop(ping)?|instead of|no longer|won'?t)\b", t):
+            kind = "decision"
+        elif re.search(r"\b(must|should|needs? to|has to|require[ds]?|shall)\b", t):
+            kind = "requirement"
+        elif re.search(r"\b(can'?t|cannot|limit(ed|ation)?|only|at most|budget|deadline|max |within )\b", t):
+            kind = "constraint"
+        elif re.search(r"https?://|www\.|\.com|\.md\b|\.pdf\b", t):
+            kind = "reference"
+        elif re.search(r"\b(prompt|generate|create an?|write me|make an?|draw)\b", t):
+            kind = "prompt"
+        elif re.search(r"\b(learned|realized|takeaway|insight|turns out|lesson|conclude)\b", t):
             kind = "insight"
         elif re.search(r"\b(result|output|came out|too |worked|failed|broke|error)\b", t):
             kind = "result"

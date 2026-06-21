@@ -321,6 +321,7 @@
   .dctop{display:flex; align-items:center; gap:8px; margin-bottom:6px}
   .dctop .iwhen{margin-left:auto}
   .exctag{font-family:var(--mono); font-size:9px; text-transform:uppercase; color:var(--muted2); border:1px solid var(--hair); border-radius:var(--pill); padding:2px 7px}
+  .dcsrc{font-family:var(--mono); font-size:9px; color:var(--muted2); background:var(--soft); border-radius:var(--pill); padding:2px 7px}
   .dctext{font-size:13.5px; color:var(--body); line-height:1.5; word-break:break-word; white-space:pre-wrap}
   .dctext:not(.full){display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
   .more-link{display:inline-block; margin-top:6px; color:var(--teal); font-size:12px; cursor:pointer}
@@ -330,6 +331,10 @@
   .k-reference{background:var(--teal-bg); color:var(--teal)} .k-prompt{background:#eae3f5; color:#5b3fa0}
   .k-suggestion{background:var(--peach-bg); color:var(--peach)} .k-result{background:#e6efe0; color:#3d6b2a}
   .k-insight{background:#fbf0d0; color:#8a6a17} .k-question{background:var(--coral-bg); color:var(--coral)}
+  /* signals — the high-value entries that drive working memory */
+  .k-decision{background:#e3eefb; color:#1f5fb0; font-weight:700}
+  .k-requirement{background:#e6efe0; color:#3d6b2a; font-weight:700}
+  .k-constraint{background:var(--coral-bg); color:var(--coral); font-weight:700}
   .bgwrap{margin-top:20px} .bgwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
   .bgwrap .bgbox{margin-top:10px}
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
@@ -641,7 +646,7 @@ function unsortedRow(e){
     <span class="iwhen mono">${rel(e.created_at)}</span>
   </div></div>`;
 }
-const CARD_KIND_LABELS={reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",insight:"Insight",question:"Question",note:"Note"};
+const CARD_KIND_LABELS={decision:"Decision",requirement:"Requirement",constraint:"Constraint",insight:"Conclusion",question:"Open question",reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",note:"Note"};
 function vThread(t){
   const active=t.status==='active';
   const owned=t.context_owned;
@@ -698,12 +703,14 @@ function dumpCard(c){
   const open=!!state.expanded['dc-'+c.id];
   const full=(c.raw_content||'');
   const text=open?full:full.slice(0,200);
+  const src=c.source_ref||((c.source_type&&c.source_type!=='note'&&c.source_type!=='paste')?c.source_type:'');
   return `<div class="dumpcard ${c.included?'':'excluded'} ${sorting?'sorting':''}">
     <div class="dcside">
       <button class="incl ${c.included?'on':''}" title="${c.included?'In context — click to exclude':'Excluded — click to include'}" onclick="toggleInclude('${c.id}',${c.included?0:1})">${c.included?'✓':'○'}</button>
     </div>
     <div class="dcmain" onclick="toggleCard('${c.id}')">
       <div class="dctop"><span class="kind k-${esc(c.kind)}">${label}</span>
+        ${src?`<span class="dcsrc" title="Where this came from">via ${esc(src)}</span>`:''}
         ${c.included?'':'<span class="exctag">not in context</span>'}
         <span class="iwhen mono">${rel(c.created_at)}</span></div>
       <div class="dctext ${open?'full':''}">${esc(text)}${(!open&&full.length>200)?'…':''}</div>

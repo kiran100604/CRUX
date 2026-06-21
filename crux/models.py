@@ -59,10 +59,22 @@ SOURCE_TYPES = ("note", "file", "paste", "hotkey", "agent")
 # A card (a dumped step in a thread) has a KIND — what it IS — decided by the
 # router at dump time, never filed by hand. Kept short on purpose: there's nothing
 # for the user to learn, and "note" is the catch-all when nothing else fits.
-CARD_KINDS = ("reference", "prompt", "suggestion", "result", "insight", "question", "note")
+#
+# The first group are SIGNALS — the high-value entries that drive working memory
+# (decisions/requirements/constraints/conclusions/open questions). The rest are
+# supporting material. The router classifies every dump, from any source.
+CARD_KINDS = (
+    "decision", "requirement", "constraint", "insight", "question",  # signals
+    "reference", "prompt", "suggestion", "result", "note",           # supporting
+)
+# Signals carry the durable "what's decided / what matters" — weighted highest when
+# synthesizing working memory and when promoting learnings to the knowledge base.
+SIGNAL_KINDS = frozenset({"decision", "requirement", "constraint", "insight", "question"})
 CARD_KIND_LABELS = {
+    "decision": "Decision", "requirement": "Requirement", "constraint": "Constraint",
+    "insight": "Conclusion", "question": "Open question",
     "reference": "Reference", "prompt": "Prompt", "suggestion": "Suggestion",
-    "result": "Result", "insight": "Insight", "question": "Question", "note": "Note",
+    "result": "Result", "note": "Note",
 }
 
 

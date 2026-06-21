@@ -15,7 +15,7 @@ from .chunk import chunk
 from .config import Config
 from .db import Database
 from .embeddings import get_embedding_provider
-from .models import ContextItem, Episode, now_iso
+from .models import CARD_KIND_LABELS, ContextItem, Episode, now_iso
 from .processing import Enrichment, get_processor
 from .retrieval import Result, search
 
@@ -264,9 +264,13 @@ class Store:
         return self.db.get_thread(t["id"])
 
     def add_step(self, content: str, *, source: str = "note",
+                 source_ref: str | None = None,
                  thread_id: str | None = None, route: bool = False) -> dict:
         """Dump a card. Lands on the given thread (or the current one); with no
         thread it's a global unsorted capture. Kept raw — never atomized into facts.
+        `source` is the channel (note/hotkey/agent/…); `source_ref` is the
+        provenance label (which tool/agent it came from), shown on the card and
+        used to attribute decisions in working memory.
         It arrives UNCLASSIFIED ('sorting…'); route_card tags its kind and marks the
         context stale. route=True classifies inline (CLI/offline); the server does
         it in the background so capture stays instant."""
@@ -279,7 +283,7 @@ class Store:
             thread_id = None
         ep = self.db.insert_episode(Episode(
             id=str(uuid.uuid4()), raw_content=content, source_type=source,
-            source_ref=None, thread_id=thread_id, routed=False, included=True))
+            source_ref=(source_ref or None), thread_id=thread_id, routed=False, included=True))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
             if route:
@@ -307,6 +311,20 @@ class Store:
         if t and not t["summary_owned"]:
             self.db.update_thread(thread_id, {"summary_stale": 1}, now_iso())
 
+    @staticmethod
+    def _labelled_item(c: Episode) -> str:
+        """Prefix a card with its kind and provenance so the synthesis can weight
+        signals and attribute decisions to the agent/tool they came from."""
+        tags = []
+        if c.routed and c.kind:
+            tags.append(CARD_KIND_LABELS.get(c.kind, c.kind).lower())
+        if c.source_ref:
+            tags.append(f"via {c.source_ref}")
+        elif c.source_type and c.source_type not in ("note", "paste"):
+            tags.append(f"via {c.source_type}")
+        prefix = f"[{' · '.join(tags)}] " if tags else ""
+        return f"{prefix}{c.raw_content}"
+
     def ensure_context(self, thread_id: str) -> dict | None:
         """Lazily re-refine the living context from the cards still in scope, when
         it's gone stale and the user hasn't taken the pen. Work happens on view so
@@ -315,7 +333,8 @@ class Store:
         if not t:
             return None
         if not t["summary_owned"] and (t["summary_stale"] or not t["summary"]):
-            items = [c.raw_content for c in self.db.thread_steps(thread_id) if c.included]
+            items = [self._labelled_item(c) for c in self.db.thread_steps(thread_id)
+                     if c.included]
             if items:
                 ctx = self.processor.refine_context(t["intent"] or "", items, t["summary"] or "")
                 self.db.update_thread(thread_id, {"summary": ctx, "summary_stale": 0}, now_iso())
