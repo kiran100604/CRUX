@@ -48,9 +48,9 @@ def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
     else:
         print("   · skipped — running on offline models\n")
 
-    # 2. Claude Code hook (global = works in every project automatically)
-    print("2) Auto-inject context into Claude Code on every prompt.")
-    if install_hook if non_interactive else _ask("   Install the hook globally (recommended)?"):
+    # 2. Claude Code hooks (global = works in every project automatically)
+    print("2) Auto resume, inject context, and capture work in Claude Code.")
+    if install_hook if non_interactive else _ask("   Install the hooks globally (recommended)?"):
         status = install_claude_hook(claude_settings_path(globally=True))
         print("   ✓ " + ("already installed" if status == "already-installed"
                           else "installed in ~/.claude/settings.json") + "\n")

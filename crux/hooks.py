@@ -108,15 +108,109 @@ def hook_inject() -> int:
         return 0
 
 
-def hook_capture() -> int:
-    """Stop hook stub — reads transcript_path and (later) stages candidate facts.
+def _emit_start(ctx: str) -> None:
+    if ctx:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "SessionStart", "additionalContext": ctx}}))
+    else:
+        print("{}")
 
-    Ships as a no-op in v1: we earn trust on inject first, then turn on capture so
-    an over-eager extractor can't pollute the store before retrieval is trusted.
+
+def hook_session_start() -> int:
+    """SessionStart hook. Injects the active project's resume brief — intent,
+    working memory, open questions, and the KB knowledge relevant to where things
+    stand — so the agent picks up exactly where you left off, with zero input.
+    Crash-safe: any error prints {} and exits 0 so it can never break startup."""
+    try:
+        cfg = Config.load()
+        if cfg.server:
+            # team mode: per-prompt injection still runs; skip the start brief here
+            print("{}")
+            return 0
+        store = Store(cfg)
+        tid = store.current_thread_id()
+        ctx = store.assemble_context(tid)["brief"] if tid else ""
+        store.close()
+        _emit_start(ctx)
+        return 0
+    except Exception:
+        print("{}")
+        return 0
+
+
+def _last_assistant_text(path: str) -> tuple[str, str]:
+    """The text of the agent's most recent response in a Claude Code transcript
+    (JSONL), plus its uuid for dedupe. Tool-use blocks are ignored — we want the
+    prose where the agent states what it decided/did."""
+    last_text, last_uuid = "", ""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                if ev.get("type") != "assistant":
+                    continue
+                content = (ev.get("message") or {}).get("content")
+                parts = []
+                if isinstance(content, list):
+                    parts = [b.get("text", "") for b in content
+                             if isinstance(b, dict) and b.get("type") == "text"]
+                elif isinstance(content, str):
+                    parts = [content]
+                txt = " ".join(p for p in parts if p).strip()
+                if txt:
+                    last_text = txt
+                    last_uuid = ev.get("uuid") or ev.get("requestId") or ""
+    except OSError:
+        return "", ""
+    return last_text, last_uuid
+
+
+def hook_capture() -> int:
+    """Stop hook — the automatic capture path. Reads the turn's transcript, pulls
+    the decisions/requirements/results/open-questions out of the agent's last
+    response, and files them into the ACTIVE project's working memory, tagged
+    'via claude-code'. No input required.
+
+    Safe by contract: runs only when a project is active (so it can't pollute a
+    stray store), dedupes per session so the same turn isn't captured twice, and on
+    ANY error prints {} and exits 0 so it can never break a turn.
     """
     try:
-        json.loads(sys.stdin.read() or "{}")
+        payload = json.loads(sys.stdin.read() or "{}")
+        tpath = payload.get("transcript_path")
+        session = payload.get("session_id", "")
+        if not tpath:
+            print("{}")
+            return 0
+        cfg = Config.load()
+        if cfg.server:
+            print("{}")           # team-mode capture flows through /hook elsewhere
+            return 0
+        store = Store(cfg)
+        tid = store.current_thread_id()
+        if not tid:
+            store.close()
+            print("{}")
+            return 0
+        text, uuid = _last_assistant_text(tpath)
+        seen_key = f"capture_seen:{session}"
+        if not text or store.db.get_meta(seen_key) == (uuid or text[:60]):
+            store.close()
+            print("{}")
+            return 0
+        store.ingest_working(text, thread_id=tid, source="agent",
+                             source_ref="claude-code", split=True)
+        store.db.set_meta(seen_key, uuid or text[:60])
+        store.close()
+        print("{}")
+        return 0
     except Exception:
-        pass
-    print("{}")
-    return 0
+        # Never break the user's turn because of CRUX.
+        print("{}")
+        return 0

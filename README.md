@@ -16,9 +16,12 @@ stop re-explaining context and agents stop contradicting decisions you already m
   (what you're currently doing — transient, fades). You **promote** the true,
   durable bits into the **main graph**, which agents prioritize. Only verified
   things enter trusted context.
-- **Injection is hook-first, not tool-first.** A Claude Code `UserPromptSubmit`
-  hook retrieves and injects context on *every* prompt — the model never has to
-  remember to call a tool. (MCP tools remain as a fallback.)
+- **Ambient by default — zero extra steps.** CRUX rides Claude Code's hooks:
+  it injects your resume brief at **SessionStart**, the relevant context on every
+  **UserPromptSubmit**, and quietly captures the turn's decisions/results into
+  working memory at **Stop**. You just code; it captures and injects itself. Open
+  the dashboard only when you want to review or curate. (MCP tools are the
+  fallback for agents without hooks.)
 - **Hybrid retrieval (vector + keyword, fused with RRF)**, not vector-only — so it
   surfaces the *decision* and the *constraint*, not abandoned exploratory notes.
 - **Supersession, never delete.** Newer decisions demote older contradictory ones
@@ -85,12 +88,20 @@ export CRUX_PROCESSING_PROVIDER=anthropic ANTHROPIC_API_KEY=...   # Haiku enrich
 export CRUX_EMBEDDING_PROVIDER=openai     OPENAI_API_KEY=...      # real embeddings
 ```
 
-## Automatic injection into Claude Code
+## Automatic capture + injection in Claude Code
 ```bash
-crux install-hook        # explicit; prints exactly what it writes to .claude/settings.json
+crux install-hook        # explicit; prints exactly the 3 hooks it writes to .claude/settings.json
 ```
-From then on, every prompt in that project gets a `[CRUX CONTEXT]` block injected
-automatically. Remove it any time by editing `.claude/settings.json`.
+This installs three hooks so CRUX works with **zero extra steps**:
+- **SessionStart** → injects your resume brief (intent + working memory + open
+  questions + relevant KB) so you pick up where you left off.
+- **UserPromptSubmit** → injects a `[CRUX CONTEXT]` block relevant to each prompt.
+- **Stop** → captures the turn's decisions/requirements/results into the active
+  project's working memory, tagged `via claude-code` (only when a project is
+  active, so it never pollutes; deduped per session).
+
+Nothing is silent — the install prints every block, and you can remove any of them
+by editing `.claude/settings.json`.
 
 ## MCP (fallback / other agents)
 ```bash

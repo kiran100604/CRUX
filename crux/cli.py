@@ -237,23 +237,29 @@ def cmd_hook_capture(args):
     raise SystemExit(hook_capture())
 
 
+def cmd_hook_session_start(args):
+    from .hooks import hook_session_start
+    raise SystemExit(hook_session_start())
+
+
 def cmd_install_hook(args):
     """Explicit, transparent hook install — prints exactly what it writes."""
-    from .install import HOOK_BLOCK, claude_settings_path, hook_present, install_claude_hook
+    from .install import blocks_preview, claude_settings_path, install_claude_hooks
     settings = Path(args.settings).expanduser() if args.settings \
         else claude_settings_path(globally=args.globally)
-    data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
-    if hook_present(data):
-        print("hook already installed in", settings)
-        return
     scope = "every Claude Code project" if args.globally else "this project"
-    print(f"Will add this UserPromptSubmit hook to {settings} ({scope}):\n")
-    print(json.dumps(HOOK_BLOCK, indent=2))
+    print(f"Will add CRUX's Claude Code hooks to {settings} ({scope}):\n")
+    print("  • SessionStart    → resume where you left off")
+    print("  • UserPromptSubmit → inject relevant context on every prompt")
+    print("  • Stop            → capture decisions/results into working memory\n")
+    print(json.dumps(blocks_preview(), indent=2))
     if not args.yes and input("\nProceed? [y/N] ").strip().lower() != "y":
         print("aborted")
         return
-    install_claude_hook(settings)
-    print(f"✓ installed. CRUX now injects context on every prompt in {scope}.")
+    res = install_claude_hooks(settings)
+    print("✓ " + ", ".join(f"{k}: {v}" for k, v in res.items()))
+    print(f"CRUX now captures and injects automatically in {scope} — "
+          "open the dashboard only when you want to.")
 
 
 def cmd_setup(args):
@@ -727,7 +733,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="admin token → validate the KB remotely (else member: propose & use)")
     cn.set_defaults(func=cmd_connect)
 
-    ih = sub.add_parser("install-hook", help="install the UserPromptSubmit hook")
+    ih = sub.add_parser("install-hook", help="install CRUX's Claude Code hooks (resume + inject + capture)")
     ih.add_argument("--global", dest="globally", action="store_true",
                     help="install for every Claude Code project (~/.claude/settings.json)")
     ih.add_argument("--settings", default=None, help="explicit settings.json path")
@@ -740,6 +746,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("hook-inject").set_defaults(func=cmd_hook_inject)
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)
+    sub.add_parser("hook-session-start").set_defaults(func=cmd_hook_session_start)
     sp = sub.add_parser("start", help="START HERE — dashboard + capture hotkey, works on every OS")
     sp.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
     sp.set_defaults(func=cmd_start)

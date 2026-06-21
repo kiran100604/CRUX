@@ -664,3 +664,83 @@ def test_assemble_endpoint(tmp_path, monkeypatch):
     assert "[CURRENT TASK]" in r["brief"]
     assert r["intent"] == "Build an API"
     assert c.post("/threads/does-not-exist/assemble", json={}).status_code == 404
+
+
+def test_hook_session_start_injects_resume(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "t.db"))
+    from crux import hooks
+    from crux.config import Config
+    from crux.store import Store
+    s = Store(Config.load())
+    t = s.create_thread("Site", "Build a marketing site")
+    s.add_step("We decided on a one-page layout.", thread_id=t["id"], route=True)
+    s.set_current_thread(t["id"])
+    s.close()
+    assert hooks.hook_session_start() == 0
+    out = json.loads(capsys.readouterr().out.strip())
+    assert out["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    ctx = out["hookSpecificOutput"]["additionalContext"]
+    assert "Build a marketing site" in ctx and "one-page layout" in ctx
+
+
+def test_hook_capture_files_turn_into_working_memory(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "t.db"))
+    from crux import hooks
+    from crux.config import Config
+    from crux.store import Store
+    s = Store(Config.load())
+    t = s.create_thread("API", "Build an API")
+    s.set_current_thread(t["id"])
+    s.close()
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(
+        json.dumps({"type": "user", "uuid": "u1",
+                    "message": {"role": "user", "content": "build it"}}) + "\n" +
+        json.dumps({"type": "assistant", "uuid": "a1", "message": {"role": "assistant",
+                    "content": [{"type": "text",
+                                 "text": "We decided to use FastAPI. The API must respond under 200ms."}]}}) + "\n",
+        encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", _FakeStdin(json.dumps(
+        {"session_id": "sess1", "transcript_path": str(transcript)})))
+    assert hooks.hook_capture() == 0
+    assert capsys.readouterr().out.strip() == "{}"
+    s2 = Store(Config.load())
+    cards = s2.db.thread_steps(t["id"])
+    kinds = {c.kind for c in cards}
+    assert {"decision", "requirement"} <= kinds
+    assert all(c.source_ref == "claude-code" for c in cards)
+    # a second Stop on the unchanged transcript dedupes — no new cards
+    monkeypatch.setattr("sys.stdin", _FakeStdin(json.dumps(
+        {"session_id": "sess1", "transcript_path": str(transcript)})))
+    hooks.hook_capture()
+    assert len(s2.db.thread_steps(t["id"])) == len(cards)
+    s2.close()
+
+
+def test_hook_capture_noop_without_active_project(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "t.db"))
+    from crux import hooks
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(json.dumps({"type": "assistant", "uuid": "a1",
+        "message": {"role": "assistant", "content": [{"type": "text",
+        "text": "We decided to ship."}]}}) + "\n", encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", _FakeStdin(json.dumps(
+        {"session_id": "s", "transcript_path": str(transcript)})))
+    assert hooks.hook_capture() == 0
+    assert capsys.readouterr().out.strip() == "{}"
+
+
+def test_install_writes_all_three_hooks(tmp_path):
+    from crux.install import install_claude_hooks
+    settings = tmp_path / "settings.json"
+    assert install_claude_hooks(settings) == {
+        "SessionStart": "installed", "UserPromptSubmit": "installed", "Stop": "installed"}
+    data = json.loads(settings.read_text())
+    assert "crux hook-session-start" in json.dumps(data["hooks"]["SessionStart"])
+    assert "crux hook-capture" in json.dumps(data["hooks"]["Stop"])
+    assert install_claude_hooks(settings) == {  # idempotent
+        "SessionStart": "already-installed", "UserPromptSubmit": "already-installed",
+        "Stop": "already-installed"}
