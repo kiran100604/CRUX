@@ -412,8 +412,20 @@ def create_app(cfg: Config):
         return {"ok": store.delete_card(card_id)}
 
     @app.get("/threads/{thread_id}/brief")
-    def thread_brief(thread_id: str):
-        return {"brief": store.thread_brief(thread_id)}
+    def thread_brief(thread_id: str, q: str | None = None):
+        return {"brief": store.thread_brief(thread_id, query=q)}
+
+    class AssembleIn(BaseModel):
+        query: str | None = None   # the agent's immediate task, to focus retrieval
+        kb_limit: int = 6
+
+    @app.post("/threads/{thread_id}/assemble")
+    def assemble_context(thread_id: str, body: AssembleIn):
+        # Flow B: state-aware injection — what does the agent need RIGHT NOW?
+        pkg = store.assemble_context(thread_id, query=body.query, kb_limit=body.kb_limit)
+        if not pkg["brief"] and not store.db.get_thread(thread_id):
+            raise HTTPException(status_code=404, detail="no such thread")
+        return pkg
 
     @app.post("/threads/{thread_id}/current")
     def make_current(thread_id: str):

@@ -531,27 +531,67 @@ class Store:
         self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
         return self.ensure_context(thread_id)
 
-    def thread_brief(self, thread_id: str) -> str:
-        """The portable context, as three distinct sections: the stable INTENT
-        (the goal), the WORKING MEMORY (decisions/state/learnings), and the seeded
-        KB background (agents can pull more). Paste into any tool, no re-explaining."""
+    def assemble_context(self, thread_id: str, *, query: str | None = None,
+                         kb_limit: int = 6, record: bool = True) -> dict:
+        """Flow B — the state-aware injection. Given where the work stands RIGHT NOW
+        (intent + working memory + recent signals + open questions) and, optionally,
+        the agent's immediate task (`query`), pull the KB knowledge relevant to this
+        moment and assemble a focused, paste-ready package. Unlike the seeded
+        background (fixed at thread creation), the KB section is retrieved fresh
+        against the current state, so it tracks the work as it moves."""
         t = self.ensure_context(thread_id)
         if not t:
-            return ""
-        parts = []
+            return {"brief": "", "intent": "", "working_memory": "",
+                    "open_questions": [], "recent": [], "kb": []}
         intent = (t.get("intent") or "").strip()
         memory = (t.get("summary") or "").strip()
+        steps = [c for c in self.db.thread_steps(thread_id) if c.included]
+        questions = [c.raw_content for c in steps if c.kind == "question"][-6:]
+        recent = [self._labelled_item(c) for c in steps
+                  if c.kind in ("decision", "requirement", "constraint", "insight")][-5:]
+
+        # Retrieval query = the immediate task (if any) weighted up front, then the
+        # current state — so the KB tracks the moment, not the stale initial intent.
+        q_parts = []
+        if query and query.strip():
+            q_parts.append(query.strip())
+        q_parts += [p for p in (intent, memory, " ".join(questions)) if p]
+        retr_q = "\n".join(q_parts)[:1500]
+
+        results, links, kb_text, kb = [], [], "", []
+        if retr_q:
+            results, links = self.retrieve(retr_q, limit=kb_limit, scope="main")
+            if results:
+                from .hooks import _format  # lazy: hooks pulls nothing heavy
+                kb_text = _format(results, links)
+                kb = [{"id": r.item.id, "title": r.item.title,
+                       "summary": r.item.summary, "type": r.item.type,
+                       "score": round(r.score, 3)} for r in results]
+                if record:
+                    ids = [r.item.id for r in results] + [it.id for _, it in links]
+                    self.record_usage(ids, retr_q, session=thread_id)
+
+        parts = []
+        if query and query.strip():
+            parts.append("[CURRENT TASK]\n" + query.strip())
         if intent:
             parts.append("[INTENT — the goal]\n" + intent)
         if memory:
             parts.append("[WORKING MEMORY — decisions, state & learnings]\n" + memory)
-        questions = [c.raw_content for c in self.db.thread_steps(thread_id)
-                     if c.included and c.kind == "question"][-6:]
         if questions:
             parts.append("[OPEN QUESTIONS]\n" + "\n".join(f"- {q}" for q in questions))
-        if t.get("background"):
+        if kb_text:
+            parts.append(kb_text)
+        elif t.get("background"):                       # fall back to the seed
             parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
-        return "\n\n".join(parts)
+        return {"brief": "\n\n".join(parts), "intent": intent,
+                "working_memory": memory, "open_questions": questions,
+                "recent": recent, "kb": kb}
+
+    def thread_brief(self, thread_id: str, *, query: str | None = None) -> str:
+        """The portable, paste-into-any-tool context — the brief slice of the
+        state-aware assembly (see assemble_context)."""
+        return self.assemble_context(thread_id, query=query)["brief"]
 
     def finish_thread(self, thread_id: str) -> bool:
         if self.current_thread_id() == thread_id:

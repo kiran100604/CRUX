@@ -52,6 +52,12 @@ def run() -> None:
             from . import client
             r = client.retrieve(cfg.server, task, user=cfg.user, limit=limit)
             return {"context": r.get("context", ""), "count": r.get("count", 0)}
+        # If a project is active, return the STATE-AWARE package (working memory +
+        # open questions + KB relevant to the task); else a bare KB lookup.
+        tid = store.current_thread_id()
+        if tid:
+            pkg = store.assemble_context(tid, query=task, kb_limit=limit)
+            return {"context": pkg["brief"], "count": len(pkg["kb"])}
         from .hooks import _format
         results, links = store.retrieve(task, limit=limit, user=cfg.user)
         if not results:

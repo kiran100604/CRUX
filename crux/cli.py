@@ -289,8 +289,9 @@ def cmd_ctx(args):
 
 
 def cmd_brief(args):
-    """Print the current thread's portable brief = seeded background + the living
-    state of what you're doing. Paste it into any AI tool — no re-explaining."""
+    """Print the current thread's portable brief — intent + working memory + open
+    questions + the KB knowledge relevant to where things stand right now. Paste it
+    into any AI tool, no re-explaining."""
     store = _store()
     try:
         tid = args.thread or store.current_thread_id()

@@ -82,6 +82,15 @@ def hook_inject() -> int:
             print(json.dumps({"additionalContext": ctx}) if ctx else "{}")
             return 0
         store = Store(cfg)
+        # If a project is active, inject the STATE-AWARE package (Flow B): the
+        # current working memory + open questions + KB knowledge relevant to this
+        # prompt, not just a bare KB lookup. Otherwise fall back to plain retrieval.
+        tid = store.current_thread_id()
+        if tid:
+            ctx = store.assemble_context(tid, query=prompt, kb_limit=MAX_ITEMS)["brief"]
+            store.close()
+            print(json.dumps({"additionalContext": ctx}) if ctx else "{}")
+            return 0
         results, links = store.retrieve(prompt, limit=MAX_ITEMS, user=cfg.user)
         if results:
             # record the payoff: these items (and their connected facts) just helped

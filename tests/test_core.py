@@ -619,3 +619,48 @@ def test_resume_surfaces_after_idle(store):
     tv = store.thread_view(t["id"])
     assert tv["resume"]
     assert any("pricing" in q.lower() for q in tv["open_questions"])
+
+
+def test_assemble_context_is_state_aware(store):
+    # verified KB facts the assembler should surface for the current state
+    store.capture("We use PostgreSQL for all persistence.", type_hint="decision",
+                  scope="main", proposed=False)
+    store.capture("Never deploy on Fridays.", type_hint="constraint",
+                  scope="main", proposed=False)
+    t = store.create_thread("Sync", "Build a data sync feature", seed=False)
+    store.add_step("We decided to sync incrementally.", thread_id=t["id"], route=True)
+    store.add_step("How should we resolve conflicts?", thread_id=t["id"], route=True)
+    pkg = store.assemble_context(t["id"], query="design the database writes")
+    assert "[CURRENT TASK]" in pkg["brief"]
+    assert "design the database writes" in pkg["brief"]
+    assert "[INTENT — the goal]" in pkg["brief"]
+    assert "[WORKING MEMORY" in pkg["brief"]
+    # KB knowledge retrieved fresh against the current state
+    titles = {k["title"] for k in pkg["kb"]}
+    assert any("PostgreSQL" in x for x in titles)
+    assert any("resolve conflicts" in q.lower() for q in pkg["open_questions"])
+
+
+def test_assemble_records_usage_payoff(store):
+    i = store.capture("Payments go through Stripe.", type_hint="decision",
+                      scope="main", proposed=False)
+    t = store.create_thread("Checkout", "Build checkout", seed=False)
+    store.add_step("Working on the payment step.", thread_id=t["id"], route=True)
+    store.assemble_context(t["id"], query="wire up the payment provider")
+    assert store.db.usage_counts().get(i.id, 0) >= 1
+
+
+def test_assemble_endpoint(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "t.db"))
+    from fastapi.testclient import TestClient
+    from crux.config import Config
+    from crux.server import create_app
+    c = TestClient(create_app(Config.load()))
+    tid = c.post("/threads", json={"intent": "Build an API"}).json()["id"]
+    c.post("/hook", json={"content": "We decided to use FastAPI.", "project": tid,
+                          "source": "paste", "split": True})
+    r = c.post(f"/threads/{tid}/assemble", json={"query": "add an endpoint"}).json()
+    assert "[CURRENT TASK]" in r["brief"]
+    assert r["intent"] == "Build an API"
+    assert c.post("/threads/does-not-exist/assemble", json={}).status_code == 404

@@ -678,6 +678,7 @@ function vThread(t){
       <div><h1 class="head display" style="font-size:30px">${esc(t.title)}</h1></div>
       <div class="thactions">
         ${active?`<button class="btn teal" onclick="copyBrief('${t.id}')">⧉ Copy context</button>`:''}
+        ${active?`<button class="btn out sm" onclick="copyForTask('${t.id}')" title="Pull the knowledge relevant to a specific next task">for a task…</button>`:''}
         ${active?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
       </div>
     </div>
@@ -819,8 +820,16 @@ async function promoteThread(id){
   toast(`✓ ${r.staged||0} learning(s) staged in Review`); await load();
 }
 async function copyBrief(id){
-  const r=await api(`/threads/${id}/brief`);
+  // state-aware assembly: current working memory + KB relevant to right now
+  const r=await post(`/threads/${id}/assemble`,{});
   try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Context copied — paste it into any tool"); }
+  catch(e){ prompt("Copy this context:", r.brief||""); }
+}
+async function copyForTask(id){
+  const q=prompt("What are you about to do? CRUX pulls the knowledge relevant to that.");
+  if(q===null) return;
+  const r=await post(`/threads/${id}/assemble`,{query:q.trim()});
+  try{ await navigator.clipboard.writeText(r.brief||''); toast("⧉ Focused context copied"); }
   catch(e){ prompt("Copy this context:", r.brief||""); }
 }
 function ctxDirty(){ const r=document.getElementById('ctxsave'); if(r) r.style.display='flex'; }
@@ -829,7 +838,7 @@ window.startThread=startThread; window.openThread=openThread; window.closeThread
 window.toggleCard=toggleCard; window.dump=dump; window.toggleInclude=toggleInclude; window.deleteCard=deleteCard;
 window.saveContext=saveContext; window.refineContext=refineContext; window.saveIntent=saveIntent; window.intDirty=intDirty;
 window.extractChunk=extractChunk;
-window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.ctxDirty=ctxDirty;
+window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.copyForTask=copyForTask; window.ctxDirty=ctxDirty;
 
 /* ---------------- OVERVIEW ---------------- */
 function vOverview(){
