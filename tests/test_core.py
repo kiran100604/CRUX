@@ -577,3 +577,45 @@ def test_resolve_thread_by_title_and_current(store):
     assert store.resolve_thread("Launch plan") == t["id"]   # exact active title
     assert store.resolve_thread(t["id"]) == t["id"]          # by id
     assert store.resolve_thread("") == store.current_thread_id()
+
+
+def test_sessions_autostart_and_rollover_with_checkpoint(store):
+    t = store.create_thread("Site", "Build a marketing site")
+    store.add_step("We decided on a one-page layout.", thread_id=t["id"], route=True)
+    s1 = store.db.active_session(t["id"])
+    assert s1 and s1["status"] == "active"
+    # force the open session past the idle gap, then capture again
+    store.db.update_session(s1["id"], {"last_at": "2020-01-01T00:00:00+00:00"})
+    store.add_step("Now adding a pricing section.", thread_id=t["id"], route=True)
+    sessions = store.db.list_sessions(t["id"])
+    assert len(sessions) == 2
+    closed = [x for x in sessions if x["status"] == "closed"]
+    active = [x for x in sessions if x["status"] == "active"]
+    assert len(closed) == 1 and len(active) == 1
+    assert closed[0]["summary"]  # a checkpoint was written at rollover
+    # each card belongs to exactly one (different) session
+    cards = store.db.thread_steps(t["id"])
+    assert len({c.session_id for c in cards}) == 2
+
+
+def test_finish_thread_checkpoints_open_session(store):
+    t = store.create_thread("Launch", "Plan the launch")
+    store.add_step("We chose June 1 as the launch date.", thread_id=t["id"], route=True)
+    store.finish_thread(t["id"])
+    sessions = store.db.list_sessions(t["id"])
+    assert sessions and all(s["status"] == "closed" for s in sessions)
+    assert sessions[-1]["summary"]
+
+
+def test_resume_surfaces_after_idle(store):
+    t = store.create_thread("Site", "Build a site")
+    store.add_step("Decided to use a dark theme.", thread_id=t["id"], route=True)
+    s1 = store.db.active_session(t["id"])
+    store.db.update_session(s1["id"], {"last_at": "2020-01-01T00:00:00+00:00"})
+    store.add_step("How should pricing tiers work?", thread_id=t["id"], route=True)
+    # idle the new session too → next view should offer a resume from the checkpoint
+    s2 = store.db.active_session(t["id"])
+    store.db.update_session(s2["id"], {"last_at": "2020-01-02T00:00:00+00:00"})
+    tv = store.thread_view(t["id"])
+    assert tv["resume"]
+    assert any("pricing" in q.lower() for q in tv["open_questions"])

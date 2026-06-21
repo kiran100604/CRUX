@@ -91,6 +91,7 @@ class Episode:
     title: str | None = None       # document title, if any
     added_by: str | None = None    # nullable now; identity for company/multi-user later
     thread_id: str | None = None   # the work thread this capture is a step of (if any)
+    session_id: str | None = None  # the work period (session) within the thread
     kind: str = "note"             # router-assigned: reference|prompt|insight|… (what it is)
     approach_id: str | None = None # which approach (direction) it belongs to, if any
     is_guide: bool = False         # a thread-level reference that governs the whole thread
@@ -109,7 +110,7 @@ class Episode:
         return Episode(
             id=row["id"], raw_content=row["raw_content"], source_type=row["source_type"],
             source_ref=row["source_ref"], title=row["title"], added_by=row["added_by"],
-            thread_id=g("thread_id"),
+            thread_id=g("thread_id"), session_id=g("session_id"),
             kind=g("kind") or "note", approach_id=g("approach_id"),
             is_guide=bool(g("is_guide", 0)), routed=bool(g("routed", 0)),
             route_reason=g("route_reason"), included=bool(g("included", 1)),

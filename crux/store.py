@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .chunk import chunk
@@ -263,6 +264,67 @@ class Store:
         self.db.set_meta("current_thread", t["id"])  # newest thread becomes current
         return self.db.get_thread(t["id"])
 
+    # --- sessions: auto work-periods within a thread, for continuity ----------
+    #
+    # Captures from any source land in the thread's OPEN session. After an idle
+    # gap the session auto-closes with a checkpoint summary, and the next capture
+    # opens a fresh one — so when you come back you get a clean resume point
+    # without ever pressing start/stop.
+
+    IDLE_GAP_SECONDS = 2 * 3600  # a gap longer than this starts a new session
+
+    @staticmethod
+    def _age_seconds(iso: str | None) -> float:
+        if not iso:
+            return float("inf")
+        try:
+            dt = datetime.fromisoformat(iso)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - dt).total_seconds()
+        except ValueError:
+            return float("inf")
+
+    def _active_session(self, thread_id: str) -> str:
+        """The id of the thread's open session — bumped if recent, rolled over (old
+        one closed with a checkpoint, new one started) once it's been idle too long."""
+        ts = now_iso()
+        s = self.db.active_session(thread_id)
+        if s and self._age_seconds(s["last_at"]) <= self.IDLE_GAP_SECONDS:
+            self.db.update_session(s["id"], {"last_at": ts})
+            return s["id"]
+        if s:                                   # idle too long → checkpoint & roll over
+            self._close_session(s["id"])
+        new = {"id": str(uuid.uuid4()), "thread_id": thread_id, "status": "active",
+               "summary": None, "started_at": ts, "last_at": ts, "ended_at": None}
+        self.db.insert_session(new)
+        return new["id"]
+
+    def _close_session(self, session_id: str) -> None:
+        """Write a checkpoint summary for a session from its in-scope cards, then
+        mark it closed. Best-effort: a summary failure still closes the session."""
+        s = self.db.get_session(session_id)
+        if not s or s["status"] == "closed":
+            return
+        t = self.db.get_thread(s["thread_id"])
+        items = [self._labelled_item(c) for c in self.db.session_steps(session_id)
+                 if c.included]
+        summary = ""
+        if items:
+            try:
+                summary = self.processor.refine_context(
+                    (t["intent"] if t else "") or "", items, "")
+            except Exception:
+                summary = ""
+        self.db.update_session(
+            session_id, {"status": "closed", "summary": summary, "ended_at": now_iso()})
+
+    def close_session_now(self, thread_id: str) -> None:
+        """Explicitly close the thread's open session (e.g. on finish)."""
+        s = self.db.active_session(thread_id)
+        if s:
+            self._close_session(s["id"])
+
     def add_step(self, content: str, *, source: str = "note",
                  source_ref: str | None = None,
                  thread_id: str | None = None, route: bool = False) -> dict:
@@ -281,9 +343,11 @@ class Store:
             thread_id = self.current_thread_id()
         if thread_id and not self.db.get_thread(thread_id):
             thread_id = None
+        session_id = self._active_session(thread_id) if thread_id else None
         ep = self.db.insert_episode(Episode(
             id=str(uuid.uuid4()), raw_content=content, source_type=source,
-            source_ref=(source_ref or None), thread_id=thread_id, routed=False, included=True))
+            source_ref=(source_ref or None), thread_id=thread_id,
+            session_id=session_id, routed=False, included=True))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
             if route:
@@ -331,12 +395,13 @@ class Store:
             return {"thread_id": thread_id, "card_ids": [res.get("card_id")], "count": 1}
         entries = self.processor.extract_entries(content) or [
             {"content": content, "kind": "note"}]
+        session_id = self._active_session(thread_id) if thread_id else None
         card_ids = []
         for e in entries:
             ep = self.db.insert_episode(Episode(
                 id=str(uuid.uuid4()), raw_content=e["content"], source_type=source,
                 source_ref=(source_ref or None), thread_id=thread_id,
-                kind=e.get("kind", "note"), routed=True,
+                session_id=session_id, kind=e.get("kind", "note"), routed=True,
                 route_reason="extracted", included=True))
             card_ids.append(ep.id)
         if thread_id:
@@ -399,9 +464,21 @@ class Store:
         if not t:
             return None
         cards = [c.to_public_dict() for c in reversed(self.db.thread_steps(thread_id))]
+        sessions = self.db.list_sessions(thread_id)
+        active = next((s for s in sessions if s["status"] == "active"), None)
+        # Resuming = the open session has been idle a while, or it's all closed —
+        # surface the last checkpoint so you reload context instantly on return.
+        last_closed = next((s for s in reversed(sessions) if s["status"] == "closed"), None)
+        resuming = bool(last_closed) and (
+            active is None or self._age_seconds(active["last_at"]) > self.IDLE_GAP_SECONDS)
         return {**t, "context": t.get("summary") or "",
                 "context_owned": bool(t["summary_owned"]),
-                "cards": cards, "card_count": len(cards)}
+                "cards": cards, "card_count": len(cards),
+                "sessions": list(reversed(sessions)),  # newest first for display
+                "session_count": len(sessions),
+                "resume": (last_closed.get("summary") or "") if resuming else "",
+                "open_questions": [c["raw_content"] for c in cards
+                                   if c.get("kind") == "question" and c.get("included")][:6]}
 
     def list_threads(self, status: str | None = None) -> list[dict]:
         cur = self.current_thread_id()
@@ -468,6 +545,10 @@ class Store:
             parts.append("[INTENT — the goal]\n" + intent)
         if memory:
             parts.append("[WORKING MEMORY — decisions, state & learnings]\n" + memory)
+        questions = [c.raw_content for c in self.db.thread_steps(thread_id)
+                     if c.included and c.kind == "question"][-6:]
+        if questions:
+            parts.append("[OPEN QUESTIONS]\n" + "\n".join(f"- {q}" for q in questions))
         if t.get("background"):
             parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
         return "\n\n".join(parts)
@@ -475,6 +556,7 @@ class Store:
     def finish_thread(self, thread_id: str) -> bool:
         if self.current_thread_id() == thread_id:
             self.db.set_meta("current_thread", None)
+        self.close_session_now(thread_id)  # checkpoint the open session as it wraps
         return self.db.update_thread(thread_id, {"status": "done"}, now_iso())
 
     def delete_thread(self, thread_id: str) -> None:

@@ -283,6 +283,19 @@
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
     font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
   .promote{margin-top:22px; padding-top:18px; border-top:1px solid var(--hair)}
+  /* resume banner + session timeline */
+  .resumebox{background:var(--peach-bg); border:1px solid var(--peach-line); border-radius:var(--r-lg); padding:14px 18px; margin-bottom:14px}
+  .resumehd{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--peach); margin-bottom:7px}
+  .resumebody{font-size:14px; line-height:1.55; color:var(--ink); white-space:pre-wrap}
+  .resumeq{margin-top:9px; font-size:13px; color:var(--body)}
+  .resumeq b{font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--muted); letter-spacing:.04em}
+  .seswrap{margin-top:20px} .seswrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
+  .sesitem{display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--hair)}
+  .sesitem:last-child{border-bottom:none}
+  .sesdot{width:9px;height:9px;border-radius:50%;background:var(--strong);margin-top:5px;flex:none}
+  .sesdot.live{background:var(--green)}
+  .sesmeta{font-family:var(--mono); font-size:10px; color:var(--muted2); margin-bottom:3px}
+  .sessum{font-size:13px; line-height:1.5; color:var(--body); white-space:pre-wrap}
   /* thread = stable INTENT (north star) + evolving WORKING MEMORY + a list of dumps */
   .intpanel{background:var(--soft); border:1px solid var(--hair); border-left:3px solid var(--ink); border-radius:var(--r-lg); padding:14px 18px; margin-bottom:14px}
   .intlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); flex:1; min-width:0}
@@ -669,6 +682,12 @@ function vThread(t){
       </div>
     </div>
 
+    ${t.resume?`<div class="resumebox">
+      <div class="resumehd">▸ Resuming — picking up from your last session</div>
+      <div class="resumebody">${esc(t.resume)}</div>
+      ${(t.open_questions&&t.open_questions.length)?`<div class="resumeq"><b>still open:</b> ${t.open_questions.map(q=>esc(q)).join(' · ')}</div>`:''}
+    </div>`:''}
+
     <div class="intpanel">
       <div class="ctxhd">
         <span class="intlbl">★ INTENT — what you're working toward</span>
@@ -690,6 +709,9 @@ function vThread(t){
     <details class="bgwrap"${t.background?'':''}><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
       ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
     </details>
+    ${(t.sessions&&t.sessions.length)?`<details class="seswrap"><summary>Sessions — ${t.session_count} work period${t.session_count===1?'':'s'} on this project</summary>
+      ${t.sessions.map(sessionRow).join("")}
+    </details>`:''}
 
     ${active?`<div class="dumprow">
       <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
@@ -710,6 +732,18 @@ function vThread(t){
 
     ${active?`<div class="promote"><button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
       <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}`);
+}
+function sessionRow(s){
+  const live=s.status==='active';
+  const when=live?`started ${rel(s.started_at)} · live`:`${rel(s.started_at)} → ${rel(s.ended_at||s.last_at)}`;
+  const sum=(s.summary||'').trim();
+  return `<div class="sesitem">
+    <div class="sesdot ${live?'live':''}"></div>
+    <div style="flex:1;min-width:0">
+      <div class="sesmeta">${esc(when)}</div>
+      <div class="sessum">${sum?esc(sum):'<span class="muted2">'+(live?'in progress — checkpoint written when it wraps':'no checkpoint')+'</span>'}</div>
+    </div>
+  </div>`;
 }
 function dumpCard(c){
   const sorting=!c.routed;

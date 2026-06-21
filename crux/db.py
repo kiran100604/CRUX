@@ -73,6 +73,21 @@ CREATE TABLE IF NOT EXISTS approaches (
 );
 CREATE INDEX IF NOT EXISTS idx_approaches_thread ON approaches(thread_id);
 
+-- sessions: a time-bounded work period within a thread. Captures from any source
+-- (hotkey, agent hooks, paste) land in the OPEN session; after an idle gap the
+-- session auto-closes with a checkpoint summary and the next capture opens a new
+-- one. The thread keeps the rolling working memory; sessions give resume points.
+CREATE TABLE IF NOT EXISTS sessions (
+    id          TEXT PRIMARY KEY,
+    thread_id   TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'active',   -- active | closed
+    summary     TEXT,                             -- checkpoint synthesized at close
+    started_at  TEXT NOT NULL,
+    last_at     TEXT NOT NULL,                    -- last activity, for idle detection
+    ended_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_thread ON sessions(thread_id);
+
 -- tiny key/value for app-level pointers (e.g. the current thread for hotkey capture)
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
@@ -245,6 +260,8 @@ class Database:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN route_reason TEXT")
         if "included" not in ecols:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN included INTEGER NOT NULL DEFAULT 1")
+        if "session_id" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN session_id TEXT")
         # index lives here, not in SCHEMA: on an upgraded db the column only exists
         # after the ALTER above (SCHEMA runs before _migrate).
         self.conn.execute(
@@ -266,12 +283,13 @@ class Database:
     def insert_episode(self, ep: Episode) -> Episode:
         self.conn.execute(
             """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
-                   added_by, thread_id, kind, approach_id, is_guide, routed,
+                   added_by, thread_id, session_id, kind, approach_id, is_guide, routed,
                    route_reason, included, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
-             ep.added_by, ep.thread_id, ep.kind, ep.approach_id, int(ep.is_guide),
-             int(ep.routed), ep.route_reason, int(ep.included), ep.created_at),
+             ep.added_by, ep.thread_id, ep.session_id, ep.kind, ep.approach_id,
+             int(ep.is_guide), int(ep.routed), ep.route_reason, int(ep.included),
+             ep.created_at),
         )
         self.conn.commit()
         return ep
@@ -394,14 +412,58 @@ class Database:
         return cur.rowcount > 0
 
     def delete_thread(self, thread_id: str) -> None:
-        # steps (episodes) survive; just detach them from the thread
-        self.conn.execute("UPDATE episodes SET thread_id=NULL WHERE thread_id=?", (thread_id,))
+        # steps (episodes) survive; just detach them from the thread + its sessions
+        self.conn.execute(
+            "UPDATE episodes SET thread_id=NULL, session_id=NULL WHERE thread_id=?", (thread_id,))
+        self.conn.execute("DELETE FROM sessions WHERE thread_id=?", (thread_id,))
         self.conn.execute("DELETE FROM threads WHERE id=?", (thread_id,))
         self.conn.commit()
 
     def thread_steps(self, thread_id: str) -> list[Episode]:
         rows = self.conn.execute(
             "SELECT * FROM episodes WHERE thread_id=? ORDER BY created_at ASC", (thread_id,))
+        return [Episode.from_row(r) for r in rows]
+
+    # --- sessions (work periods within a thread) -----------------------------
+
+    def insert_session(self, s: dict) -> dict:
+        self.conn.execute(
+            """INSERT INTO sessions (id, thread_id, status, summary, started_at, last_at, ended_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (s["id"], s["thread_id"], s.get("status", "active"), s.get("summary"),
+             s["started_at"], s["last_at"], s.get("ended_at")))
+        self.conn.commit()
+        return s
+
+    def get_session(self, session_id: str) -> dict | None:
+        row = self.conn.execute("SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone()
+        return dict(row) if row else None
+
+    def active_session(self, thread_id: str) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM sessions WHERE thread_id=? AND status='active' "
+            "ORDER BY started_at DESC LIMIT 1", (thread_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_sessions(self, thread_id: str) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM sessions WHERE thread_id=? ORDER BY started_at ASC", (thread_id,))
+        return [dict(r) for r in rows]
+
+    def update_session(self, session_id: str, fields: dict) -> bool:
+        allowed = {"status", "summary", "last_at", "ended_at"}
+        cols = {k: v for k, v in fields.items() if k in allowed}
+        if not cols:
+            return False
+        assignment = ", ".join(f"{c}=?" for c in cols)
+        cur = self.conn.execute(
+            f"UPDATE sessions SET {assignment} WHERE id=?", (*cols.values(), session_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def session_steps(self, session_id: str) -> list[Episode]:
+        rows = self.conn.execute(
+            "SELECT * FROM episodes WHERE session_id=? ORDER BY created_at ASC", (session_id,))
         return [Episode.from_row(r) for r in rows]
 
     def unsorted_steps(self, limit: int = 100) -> list[Episode]:
