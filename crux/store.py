@@ -291,6 +291,59 @@ class Store:
         return {"episode": self.db.get_episode(ep.id).to_public_dict(),
                 "thread_id": thread_id, "card_id": ep.id}
 
+    def resolve_thread(self, ref: str | None, *, create: bool = False) -> str | None:
+        """Map a project reference (thread id, or exact active title) to a thread id.
+        Falls back to the current thread when ref is empty. With create=True, an
+        unmatched non-empty ref starts a new thread by that name — the drop-in path
+        for agent hooks that name a project CRUX hasn't seen yet."""
+        ref = (ref or "").strip()
+        if not ref:
+            return self.current_thread_id()
+        if self.db.get_thread(ref):
+            return ref
+        for t in self.db.list_threads(status="active"):
+            if t["title"].strip().lower() == ref.lower():
+                return t["id"]
+        if create:
+            return self.create_thread(ref, ref, seed=False)["id"]
+        return self.current_thread_id()
+
+    def ingest_working(self, content: str, *, thread_id: str | None = None,
+                       source: str = "agent", source_ref: str | None = None,
+                       split: bool = True) -> dict:
+        """Bridge a chunk of work (a transcript, an agent's output, a block of
+        notes) into a project's working memory. With split=True the chunk is broken
+        into discrete, pre-classified typed entries (one card each); otherwise it
+        lands as a single dump that the router classifies. All entries share the
+        same provenance so working memory can attribute them."""
+        content = (content or "").strip()
+        if not content:
+            raise ValueError("cannot ingest empty content")
+        if thread_id is None:
+            thread_id = self.current_thread_id()
+        if thread_id and not self.db.get_thread(thread_id):
+            thread_id = None
+        if not split:
+            res = self.add_step(content, source=source, source_ref=source_ref,
+                                thread_id=thread_id)
+            if res.get("card_id"):
+                self.route_card(res["card_id"])
+            return {"thread_id": thread_id, "card_ids": [res.get("card_id")], "count": 1}
+        entries = self.processor.extract_entries(content) or [
+            {"content": content, "kind": "note"}]
+        card_ids = []
+        for e in entries:
+            ep = self.db.insert_episode(Episode(
+                id=str(uuid.uuid4()), raw_content=e["content"], source_type=source,
+                source_ref=(source_ref or None), thread_id=thread_id,
+                kind=e.get("kind", "note"), routed=True,
+                route_reason="extracted", included=True))
+            card_ids.append(ep.id)
+        if thread_id:
+            self.db.update_thread(thread_id, {}, now_iso())
+            self._mark_context_stale(thread_id)
+        return {"thread_id": thread_id, "card_ids": card_ids, "count": len(card_ids)}
+
     def route_card(self, card_id: str) -> dict | None:
         """Tag a dumped card's KIND (reference/prompt/result/…) and mark the thread's
         context stale so it re-refines. No lanes to file into — the dump just feeds

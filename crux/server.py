@@ -251,6 +251,27 @@ def create_app(cfg: Config):
                              owner=body.user or cfg.user, proposed=body.proposed)
         return _enrich([item])[0]
 
+    class HookIn(BaseModel):
+        content: str
+        project: str | None = None   # thread id or exact active title; else current
+        source: str = "agent"        # the channel (agent/hotkey/note/…)
+        source_ref: str | None = None  # provenance label (which tool/agent)
+        type: str | None = None      # optional kind hint (unused when splitting)
+        split: bool = True           # break a transcript into discrete typed entries
+        create: bool = False         # start the project if the name is unknown
+
+    @app.post("/hook")
+    def hook(body: HookIn):
+        # The drop-in for live agent hooks and transcript pastes: a chunk of work
+        # → one or more typed, source-tagged entries in a project's working memory.
+        # Splitting/classification run inline (off the hotkey path) so a hook fires
+        # once and gets clean signals back.
+        tid = store.resolve_thread(body.project, create=body.create)
+        res = store.ingest_working(body.content, thread_id=tid,
+                                   source=body.source, source_ref=body.source_ref,
+                                   split=body.split)
+        return {"ok": True, **res}
+
     @app.post("/ingest")
     def ingest(body: IngestIn):
         # Episode saved synchronously (so we can return its id); facts extracted

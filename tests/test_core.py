@@ -543,3 +543,37 @@ class _FakeStdin:
 
     def read(self):
         return self._data
+
+
+def test_ingest_working_splits_into_typed_entries(store):
+    # A pasted chunk becomes several discrete, pre-classified working-memory cards,
+    # all carrying the same provenance so the synthesis can attribute them.
+    t = store.create_thread("Build the API", "Build a fast JSON API")
+    chunk = ("We decided to use Postgres instead of SQLite.\n"
+             "The API must respond under 200ms.\n"
+             "Should we add rate limiting now?")
+    res = store.ingest_working(chunk, thread_id=t["id"], source="paste",
+                               source_ref="debug-agent", split=True)
+    assert res["count"] == 3
+    cards = store.db.thread_steps(t["id"])
+    kinds = {c.kind for c in cards}
+    assert {"decision", "requirement", "question"} <= kinds
+    assert all(c.routed and c.source_ref == "debug-agent" for c in cards)
+
+
+def test_brief_separates_intent_from_working_memory(store):
+    t = store.create_thread("Site", "Make a marketing site", seed=False)
+    store.add_step("We decided to go with a one-page layout.", thread_id=t["id"], route=True)
+    brief = store.thread_brief(t["id"])
+    assert "[INTENT — the goal]" in brief
+    assert "Make a marketing site" in brief
+    assert "[WORKING MEMORY" in brief
+    # intent must lead; working memory is a separate, later section
+    assert brief.index("[INTENT") < brief.index("[WORKING MEMORY")
+
+
+def test_resolve_thread_by_title_and_current(store):
+    t = store.create_thread("Launch plan", "Plan the launch")
+    assert store.resolve_thread("Launch plan") == t["id"]   # exact active title
+    assert store.resolve_thread(t["id"]) == t["id"]          # by id
+    assert store.resolve_thread("") == store.current_thread_id()

@@ -129,6 +129,49 @@ Rules:
   note=anything else."""
 
 
+_EXTRACT_PROMPT = """You read a chunk of work — a chat transcript, an agent's
+output, a block of notes — and pull out the discrete points worth remembering for
+an ongoing project's WORKING MEMORY. One entry per distinct point; keep each
+self-contained (resolve "it"/"that" so the entry stands alone). Skip greetings,
+filler, restated questions, and anything with no lasting signal. If there's
+nothing worth keeping, return [].
+
+Return ONLY a minified JSON array; each element:
+{{"content":"<the point, one sentence, self-contained>",
+  "kind":"decision|requirement|constraint|insight|question|reference|prompt|suggestion|result|note"}}
+
+Prefer SIGNAL kinds when they fit: decision=a choice made / direction settled;
+requirement=something that must be true/done; constraint=a limit or rule;
+insight=a conclusion or learning; question=an open/unresolved question.
+
+CHUNK:
+\"\"\"
+{content}
+\"\"\""""
+
+
+def _parse_entries(text: str) -> list[dict]:
+    """Normalize the extractor's JSON array into [{content, kind}]. Defensive: bad
+    output yields [] so a transcript paste never crashes capture."""
+    out: list[dict] = []
+    try:
+        m = re.search(r"\[.*\]", text, re.DOTALL)
+        arr = json.loads(m.group(0) if m else text)
+    except Exception:
+        return out
+    if not isinstance(arr, list):
+        return out
+    for d in arr:
+        if not isinstance(d, dict):
+            continue
+        content = str(d.get("content", "")).strip()
+        if not content:
+            continue
+        kind = str(d.get("kind", "note")).lower().strip()
+        out.append({"content": content, "kind": kind if kind in CARD_KINDS else "note"})
+    return out
+
+
 def _parse_route(text: str, approach_ids: set[str]) -> dict:
     """Normalize the router's JSON into an actionable decision. Defensive: any
     garbage degrades to a low-confidence 'note' so a bad model reply never crashes
@@ -278,6 +321,19 @@ class FakeProcessor:
         return {"kind": kind, "target": "guide" if is_guide else "current",
                 "new_title": None, "confidence": 0.55, "reason": "offline heuristic"}
 
+    def extract_entries(self, content: str) -> list[dict]:
+        # Offline: split a chunk into candidate points and classify each with the
+        # same keyword heuristic the router uses. Splits on blank lines, list
+        # bullets, and sentence breaks; drops trivially short fragments.
+        raw = re.split(r"\n{2,}|\n\s*[-*•]\s+|(?<=[.!?])\s+(?=[A-Z])", content.strip())
+        out: list[dict] = []
+        for piece in raw:
+            p = " ".join(piece.split()).lstrip("-*• ").strip()
+            if len(p) < 12:           # too short to be a standalone point
+                continue
+            out.append({"content": p, "kind": self.route(p)["kind"]})
+        return out
+
     def answer(self, question: str, facts: list, history: list | None = None) -> str:
         # Offline: no model to synthesize prose, so return an honest extractive
         # answer — the top related facts, cited. Goes to real synthesis with a key.
@@ -391,6 +447,16 @@ class AnthropicProcessor:
                 items=joined), 600).strip()
         except Exception:
             return FakeProcessor.refine_context(self, intent, items, prior)
+
+    def extract_entries(self, content: str) -> list[dict]:
+        """Split a chunk (transcript, agent output, notes) into discrete typed
+        working-memory entries. Falls back to the offline splitter on any failure."""
+        try:
+            text = self._call(_EXTRACT_PROMPT.format(content=content[:8000]), 900)
+            entries = _parse_entries(text)
+            return entries if entries else FakeProcessor.extract_entries(self, content)
+        except Exception:
+            return FakeProcessor.extract_entries(self, content)
 
     def answer(self, question: str, facts: list, history: list | None = None) -> str:
         """Grounded Q&A over the knowledge base: synthesize an answer from the

@@ -303,6 +303,13 @@
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
   .dumprow{display:flex; gap:10px; margin:6px 0 6px}
+  .chunkwrap{margin:0 0 18px} .chunkwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.05em}
+  .chunkbox{width:100%; min-height:110px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md);
+    padding:12px 14px; font-size:13.5px; line-height:1.55; color:var(--ink); outline:none; resize:vertical; margin-top:10px; white-space:pre-wrap}
+  .chunkbox:focus{border-color:var(--teal)}
+  .chunkrow{display:flex; gap:10px; margin-top:8px}
+  .chunksrc{flex:1; height:40px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md); padding:0 12px; font-size:13px; color:var(--ink); outline:none}
+  .chunksrc:focus{border-color:var(--teal)}
   .hotkeyhint{font-size:11.5px; color:var(--muted2); padding:0 2px; margin:0 0 18px}
   .hotkeyhint b{color:var(--muted); font-weight:600; font-family:var(--mono)}
   .hotkeyhint .resum{color:var(--teal); cursor:pointer}
@@ -688,7 +695,14 @@ function vThread(t){
       <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
       <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
     </div>
-    <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>`:''}
+    <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>
+    <details class="chunkwrap"><summary>Paste a transcript or agent output — CRUX splits it into points</summary>
+      <textarea id="chunkin" class="chunkbox" placeholder="Paste a chunk of chat / an agent's output / a block of notes. CRUX pulls out the discrete decisions, requirements, conclusions and open questions — one card each."></textarea>
+      <div class="chunkrow">
+        <input id="chunksrc" class="chunksrc" placeholder="from (optional) — e.g. debug-agent, claude, teammate"/>
+        <button class="btn teal sm" onclick="extractChunk('${t.id}')">Extract points →</button>
+      </div>
+    </details>`:''}
 
     <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}</div>
     ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
@@ -740,6 +754,15 @@ async function dump(id){
   await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
   await refreshThread(); setTimeout(refreshThread,1500);  // context re-refines in the background
 }
+async function extractChunk(id){
+  const ta=document.getElementById('chunkin'); const v=(ta&&ta.value.trim())||'';
+  if(!v){ toast("Paste a chunk first"); return; }
+  const src=(document.getElementById('chunksrc')||{}).value||'';
+  toast("Pulling out the points…");
+  const r=await post('/hook',{content:v,project:id,source:'paste',source_ref:src.trim()||null,split:true});
+  if(ta) ta.value='';
+  toast(`✓ ${r.count||0} point(s) extracted`); await refreshThread(); setTimeout(refreshThread,1200);
+}
 async function toggleInclude(id,inc){ await post(`/cards/${id}/include`,{included:!!inc}); await refreshThread(); }
 async function deleteCard(id){ if(!confirm("Delete this dump? (nothing else is affected)")) return; await fetch(`/cards/${id}`,{method:"DELETE",headers:_token?{"x-crux-token":_token}:{}}); toast("Deleted"); await refreshThread(); }
 async function saveContext(id){
@@ -771,6 +794,7 @@ function intDirty(){ const r=document.getElementById('intsave-link'); if(r) r.st
 window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
 window.toggleCard=toggleCard; window.dump=dump; window.toggleInclude=toggleInclude; window.deleteCard=deleteCard;
 window.saveContext=saveContext; window.refineContext=refineContext; window.saveIntent=saveIntent; window.intDirty=intDirty;
+window.extractChunk=extractChunk;
 window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.ctxDirty=ctxDirty;
 
 /* ---------------- OVERVIEW ---------------- */
