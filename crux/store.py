@@ -383,15 +383,19 @@ class Store:
         return self.ensure_context(thread_id)
 
     def thread_brief(self, thread_id: str) -> str:
-        """The portable context: the living vision + the seeded KB background
-        (agents can pull more). Paste into any tool, no re-explaining."""
+        """The portable context, as three distinct sections: the stable INTENT
+        (the goal), the WORKING MEMORY (decisions/state/learnings), and the seeded
+        KB background (agents can pull more). Paste into any tool, no re-explaining."""
         t = self.ensure_context(thread_id)
         if not t:
             return ""
         parts = []
-        ctx = (t.get("summary") or "").strip() or (t.get("intent") or "").strip()
-        if ctx:
-            parts.append("[CONTEXT — what I'm going for]\n" + ctx)
+        intent = (t.get("intent") or "").strip()
+        memory = (t.get("summary") or "").strip()
+        if intent:
+            parts.append("[INTENT — the goal]\n" + intent)
+        if memory:
+            parts.append("[WORKING MEMORY — decisions, state & learnings]\n" + memory)
         if t.get("background"):
             parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
         return "\n\n".join(parts)

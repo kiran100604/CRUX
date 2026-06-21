@@ -150,26 +150,31 @@ def _parse_route(text: str, approach_ids: set[str]) -> dict:
     return out
 
 
-_CONTEXT_PROMPT = """You maintain a single living CONTEXT for a piece of work, so
-any AI tool instantly understands the direction for whatever prompt the person
-gives next. It is NOT a list of what they did — it's a refined statement of the
-vision: what they're going for, the requirements/constraints/preferences that
-matter, and what's been learned (including what NOT to do).
+_CONTEXT_PROMPT = """You maintain the WORKING MEMORY for a piece of work: the
+evolving record of what's actually been decided and where things stand, so the
+person (or any AI tool) can resume without re-deriving it. The GOAL is tracked
+separately as INTENT — do NOT restate or paraphrase it. Working memory is the
+*how it's going*, not the *what we're trying to do*.
 
-INTENT: {intent}
+INTENT (the stable goal — given only for context; do NOT repeat it back):
+{intent}
 
-PRIOR CONTEXT (refine this; keep what's still true):
+PRIOR WORKING MEMORY (refine this; keep what's still true, drop what's been
+superseded):
 {prior}
 
-ITEMS they've dumped so far (oldest first — references, prompts, results, ideas,
-learnings). Synthesize, don't list:
+ITEMS dumped so far (oldest first — references, prompts, results, ideas,
+learnings, from any tool or agent). Synthesize, don't list:
 {items}
 
-Rewrite the CONTEXT now:
-- Capture the CURRENT direction. If the latest items show a pivot, follow the new
-  direction and drop the abandoned one.
-- Fold in requirements, constraints, style/preferences, and concrete learnings.
-- Tight and concrete. No preamble, no headings like "Context:", just the text."""
+Rewrite the WORKING MEMORY now as a tight synthesis of:
+- Decisions made and conclusions reached (and what was explicitly ruled out).
+- Requirements, constraints, and preferences that have surfaced.
+- Current state — what's done, what's in progress right now.
+- Open questions still unresolved.
+If the latest items show a pivot, follow the new direction and drop the
+abandoned one. Be concrete; cite specifics. Do NOT open by restating the goal.
+No preamble, no headings like "Working memory:", just the text."""
 
 
 _ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
@@ -274,16 +279,14 @@ class FakeProcessor:
         return "\n".join(lines)
 
     def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
-        # Offline: no model to synthesize a vision, so present an honest working
-        # context = the goal + the things kept in scope. Still useful & paste-able.
-        lines = []
-        if intent:
-            lines.append(f"Goal: {intent.strip()}")
+        # Offline: no model to synthesize, so present an honest working memory =
+        # the points kept in scope. The goal lives in INTENT, kept out of here.
         kept = [i.strip().replace("\n", " ") for i in items if i.strip()]
-        if kept:
-            lines.append("In scope:")
-            lines.extend(f"- {i[:200]}" for i in kept[-12:])
-        return "\n".join(lines) if lines else (intent or "")
+        if not kept:
+            return ""
+        lines = ["Captured so far:"]
+        lines.extend(f"- {i[:200]}" for i in kept[-12:])
+        return "\n".join(lines)
 
 
 class AnthropicProcessor:
@@ -368,8 +371,9 @@ class AnthropicProcessor:
                                        approaches=approaches, recent=recent)
 
     def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
-        """Re-synthesize the thread's living context (vision/direction) from the
-        items still in scope — the heart of 'just keep dumping, AI keeps it sharp'."""
+        """Re-synthesize the thread's WORKING MEMORY (decisions/state/learnings,
+        distinct from the stable intent) from the items still in scope — the heart
+        of 'just keep dumping, AI keeps it sharp'."""
         joined = "\n".join(f"- {i.strip()}" for i in items if i.strip())[:8000] or "(nothing yet)"
         try:
             return self._call(_CONTEXT_PROMPT.format(

@@ -283,7 +283,13 @@
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
     font-size:12.5px; line-height:1.5; color:var(--muted); white-space:pre-wrap; max-height:340px; overflow:auto}
   .promote{margin-top:22px; padding-top:18px; border-top:1px solid var(--hair)}
-  /* thread = living CONTEXT + a list of dumps */
+  /* thread = stable INTENT (north star) + evolving WORKING MEMORY + a list of dumps */
+  .intpanel{background:var(--soft); border:1px solid var(--hair); border-left:3px solid var(--ink); border-radius:var(--r-lg); padding:14px 18px; margin-bottom:14px}
+  .intlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); flex:1; min-width:0}
+  .intbox{width:100%; min-height:46px; border:1px solid var(--hair); background:var(--canvas);
+    border-radius:var(--r-md); padding:11px 14px; font-size:15px; line-height:1.5; color:var(--ink);
+    font-weight:500; outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
+  .intbox:focus{border-color:var(--ink)}
   .ctxpanel{background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-lg); padding:16px 18px; margin-bottom:18px}
   .ctxhd{display:flex; align-items:center; gap:8px; margin-bottom:10px}
   .ctxlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--teal); flex:1; min-width:0}
@@ -644,21 +650,28 @@ function vThread(t){
   app(`
     <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
     <div class="threadhd">
-      <div><h1 class="head display" style="font-size:30px">${esc(t.title)}</h1>
-        ${t.intent?`<p class="sub" style="margin:6px 0 0">${esc(t.intent)}</p>`:''}</div>
+      <div><h1 class="head display" style="font-size:30px">${esc(t.title)}</h1></div>
       <div class="thactions">
         ${active?`<button class="btn teal" onclick="copyBrief('${t.id}')">⧉ Copy context</button>`:''}
         ${active?`<button class="btn out sm" onclick="finishThread('${t.id}')">Finish</button>`:`<span class="ipill">finished</span>`}
       </div>
     </div>
 
+    <div class="intpanel">
+      <div class="ctxhd">
+        <span class="intlbl">★ INTENT — what you're working toward</span>
+        <span class="resum" id="intsave-link" style="display:none" onclick="saveIntent('${t.id}')">save</span>
+      </div>
+      <textarea id="intbox" class="intbox" ${active?'':'readonly'} oninput="intDirty()" placeholder="Your north star — what you're trying to do. Set once; it rarely changes.">${esc(t.intent||'')}</textarea>
+    </div>
+
     <div class="ctxpanel">
       <div class="ctxhd">
-        <span class="ctxlbl">◆ CONTEXT — what CRUX understands you're going for</span>
+        <span class="ctxlbl">◆ WORKING MEMORY — decisions, current state & what you've learned</span>
         <span class="ctxtag">${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}</span>
-        <span class="resum" onclick="refineContext('${t.id}')" title="Re-refine from your cards">↻ refine</span>
+        <span class="resum" onclick="refineContext('${t.id}')" title="Re-synthesize from your dumps">↻ refine</span>
       </div>
-      <textarea id="ctxbox" class="ctxbox" oninput="ctxDirty()" placeholder="As you dump things, CRUX keeps a refined picture of your direction here — what you want, what matters, what you've learned. It's what any AI tool gets. Edit it anytime; once you do, it's yours until you hit ↻ refine.">${esc(t.context||'')}</textarea>
+      <textarea id="ctxbox" class="ctxbox" oninput="ctxDirty()" placeholder="As you dump things, CRUX distills them here — the decisions made, where things stand, what you've learned (including what NOT to do). The goal itself stays up in INTENT. Edit anytime; once you do, it's yours until you hit ↻ refine.">${esc(t.context||'')}</textarea>
       <div id="ctxsave" class="savedrow"><button class="btn sm teal" onclick="saveContext('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-refine pauses until you hit ↻</span></div>
     </div>
 
@@ -727,6 +740,11 @@ async function saveContext(id){
   await post(`/threads/${id}/context`,{context:(el&&el.value)||''});
   toast("✓ Saved — this context is yours now"); await refreshThread();
 }
+async function saveIntent(id){
+  const el=document.getElementById('intbox');
+  await post(`/threads/${id}/edit`,{intent:(el&&el.value.trim())||''});
+  toast("✓ Intent updated"); await refreshThread();
+}
 async function refineContext(id){ toast("Refining from your dumps…"); await post(`/threads/${id}/refine`,{}); await refreshThread(); }
 async function finishThread(id){
   if(!confirm("Finish this thread? It moves to Finished; nothing is deleted.")) return;
@@ -742,9 +760,10 @@ async function copyBrief(id){
   catch(e){ prompt("Copy this context:", r.brief||""); }
 }
 function ctxDirty(){ const r=document.getElementById('ctxsave'); if(r) r.style.display='flex'; }
+function intDirty(){ const r=document.getElementById('intsave-link'); if(r) r.style.display='inline'; }
 window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
 window.toggleCard=toggleCard; window.dump=dump; window.toggleInclude=toggleInclude; window.deleteCard=deleteCard;
-window.saveContext=saveContext; window.refineContext=refineContext;
+window.saveContext=saveContext; window.refineContext=refineContext; window.saveIntent=saveIntent; window.intDirty=intDirty;
 window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.ctxDirty=ctxDirty;
 
 /* ---------------- OVERVIEW ---------------- */
