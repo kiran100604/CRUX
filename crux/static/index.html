@@ -117,6 +117,15 @@
   .ev .when{font-family:var(--mono); font-size:11px; color:var(--muted2)}
   .ev .txt{font-size:13.5px; color:var(--body); margin-top:7px; line-height:1.5}
   .ev .txt b{color:var(--ink); font-weight:600}
+  .ev2{display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--hair)}
+  .ev2:first-of-type{border-top:none}
+  .ev2 .evk{font-family:var(--mono); font-size:10px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--pill); font-weight:700; flex:none}
+  .ev2 .evtxt{flex:1; min-width:0; font-size:13.5px; color:var(--body); line-height:1.45; overflow:hidden; text-overflow:ellipsis}
+  .ev2 .evtxt b{color:var(--ink); font-weight:600}
+  .ev2 .evwhen{font-size:11px; color:var(--muted2); flex:none}
+  .ev2 .evopen{font-size:12px; color:var(--teal); cursor:pointer; flex:none; white-space:nowrap}
+  .ev2 .evopen:hover{text-decoration:underline}
+  .dumpcard.hl{box-shadow:0 0 0 3px rgba(20,48,48,.28); border-color:var(--teal-line)}
 
   /* stat strip */
   .strip{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--hair);
@@ -580,22 +589,23 @@ const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["refe
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
   kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
-  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"",
+  threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"", activity:[], highlightCard:null,
   kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}, kbOpen:{}};
 
 async function load(){
   // diagnostic timing: each fetch + total, visible in the browser console (F12)
   const _t0=performance.now();
   const timed=(u)=>{const s=performance.now();return api(u).then(r=>{console.log(`[crux] ${u} ${(performance.now()-s).toFixed(0)}ms`);return r;});};
-  const [it,rv,st,fd,ln,wm,th,un]=await Promise.all([
+  const [it,rv,st,fd,ln,wm,th,un,ac]=await Promise.all([
     timed("/items"), timed("/review"), timed("/stats"), timed("/feed?limit=20"), timed("/lenses"),
-    timed("/working"), timed("/threads"), timed("/unsorted")]);
+    timed("/working"), timed("/threads"), timed("/unsorted"), timed("/activity?limit=60")]);
   console.log(`[crux] all fetches done in ${(performance.now()-_t0).toFixed(0)}ms`);
   state.items=it.items; state.inbox=rv.inbox||[]; state.conflicts=rv.conflicts||[];
   state.counts=rv.counts||{}; state.working=state.inbox;  // back-comp for overview
   state.stats=st; state.feed=fd.usages; state.lenses=(ln&&ln.lenses)||[]; state.workmem=(wm&&wm.items)||[];
   state.threads=(th&&th.threads)||[]; state.currentThread=(th&&th.current)||null;
   state.unsorted=(un&&un.steps)||[];
+  state.activity=(ac&&ac.events)||[];
   if(state.openThread){ const tv=await api(`/threads/${state.openThread}`); state.threadView=tv&&tv.id?tv:null; if(!state.threadView) state.openThread=null; }
   _sig=`${st.crystals}|${st.fluid}|${st.injections}`;
   document.getElementById("t-kb").textContent=state.items.filter(i=>i.scope==="main").length;
@@ -753,7 +763,7 @@ function dumpCard(c){
   const full=(c.raw_content||'');
   const text=open?full:full.slice(0,200);
   const src=c.source_ref||((c.source_type&&c.source_type!=='note'&&c.source_type!=='paste')?c.source_type:'');
-  return `<div class="dumpcard ${c.included?'':'excluded'} ${sorting?'sorting':''}">
+  return `<div class="dumpcard ${c.included?'':'excluded'} ${sorting?'sorting':''}" data-card-id="${c.id}">
     <div class="dcside">
       <button class="incl ${c.included?'on':''}" title="${c.included?'In context — click to exclude':'Excluded — click to include'}" onclick="toggleInclude('${c.id}',${c.included?0:1})">${c.included?'✓':'○'}</button>
     </div>
@@ -775,12 +785,41 @@ async function startThread(){
   toast("✓ Thread started — background seeded"); await load();
 }
 function openThread(id){
-  state.openThread=id; render();
+  state.openThread=id; state.view='working';
+  if(location.hash!=='#/project/'+id) history.replaceState(null,'','#/project/'+id);
+  render();
   // make the thread you're viewing the hotkey target, so captures land here
   post(`/threads/${id}/current`,{}).then(()=>{state.currentThread=id;});
   api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}});
 }
-function closeThread(){ state.openThread=null; state.threadView=null; render(); }
+function closeThread(){ state.openThread=null; state.threadView=null; history.replaceState(null,'','#/working'); render(); }
+
+// --- deep-link routing: a URL opens straight to a project (and highlights a card)
+function parseHash(){
+  const m=(location.hash||'').match(/^#\/project\/([^\/]+)(?:\/card\/([^\/]+))?/);
+  if(m) return {thread:m[1], card:m[2]||null};
+  return null;
+}
+function applyRoute(){
+  const r=parseHash();
+  if(!r||!r.thread) return;
+  state.highlightCard=r.card||null;
+  state.view='working';
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.v==='working'));
+  if(state.openThread!==r.thread){
+    state.openThread=r.thread;
+    api(`/threads/${r.thread}`).then(tv=>{ state.threadView=(tv&&tv.id)?tv:null; if(!state.threadView)state.openThread=null; render(); flashCard(); });
+  } else { render(); flashCard(); }
+}
+function flashCard(){
+  if(!state.highlightCard) return;
+  const id=state.highlightCard; state.highlightCard=null;
+  setTimeout(()=>{ const el=document.querySelector(`[data-card-id="${id}"]`);
+    if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('hl'); setTimeout(()=>el.classList.remove('hl'),2600);} },350);
+}
+function goLink(url){ const i=(url||'').indexOf('#'); location.hash = i>=0 ? url.slice(i+1) : url; }
+window.addEventListener('hashchange', applyRoute);
+window.goLink=goLink;
 async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();} }
 function toggleCard(id){ state.expanded['dc-'+id]=!state.expanded['dc-'+id]; render(); }
 async function dump(id){
@@ -1353,12 +1392,27 @@ window.toggleRow=toggleRow; window.promoteClean=promoteClean; window.extendItem=
 function vActivity(){
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> ACTIVITY</div>
-    <h1 class="head display">Your past self, helping you now</h1>
-    <p class="sub">Every time an agent pulls your context through the CRUX hook, it lands here. This is the value you can usually never see.</p>
-    <div class="card" style="max-width:760px">
-      <h4 style="font-family:var(--sans);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 18px">Injection feed</h4>
-      ${feedHTML(state.feed) || '<div class="muted2" style="font-size:14px">No injections yet. Run <span class="mono">crux install-hook</span>, then start a task in Claude Code.</div>'}
+    <h1 class="head display">Every pull &amp; capture, as it happens</h1>
+    <p class="sub">CRUX logs every time it feeds context to an agent or captures something into a project — automatically, on every prompt. Click any row to land on the exact project.</p>
+    <div class="card" style="max-width:820px">
+      ${activityHTML(state.activity) || '<div class="muted2" style="font-size:14px">Nothing yet. Run <span class="mono">crux install-hook</span>, then start a task in Claude Code — pulls and captures show up here.</div>'}
     </div>`);
+}
+function activityHTML(events){
+  if(!events||!events.length) return "";
+  return events.map(e=>{
+    const pull=e.kind==='pull';
+    const ic=pull?'⌁':'⤓';
+    const col=pull?'var(--teal)':'var(--peach)';
+    const bg=pull?'var(--teal-bg)':'var(--peach-bg)';
+    const open=e.link?`<span class="evopen" onclick="goLink('${esc(e.link)}')">open →</span>`:'';
+    return `<div class="ev2">
+      <span class="evk" style="background:${bg};color:${col}">${ic} ${pull?'PULL':'CAPTURE'}</span>
+      <div class="evtxt"><b>${esc(e.title)}</b>${e.detail?` — ${esc(e.detail)}`:''}</div>
+      <span class="evwhen mono">${rel(e.created_at)}</span>
+      ${open}
+    </div>`;
+  }).join("");
 }
 function feedHTML(feed){
   if(!feed||!feed.length) return "";
@@ -1471,6 +1525,7 @@ async function init(){
     try{ await load(); }
     catch(e2){ if(a) a.innerHTML='<div class="booting">Couldn\'t reach CRUX — <span class="resum" onclick="location.reload()">retry</span></div>'; }
   }
+  applyRoute();   // deep link in the URL → open straight to that project/card
 }
 function applyRole(){
   // members propose & use; only the leader validates. Hide the Review tab + the

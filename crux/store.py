@@ -327,7 +327,8 @@ class Store:
 
     def add_step(self, content: str, *, source: str = "note",
                  source_ref: str | None = None,
-                 thread_id: str | None = None, route: bool = False) -> dict:
+                 thread_id: str | None = None, route: bool = False,
+                 _log: bool = True) -> dict:
         """Dump a card. Lands on the given thread (or the current one); with no
         thread it's a global unsorted capture. Kept raw — never atomized into facts.
         `source` is the channel (note/hotkey/agent/…); `source_ref` is the
@@ -352,6 +353,8 @@ class Store:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
             if route:
                 self.route_card(ep.id)
+            if _log:
+                self._log_capture(thread_id, source, source_ref, [ep.id])
         return {"episode": self.db.get_episode(ep.id).to_public_dict(),
                 "thread_id": thread_id, "card_id": ep.id}
 
@@ -389,25 +392,45 @@ class Store:
             thread_id = None
         if not split:
             res = self.add_step(content, source=source, source_ref=source_ref,
-                                thread_id=thread_id)
+                                thread_id=thread_id, _log=False)
             if res.get("card_id"):
                 self.route_card(res["card_id"])
+            self._log_capture(thread_id, source, source_ref, [res.get("card_id")])
             return {"thread_id": thread_id, "card_ids": [res.get("card_id")], "count": 1}
         entries = self.processor.extract_entries(content) or [
             {"content": content, "kind": "note"}]
         session_id = self._active_session(thread_id) if thread_id else None
-        card_ids = []
+        card_ids, kinds = [], []
         for e in entries:
             ep = self.db.insert_episode(Episode(
                 id=str(uuid.uuid4()), raw_content=e["content"], source_type=source,
                 source_ref=(source_ref or None), thread_id=thread_id,
                 session_id=session_id, kind=e.get("kind", "note"), routed=True,
                 route_reason="extracted", included=True))
-            card_ids.append(ep.id)
+            card_ids.append(ep.id); kinds.append(e.get("kind", "note"))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())
             self._mark_context_stale(thread_id)
+        self._log_capture(thread_id, source, source_ref, card_ids, kinds)
         return {"thread_id": thread_id, "card_ids": card_ids, "count": len(card_ids)}
+
+    def _log_capture(self, thread_id, source, source_ref, card_ids, kinds=None):
+        """One activity row for a capture, summarizing what was filed + where from."""
+        n = len([c for c in card_ids if c])
+        if not thread_id or not n:
+            return
+        from collections import Counter
+        via = source_ref or source or "capture"
+        if kinds:
+            mix = ", ".join(f"{c}× {k}" for k, c in Counter(kinds).most_common())
+            detail = f"{mix} · via {via}"
+        else:
+            detail = f"{n} item{'s' if n != 1 else ''} · via {via}"
+        sid = self.db.active_session(thread_id)
+        self.log_event("capture", thread_id=thread_id,
+                       session_id=(sid or {}).get("id"),
+                       title=f"Captured {n} signal{'s' if n != 1 else ''}",
+                       detail=detail, count=n)
 
     def route_card(self, card_id: str) -> dict | None:
         """Tag a dumped card's KIND (reference/prompt/result/…) and mark the thread's
@@ -584,7 +607,17 @@ class Store:
             parts.append(kb_text)
         elif t.get("background"):                       # fall back to the seed
             parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
-        return {"brief": "\n\n".join(parts), "intent": intent,
+        brief = "\n\n".join(parts)
+        if record and brief:
+            bits = []
+            if kb: bits.append(f"{len(kb)} fact{'s' if len(kb)!=1 else ''}")
+            if memory: bits.append("working memory")
+            if questions: bits.append(f"{len(questions)} open q")
+            focus = (query or "").strip()
+            self.log_event("pull", thread_id=thread_id, title="Context pulled",
+                           detail=(", ".join(bits) or "context") + (f" · {focus[:80]}" if focus else ""),
+                           count=len(kb))
+        return {"brief": brief, "intent": intent,
                 "working_memory": memory, "open_questions": questions,
                 "recent": recent, "kb": kb}
 
@@ -693,6 +726,35 @@ class Store:
         ts = now_iso()
         for iid in item_ids:
             self.db.log_usage(iid, query, session, ts, user=user)
+
+    # --- activity trail: every pull + capture, deep-linked -------------------
+
+    def deep_link(self, thread_id: str | None, card_id: str | None = None) -> str:
+        """A clickable URL straight to the exact project (and card) in the
+        dashboard — so any activity row, or an agent breadcrumb, is one click from
+        the precise page. localhost (not 127.0.0.1) so terminals make it clickable."""
+        if not thread_id:
+            return ""
+        host = "localhost" if self.cfg.host in ("127.0.0.1", "0.0.0.0", "") else self.cfg.host
+        base = f"http://{host}:{self.cfg.port}/#/project/{thread_id}"
+        return f"{base}/card/{card_id}" if card_id else base
+
+    def log_event(self, kind: str, *, thread_id: str | None = None,
+                  session_id: str | None = None, title: str, detail: str = "",
+                  count: int = 0) -> None:
+        """Record one activity event (pull|capture). Best-effort: never let a
+        logging failure break capture/injection."""
+        try:
+            self.db.log_event(kind, thread_id, session_id, title, detail, count, now_iso())
+        except Exception:
+            pass
+
+    def activity(self, limit: int = 50, thread_id: str | None = None) -> list[dict]:
+        """The activity timeline with a deep link attached to each row."""
+        out = []
+        for e in self.db.recent_events(limit, thread_id=thread_id):
+            out.append({**e, "link": self.deep_link(e.get("thread_id"))})
+        return out
 
     # --- contradiction-aware writes (the "neighborhood update") --------------
 

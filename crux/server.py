@@ -480,6 +480,11 @@ def create_app(cfg: Config):
     def feed(limit: int = 20):
         return {"usages": store.db.recent_usages(limit)}
 
+    @app.get("/activity")
+    def activity(limit: int = 60, thread: str | None = None):
+        # the always-on, deep-linked trail of every pull + capture
+        return {"events": store.activity(limit, thread_id=thread)}
+
     @app.get("/review")
     def review():
         items = store.triage()

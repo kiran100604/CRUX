@@ -154,6 +154,22 @@ CREATE TABLE IF NOT EXISTS usages (
 );
 CREATE INDEX IF NOT EXISTS idx_usages_item ON usages(item_id);
 
+-- activity timeline: one human-readable row every time CRUX PULLS context into an
+-- agent or CAPTURES something into a project. Written deterministically (by the
+-- hook), so the trail is always complete regardless of how the agent renders it —
+-- each row deep-links to the exact project page.
+CREATE TABLE IF NOT EXISTS events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,          -- pull | capture
+    thread_id  TEXT,
+    session_id TEXT,
+    title      TEXT NOT NULL,
+    detail     TEXT,
+    count      INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
 -- contradiction candidates found at write time (the "neighborhood update").
 -- Never auto-applied — the human resolves (supersede) or dismisses; dismissals stick.
 CREATE TABLE IF NOT EXISTS conflicts (
@@ -619,6 +635,26 @@ class Database:
             """SELECT u.item_id, u.query, u.used_at, i.title, i.scope, i.type
                FROM usages u JOIN items i ON i.id = u.item_id
                ORDER BY u.id DESC LIMIT ?""", (limit,))
+        return [dict(r) for r in rows]
+
+    # --- activity events (pull / capture timeline) ---------------------------
+
+    def log_event(self, kind: str, thread_id: str | None, session_id: str | None,
+                  title: str, detail: str, count: int, created_at: str) -> None:
+        self.conn.execute(
+            """INSERT INTO events (kind, thread_id, session_id, title, detail, count, created_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (kind, thread_id, session_id, title, detail, int(count), created_at))
+        self.conn.commit()
+
+    def recent_events(self, limit: int = 50, thread_id: str | None = None) -> list[dict]:
+        if thread_id:
+            rows = self.conn.execute(
+                "SELECT * FROM events WHERE thread_id=? ORDER BY id DESC LIMIT ?",
+                (thread_id, limit))
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,))
         return [dict(r) for r in rows]
 
     # --- contradiction candidates --------------------------------------------

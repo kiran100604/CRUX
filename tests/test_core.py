@@ -744,3 +744,24 @@ def test_install_writes_all_three_hooks(tmp_path):
     assert install_claude_hooks(settings) == {  # idempotent
         "SessionStart": "already-installed", "UserPromptSubmit": "already-installed",
         "Stop": "already-installed"}
+
+
+def test_activity_trail_logs_pulls_and_captures_with_links(store):
+    t = store.create_thread("Sync", "Build data sync")
+    store.ingest_working("We decided to use Postgres.\nThe API must respond under 200ms.",
+                         thread_id=t["id"], source="paste", source_ref="claude-code", split=True)
+    store.assemble_context(t["id"], query="implement conflict resolution")
+    store.add_step("Quick hotkey note", source="hotkey", thread_id=t["id"], route=True)
+    ev = store.activity(50)
+    kinds = [e["kind"] for e in ev]
+    assert "pull" in kinds and "capture" in kinds
+    # every row deep-links to the exact project page
+    assert all(("/#/project/" + t["id"]) in e["link"] for e in ev if e["thread_id"])
+    cap = next(e for e in ev if e["kind"] == "capture" and "claude-code" in (e["detail"] or ""))
+    assert cap["count"] == 2 and "decision" in cap["detail"]
+
+
+def test_deep_link_uses_localhost(store):
+    link = store.deep_link("abc", card_id="xyz")
+    assert link.endswith("/#/project/abc/card/xyz")
+    assert "localhost" in link
