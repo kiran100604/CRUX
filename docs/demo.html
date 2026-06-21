@@ -3,13 +3,12 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>CRUX — demo reel</title>
+<title>CRUX — product demo</title>
 <style>
-  /* ---- CRUX brand palette ---- */
   :root{
     --canvas:#fdf8ec; --soft:#f4ecd8; --card:#efe6d0; --strong:#e3d9bf; --hair:#d6ccb2;
     --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f;
-    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb;
+    --teal:#143030; --teal-ink:#1f6b5e; --teal-bg:#e3ede9; --teal-line:#bcd2cb;
     --peach:#a8541d; --peach-bg:#fbead8; --peach-line:#eccba9;
     --coral:#bf3422; --coral-bg:#fbe2dc; --coral-line:#eebcb1;
     --green:#15833f;
@@ -18,194 +17,262 @@
   }
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{height:100%}
-  body{background:#0b0b0c; display:grid; place-items:center; font-family:var(--sans);
-    overflow:hidden}
+  body{background:#0b0b0c; display:grid; place-items:center; font-family:var(--sans); overflow:hidden}
 
-  /* 9:16 vertical stage — record this (or the whole screen, then crop) */
-  .stage{position:relative; height:96vh; aspect-ratio:9/16; max-width:96vw;
-    background:var(--canvas); border-radius:26px; overflow:hidden;
-    box-shadow:0 30px 90px rgba(0,0,0,.6); --u:calc(96vh/100);}
+  .stage{position:relative; height:96vh; aspect-ratio:9/16; max-width:96vw; background:var(--canvas);
+    border-radius:26px; overflow:hidden; box-shadow:0 30px 90px rgba(0,0,0,.6); --u:calc(96vh/100);
+    display:flex; flex-direction:column}
   @media (max-aspect-ratio:9/16){ .stage{height:auto; width:96vw; --u:calc(96vw*16/9/100);} }
 
-  .scene{position:absolute; inset:0; padding:calc(var(--u)*7) calc(var(--u)*6);
-    display:flex; flex-direction:column; justify-content:center; gap:calc(var(--u)*2.4);
-    opacity:0; transform:translateY(calc(var(--u)*1.4)); transition:opacity .6s ease, transform .6s ease;
-    pointer-events:none}
-  .scene.active{opacity:1; transform:none}
-
-  .kicker{font-family:var(--mono); font-size:calc(var(--u)*2.1); letter-spacing:.22em;
-    text-transform:uppercase; color:var(--muted2)}
-  h1{font-size:calc(var(--u)*6.6); line-height:1.04; letter-spacing:-.02em; color:var(--ink); font-weight:650}
-  h1 .coral{color:var(--coral)} h1 .teal{color:var(--teal)}
-  .big{font-size:calc(var(--u)*8.4); line-height:1; letter-spacing:-.03em; color:var(--ink); font-weight:700}
-  .cap{font-size:calc(var(--u)*2.9); line-height:1.4; color:var(--muted)}
-  .cap b{color:var(--ink)}
-
-  /* progress + brand chrome */
-  .bar{position:absolute; top:0; left:0; height:calc(var(--u)*0.7); width:0; background:var(--teal); z-index:9}
-  .stage.run .bar{animation:grow 61s linear forwards}
+  .bar{position:absolute; top:0; left:0; height:calc(var(--u)*0.7); width:0; background:var(--teal); z-index:30}
+  .stage.run .bar{animation:grow 58s linear forwards}
   @keyframes grow{to{width:100%}}
-  .wm{position:absolute; bottom:calc(var(--u)*3.2); left:0; right:0; text-align:center;
-    font-family:var(--mono); font-size:calc(var(--u)*1.9); letter-spacing:.34em; color:var(--muted2); z-index:8}
 
-  /* chat bubbles (scene 2) */
-  .chat{display:flex; flex-direction:column; gap:calc(var(--u)*1.8)}
-  .bub{max-width:84%; padding:calc(var(--u)*2.2) calc(var(--u)*2.6); font-size:calc(var(--u)*2.7);
-    line-height:1.34; border-radius:calc(var(--u)*2.4)}
-  .me{align-self:flex-end; background:var(--teal); color:#fff; border-bottom-right-radius:calc(var(--u)*0.6)}
-  .ai{align-self:flex-start; background:var(--soft); color:var(--body); border:1px solid var(--hair);
-    border-bottom-left-radius:calc(var(--u)*0.6)}
-  .ai.lost{background:var(--coral-bg); border-color:var(--coral-line); color:var(--coral)}
+  /* phase label */
+  .phase{position:absolute; top:calc(var(--u)*2.4); left:calc(var(--u)*5); z-index:20;
+    font-family:var(--mono); font-size:calc(var(--u)*2); letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted2); opacity:0; transition:opacity .5s}
+  .phase.show{opacity:1}
 
-  /* terminal + working-memory cards (scenes 4/5) */
-  .term{background:#10100f; border-radius:calc(var(--u)*2); padding:calc(var(--u)*2.4);
-    font-family:var(--mono); font-size:calc(var(--u)*2.2); line-height:1.6; color:#d8cfb8}
-  .term .dot{display:inline-block; width:calc(var(--u)*1.3); height:calc(var(--u)*1.3); border-radius:50%; margin-right:calc(var(--u)*0.8)}
-  .term .prompt{color:#7fb0a3}
-  .panel{margin-top:calc(var(--u)*2.6); background:var(--canvas); border:1px solid var(--hair);
-    border-radius:calc(var(--u)*2); padding:calc(var(--u)*2.2)}
-  .ptitle{font-family:var(--mono); font-size:calc(var(--u)*1.9); letter-spacing:.12em; text-transform:uppercase;
-    color:var(--teal); margin-bottom:calc(var(--u)*1.8)}
-  .ptitle.peach{color:var(--peach)}
-  .crd{display:flex; align-items:center; gap:calc(var(--u)*1.4); padding:calc(var(--u)*1.5) 0;
-    border-top:1px solid var(--hair); font-size:calc(var(--u)*2.4); color:var(--body)}
-  .crd:first-of-type{border-top:none}
-  .tag{font-family:var(--mono); font-size:calc(var(--u)*1.5); letter-spacing:.05em; text-transform:uppercase;
-    font-weight:700; padding:calc(var(--u)*0.5) calc(var(--u)*1.1); border-radius:999px; flex:none}
+  .desk{position:relative; flex:1; min-height:0; padding:calc(var(--u)*5.5) calc(var(--u)*5) 0}
+
+  /* a window (terminal or app) */
+  .win{position:absolute; left:calc(var(--u)*5); right:calc(var(--u)*5); border-radius:calc(var(--u)*2.2);
+    overflow:hidden; box-shadow:0 calc(var(--u)*2) calc(var(--u)*5) rgba(8,8,8,.18);
+    opacity:0; transform:translateY(calc(var(--u)*2)); transition:opacity .55s ease, transform .55s ease, top .55s ease, height .55s ease}
+  .win.show{opacity:1; transform:none}
+  .chrome{display:flex; align-items:center; gap:calc(var(--u)*1); padding:calc(var(--u)*1.5) calc(var(--u)*2)}
+  .chrome .d{width:calc(var(--u)*1.4); height:calc(var(--u)*1.4); border-radius:50%}
+  .chrome .t{margin-left:calc(var(--u)*1.4); font-family:var(--mono); font-size:calc(var(--u)*1.8)}
+
+  /* terminal */
+  #term{background:#100f0d}
+  #term .chrome{background:#1b1916} #term .chrome .t{color:#9b9282}
+  .scr{padding:calc(var(--u)*2) calc(var(--u)*2.2); font-family:var(--mono); font-size:calc(var(--u)*1.95);
+    line-height:1.55; color:#e7ddc6; min-height:calc(var(--u)*12)}
+  .scr .pr{color:#6fc0a8}
+  .scr .out{color:#cfe6dd}
+  .scr .ctx{display:block; margin:calc(var(--u)*1.4) 0; padding:calc(var(--u)*1.6) calc(var(--u)*1.8);
+    border:1px dashed #3a5650; border-radius:calc(var(--u)*1.2); color:#8fc7b8; font-size:calc(var(--u)*1.95); line-height:1.5; white-space:pre-wrap}
+  .scr .ctx b{color:#bfe3d8}
+  .scr .hook{color:#7c9b93; font-size:calc(var(--u)*1.9)}
+  .caret{display:inline-block; width:calc(var(--u)*1.1); height:calc(var(--u)*2.4); background:#6fc0a8;
+    vertical-align:-3px; margin-left:2px; animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* CRUX app window */
+  #crux{background:var(--canvas); border:1px solid var(--hair)}
+  #crux .chrome{background:var(--soft); border-bottom:1px solid var(--hair)}
+  #crux .chrome .t{color:var(--muted)}
+  .appbar{display:flex; align-items:center; gap:calc(var(--u)*1.4); padding:calc(var(--u)*1.6) calc(var(--u)*2.2);
+    border-bottom:1px solid var(--hair)}
+  .logo{display:flex; align-items:center; gap:calc(var(--u)*1.2)}
+  .logo .mk{width:calc(var(--u)*3); height:calc(var(--u)*3); border-radius:calc(var(--u)*0.9); background:var(--ink); position:relative}
+  .logo .mk::after{content:""; position:absolute; inset:calc(var(--u)*0.9); border-radius:50%; background:var(--teal)}
+  .logo .nm{font-weight:800; letter-spacing:.14em; font-size:calc(var(--u)*2.3); color:var(--ink)}
+  .tabs{display:flex; gap:calc(var(--u)*0.6); margin-left:auto}
+  .tab{font-size:calc(var(--u)*1.85); color:var(--muted); padding:calc(var(--u)*0.7) calc(var(--u)*1.6); border-radius:999px}
+  .tab.on{background:var(--ink); color:#fff}
+  .appbody{padding:calc(var(--u)*1.8)}
+
+  .intent{display:flex; align-items:center; gap:calc(var(--u)*1.4); background:var(--soft); border:1px solid var(--hair);
+    border-left:calc(var(--u)*0.8) solid var(--ink); border-radius:calc(var(--u)*1.4); padding:calc(var(--u)*1.4) calc(var(--u)*1.7);
+    font-size:calc(var(--u)*1.95); color:var(--ink); font-weight:600}
+  .intent .lab{font-family:var(--mono); font-size:calc(var(--u)*1.45); letter-spacing:.1em; text-transform:uppercase; color:var(--muted2)}
+
+  .ctxpanel{margin-top:calc(var(--u)*1.8); background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:calc(var(--u)*1.4); padding:calc(var(--u)*1.8)}
+  .ctxpanel .lab{font-family:var(--mono); font-size:calc(var(--u)*1.5); letter-spacing:.1em; text-transform:uppercase; color:var(--teal-ink); margin-bottom:calc(var(--u)*1.1); display:flex; align-items:center; gap:calc(var(--u)*1)}
+  .ctxpanel .auto{font-size:calc(var(--u)*1.3); background:#fff; color:var(--teal-ink); border-radius:999px; padding:1px calc(var(--u)*1)}
+  .ctxpanel .wm{font-size:calc(var(--u)*1.85); line-height:1.45; color:var(--body); min-height:calc(var(--u)*4.5)}
+
+  .dumps{margin-top:calc(var(--u)*1.5); display:flex; flex-direction:column; gap:calc(var(--u)*1)}
+  .crd{display:flex; align-items:center; gap:calc(var(--u)*1.2); background:#fff; border:1px solid var(--hair);
+    border-radius:calc(var(--u)*1.2); padding:calc(var(--u)*1.25) calc(var(--u)*1.4); font-size:calc(var(--u)*1.85); color:var(--body);
+    opacity:0; transform:translateX(calc(var(--u)*3)); transition:opacity .45s ease, transform .45s ease}
+  .crd.in{opacity:1; transform:none}
+  .tag{font-family:var(--mono); font-size:calc(var(--u)*1.4); letter-spacing:.04em; text-transform:uppercase; font-weight:700;
+    padding:calc(var(--u)*0.5) calc(var(--u)*1); border-radius:999px; flex:none}
   .t-dec{background:#e3eefb; color:#1f5fb0} .t-con{background:var(--coral-bg); color:var(--coral)}
   .t-q{background:var(--coral-bg); color:var(--coral)} .t-req{background:#e6efe0; color:#3d6b2a}
-  .via{margin-left:auto; font-family:var(--mono); font-size:calc(var(--u)*1.5); color:var(--muted2); flex:none}
+  .via{margin-left:auto; font-family:var(--mono); font-size:calc(var(--u)*1.4); color:var(--muted2); flex:none}
 
-  /* differentiator pills (scene 6) */
-  .pills{display:flex; flex-direction:column; gap:calc(var(--u)*2)}
-  .pill{display:flex; align-items:center; gap:calc(var(--u)*2); background:var(--soft);
-    border:1px solid var(--hair); border-left:calc(var(--u)*0.9) solid var(--teal);
-    border-radius:calc(var(--u)*1.8); padding:calc(var(--u)*2.4); font-size:calc(var(--u)*3); color:var(--ink); font-weight:600}
-  .pill b{font-size:calc(var(--u)*3.4)} .pill .em{font-size:calc(var(--u)*4)}
+  .toast{position:absolute; right:calc(var(--u)*7); z-index:25; background:var(--ink); color:#fff;
+    font-size:calc(var(--u)*1.9); padding:calc(var(--u)*1.3) calc(var(--u)*2); border-radius:999px;
+    display:flex; align-items:center; gap:calc(var(--u)*1); opacity:0; transform:translateY(calc(var(--u)*1.5)); transition:.4s}
+  .toast.show{opacity:1; transform:none}
+  .toast .pls{width:calc(var(--u)*1.3); height:calc(var(--u)*1.3); border-radius:50%; background:var(--green)}
 
-  /* logo */
-  .logo{display:flex; align-items:center; gap:calc(var(--u)*2)}
-  .logo .mk{width:calc(var(--u)*7); height:calc(var(--u)*7); border-radius:calc(var(--u)*1.8); background:var(--ink);
-    position:relative; flex:none}
-  .logo .mk::after{content:""; position:absolute; inset:calc(var(--u)*2.2); border-radius:50%; background:var(--teal)}
-  .logo .nm{font-size:calc(var(--u)*7.5); font-weight:800; letter-spacing:.12em; color:var(--ink)}
+  /* caption strip */
+  .cap{flex:none; padding:calc(var(--u)*2.2) calc(var(--u)*6) calc(var(--u)*3.2);
+    font-size:calc(var(--u)*2.5); line-height:1.32; color:var(--muted); text-align:center; min-height:calc(var(--u)*9)}
+  .cap b{color:var(--ink)}
 
-  /* entrance animation for staggered children */
-  .scene.active .pop{animation:pop .55s cubic-bezier(.2,.8,.2,1) both}
-  @keyframes pop{from{opacity:0; transform:translateY(calc(var(--u)*2.2)) scale(.97)} to{opacity:1; transform:none}}
+  /* CTA */
+  #cta{position:absolute; inset:0; background:var(--canvas); display:flex; flex-direction:column;
+    justify-content:center; gap:calc(var(--u)*2.6); padding:calc(var(--u)*7); opacity:0; transition:opacity .6s; z-index:18}
+  #cta.show{opacity:1}
+  #cta .logo .mk{width:calc(var(--u)*6); height:calc(var(--u)*6); border-radius:calc(var(--u)*1.6)}
+  #cta .logo .mk::after{inset:calc(var(--u)*1.9)}
+  #cta .logo .nm{font-size:calc(var(--u)*6.5); letter-spacing:.12em}
+  #cta h1{font-size:calc(var(--u)*6.2); line-height:1.05; letter-spacing:-.02em; color:var(--ink); font-weight:700}
+  #cta .row{display:flex; gap:calc(var(--u)*1.4); flex-wrap:wrap}
+  #cta .chip{font-size:calc(var(--u)*2.1); background:var(--soft); border:1px solid var(--hair); color:var(--ink);
+    border-radius:999px; padding:calc(var(--u)*1.3) calc(var(--u)*2.2); font-weight:600}
+  #cta .sub{font-size:calc(var(--u)*2.4); color:var(--muted)}
 
-  .replay{position:absolute; inset:0; display:none; place-items:center; background:rgba(8,8,8,.78); z-index:20}
+  .replay{position:absolute; inset:0; display:none; place-items:center; background:rgba(8,8,8,.78); z-index:40}
   .replay.show{display:grid}
-  .replay button{font-family:var(--sans); font-size:calc(var(--u)*3); font-weight:600; color:#fff;
-    background:var(--teal); border:none; border-radius:999px; padding:calc(var(--u)*2.2) calc(var(--u)*5); cursor:pointer}
+  .replay button{font-size:calc(var(--u)*3); font-weight:600; color:#fff; background:var(--teal); border:none;
+    border-radius:999px; padding:calc(var(--u)*2.2) calc(var(--u)*5); cursor:pointer}
 </style>
 </head>
 <body>
   <div class="stage run" id="stage">
-    <div class="bar" id="bar"></div>
+    <div class="bar"></div>
+    <div class="phase" id="phase"></div>
 
-    <!-- S1 hook -->
-    <section class="scene" id="s1">
-      <div class="kicker pop">2026</div>
-      <h1 class="pop">Your AI coding agent is brilliant.</h1>
-      <h1 class="pop" style="animation-delay:1.6s">And it <span class="coral">forgets everything.</span></h1>
-    </section>
-
-    <!-- S2 the pain -->
-    <section class="scene" id="s2">
-      <div class="kicker pop">monday</div>
-      <div class="chat">
-        <div class="bub me pop" style="animation-delay:.2s">Use Postgres, sync incrementally, never deploy on Fridays.</div>
-        <div class="bub ai pop" style="animation-delay:1.1s">Got it ✅</div>
-        <div class="kicker pop" style="animation-delay:2.4s; margin-top:calc(var(--u)*1.5)">tuesday · new session</div>
-        <div class="bub ai lost pop" style="animation-delay:3.1s">Wait — which database did we pick? And why not full-table sync?</div>
+    <div class="desk" id="desk">
+      <!-- terminal -->
+      <div class="win" id="term">
+        <div class="chrome"><span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span><span class="t">claude code — ~/sync-service</span></div>
+        <div class="scr" id="scr"></div>
       </div>
-      <div class="cap pop" style="animation-delay:4.2s">So you re-explain context. <b>All day.</b></div>
-    </section>
 
-    <!-- S3 brand -->
-    <section class="scene" id="s3" style="justify-content:center; align-items:flex-start">
-      <div class="logo pop"><div class="mk"></div><div class="nm">CRUX</div></div>
-      <h1 class="pop" style="animation-delay:.5s; font-size:calc(var(--u)*4.4); color:var(--muted)">ambient memory for<br/>coding agents</h1>
-    </section>
-
-    <!-- S4 capture -->
-    <section class="scene" id="s4">
-      <div class="kicker pop">while you work</div>
-      <div class="term pop" style="animation-delay:.3s">
-        <span class="prompt">claude code ›</span> implement the sync layer<br/>
-        <span style="color:#9fbdb2">Decided to sync incrementally, not full-table. Tests pass.</span>
+      <!-- CRUX app -->
+      <div class="win" id="crux">
+        <div class="appbar">
+          <div class="logo"><span class="mk"></span><span class="nm">CRUX</span></div>
+          <div class="tabs"><span class="tab on">Working</span><span class="tab">Knowledge</span><span class="tab">Review</span></div>
+        </div>
+        <div class="appbody">
+          <div class="intent"><span class="lab">★ intent</span><span>Build a fast data-sync feature</span></div>
+          <div class="ctxpanel">
+            <div class="lab">◆ working memory <span class="auto">auto</span></div>
+            <div class="wm" id="wm"></div>
+          </div>
+          <div class="dumps" id="dumps">
+            <div class="crd" data-i="0"><span class="tag t-dec">decision</span>Sync incrementally, not full-table<span class="via">via claude-code</span></div>
+            <div class="crd" data-i="1"><span class="tag t-con">constraint</span>Never deploy on Fridays<span class="via">via claude-code</span></div>
+            <div class="crd" data-i="2"><span class="tag t-q">open q</span>How to resolve write conflicts?<span class="via">via claude-code</span></div>
+          </div>
+        </div>
       </div>
-      <div class="panel">
-        <div class="ptitle pop" style="animation-delay:1.1s">◆ Working memory · auto</div>
-        <div class="crd pop" style="animation-delay:1.6s"><span class="tag t-dec">decision</span> Sync incrementally, not full-table <span class="via">via claude-code</span></div>
-        <div class="crd pop" style="animation-delay:2.3s"><span class="tag t-con">constraint</span> Never deploy on Fridays <span class="via">via claude-code</span></div>
-        <div class="crd pop" style="animation-delay:3.0s"><span class="tag t-q">open q</span> How to resolve write conflicts? <span class="via">via claude-code</span></div>
-      </div>
-      <div class="cap pop" style="animation-delay:3.9s">CRUX captures every decision <b>as you work</b> — zero extra steps.</div>
-    </section>
 
-    <!-- S5 resume -->
-    <section class="scene" id="s5">
-      <div class="kicker pop">next morning · you reopen the agent</div>
-      <div class="panel" style="border-color:var(--peach-line); background:var(--peach-bg)">
-        <div class="ptitle peach pop">▸ Resuming — injected automatically</div>
-        <div class="crd pop" style="animation-delay:.5s; border:none"><span class="tag t-req">intent</span> Build a fast data-sync feature</div>
-        <div class="crd pop" style="animation-delay:1.1s"><span class="tag t-dec">decision</span> Incremental sync · Postgres</div>
-        <div class="crd pop" style="animation-delay:1.7s"><span class="tag t-con">constraint</span> No Friday deploys</div>
-        <div class="crd pop" style="animation-delay:2.3s"><span class="tag t-q">open q</span> Write-conflict resolution</div>
-      </div>
-      <h1 class="pop" style="animation-delay:3.2s; font-size:calc(var(--u)*5)">Your agent <span class="teal">already knows</span> where you left off.</h1>
-    </section>
+      <div class="toast" id="toast"><span class="pls"></span><span>CRUX · captured 3</span></div>
+    </div>
 
-    <!-- S6 why we win -->
-    <section class="scene" id="s6">
-      <div class="kicker pop">why it's different</div>
-      <div class="pills">
-        <div class="pill pop" style="animation-delay:.3s"><span class="em">🔒</span><span><b>Local-first.</b> You own the data.</span></div>
-        <div class="pill pop" style="animation-delay:1.0s"><span class="em">🪝</span><span><b>Lives in your agent</b> — via hooks, no new app.</span></div>
-        <div class="pill pop" style="animation-delay:1.7s"><span class="em">🎯</span><span><b>Knows intent vs noise</b> — the right context, not all of it.</span></div>
-      </div>
-    </section>
+    <div class="cap" id="cap"></div>
 
-    <!-- S7 CTA -->
-    <section class="scene" id="s7" style="justify-content:center">
-      <div class="logo pop"><div class="mk"></div><div class="nm">CRUX</div></div>
-      <h1 class="pop" style="animation-delay:.6s">Never re-explain<br/>context again.</h1>
-      <div class="cap pop" style="animation-delay:1.4s">memory for AI coding agents · captures what you decide, feeds it back when you need it.</div>
-    </section>
+    <!-- CTA -->
+    <div id="cta">
+      <div class="logo"><span class="mk"></span><span class="nm">CRUX</span></div>
+      <h1>Never re-explain<br/>context again.</h1>
+      <div class="row"><span class="chip">🔒 Local-first</span><span class="chip">🪝 In your agent</span><span class="chip">🎯 Intent-aware</span></div>
+      <div class="sub">memory for AI coding agents — captures what you decide, feeds it back when you need it.</div>
+    </div>
 
-    <div class="wm">C R U X</div>
     <div class="replay" id="replay"><button onclick="play()">▶ Replay</button></div>
   </div>
 
 <script>
-  // scene timeline (ms). sum ≈ 61s.
-  const TL = [
-    {id:'s1', d:5200},
-    {id:'s2', d:10500},
-    {id:'s3', d:4000},
-    {id:'s4', d:15500},
-    {id:'s5', d:12500},
-    {id:'s6', d:8000},
-    {id:'s7', d:5300},
-  ];
-  const stage = document.getElementById('stage');
-  const replay = document.getElementById('replay');
-  let timers = [];
-  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
-  function activate(idx){
-    TL.forEach((s,j)=>document.getElementById(s.id).classList.toggle('active', j===idx));
-  }
-  function play(){
-    clearTimers();
-    replay.classList.remove('show');
-    stage.classList.remove('run'); void stage.offsetWidth; stage.classList.add('run'); // restart progress bar
-    let t = 0;
-    TL.forEach((s,idx)=>{ timers.push(setTimeout(()=>activate(idx), t)); t += s.d; });
-    timers.push(setTimeout(()=>{ replay.classList.add('show'); }, t + 200));
-  }
-  play();
+const $ = id => document.getElementById(id);
+const stage=$('stage'), phase=$('phase'), term=$('term'), crux=$('crux'), scr=$('scr'),
+      wm=$('wm'), toast=$('toast'), cap=$('cap'), cta=$('cta'), replay=$('replay'), desk=$('desk');
+let RUN=0;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function setPhase(t){ phase.textContent=t; phase.classList.toggle('show', !!t); }
+function caption(html){ cap.innerHTML=html; }
+function caret(el){ const c=document.createElement('span'); c.className='caret'; el.appendChild(c); return c; }
+
+async function type(el, text, cps, id){           // typewriter into a fresh span
+  const span=document.createElement('span'); el.appendChild(span);
+  const car=caret(el);
+  for(const ch of text){ if(id!==RUN) return; span.textContent+=ch; await sleep(1000/cps); }
+  car.remove(); return span;
+}
+async function stream(el, cls, text, wps, id){     // word-by-word "model output"
+  const span=document.createElement('span'); span.className=cls; el.appendChild(span);
+  const words=text.split(' ');
+  for(let i=0;i<words.length;i++){ if(id!==RUN) return; span.textContent+=(i?' ':'')+words[i]; await sleep(1000/wps); }
+  return span;
+}
+function reset(){
+  scr.innerHTML=''; wm.textContent='';
+  [term,crux].forEach(w=>w.classList.remove('show'));
+  toast.classList.remove('show'); cta.classList.remove('show'); replay.classList.remove('show');
+  document.querySelectorAll('.crd').forEach(c=>c.classList.remove('in'));
+  setPhase(''); caption('');
+  stage.classList.remove('run'); void stage.offsetWidth; stage.classList.add('run');
+}
+
+async function play(){
+  const id=++RUN; reset();
+
+  /* ===== ACT 1 — coding in Claude Code, CRUX listening ===== */
+  // split view: terminal top, CRUX bottom
+  term.style.top='0'; term.style.height='40%';
+  crux.style.top='42%'; crux.style.bottom='0'; crux.style.height='auto';
+  setPhase('you’re coding · claude code');
+  await sleep(400); if(id!==RUN)return;
+  term.classList.add('show'); crux.classList.add('show');
+  await sleep(700); if(id!==RUN)return;
+
+  const line1=document.createElement('div'); scr.appendChild(line1);
+  line1.innerHTML='<span class="pr">› </span>';
+  await type(line1, 'implement the incremental sync layer', 30, id); if(id!==RUN)return;
+  await sleep(500); if(id!==RUN)return;
+
+  const out=document.createElement('div'); out.style.marginTop='calc(var(--u)*1.2)'; scr.appendChild(out);
+  await stream(out, 'out', 'Going with incremental sync over full-table — much faster. Skipping Friday deploys per your constraint. Open question: how should we resolve write conflicts?', 8, id);
+  if(id!==RUN)return;
+  caption('You just <b>code normally</b>. CRUX is listening through the agent’s hooks.');
+  await sleep(500); if(id!==RUN)return;
+
+  // hook fires → cards land in CRUX + working memory writes
+  const hook=document.createElement('div'); hook.className='hook'; hook.style.marginTop='calc(var(--u)*1.2)';
+  scr.appendChild(hook); hook.textContent='⌁ crux · capturing from this turn…';
+  toast.style.top='calc(var(--u)*7)'; toast.classList.add('show');
+  await sleep(450); if(id!==RUN)return;
+  for(const c of document.querySelectorAll('.crd')){ c.classList.add('in'); await sleep(550); if(id!==RUN)return; }
+  await type(wm, 'Sync layer is incremental (not full-table) for speed. Friday deploys are off-limits. Conflict-resolution strategy still open.', 42, id);
+  if(id!==RUN)return;
+  caption('Every <b>decision, constraint &amp; open question</b> — filed automatically. Zero extra steps.');
+  await sleep(2600); if(id!==RUN)return;
+
+  /* ===== ACT 2 — next session, context auto-injected ===== */
+  toast.classList.remove('show'); crux.classList.remove('show');
+  await sleep(500); if(id!==RUN)return;
+  term.style.top='0'; term.style.height='78%';     // terminal grows to full
+  setPhase('next morning · brand-new session');
+  caption('');
+  scr.innerHTML='';
+  await sleep(700); if(id!==RUN)return;
+
+  const inj=document.createElement('div'); inj.className='ctx'; scr.appendChild(inj);
+  inj.innerHTML='<b>⌁ CRUX context — auto-injected at session start</b>\n';
+  await sleep(250); if(id!==RUN)return;
+  await type(inj, 'INTENT: build a fast data-sync feature\nDECISIONS: incremental sync · Postgres · no Friday deploys\nOPEN: write-conflict resolution', 90, id);
+  if(id!==RUN)return;
+  caption('A fresh session. CRUX hands the agent <b>exactly where you left off.</b>');
+  await sleep(800); if(id!==RUN)return;
+
+  const l2=document.createElement('div'); l2.style.marginTop='calc(var(--u)*1.4)'; scr.appendChild(l2);
+  l2.innerHTML='<span class="pr">› </span>';
+  await type(l2, 'continue where we left off', 30, id); if(id!==RUN)return;
+  await sleep(400); if(id!==RUN)return;
+  const o2=document.createElement('div'); o2.style.marginTop='calc(var(--u)*1.2)'; scr.appendChild(o2);
+  await stream(o2, 'out', 'Resuming the incremental Postgres sync. Next up: write-conflict resolution — I’ll go last-writer-wins with a version clock.', 8, id);
+  if(id!==RUN)return;
+  caption('It already knew. <b>No re-explaining. No repeated mistakes.</b>');
+  await sleep(2800); if(id!==RUN)return;
+
+  /* ===== ACT 3 — CTA ===== */
+  setPhase(''); caption('');
+  cta.classList.add('show');
+  await sleep(5000); if(id!==RUN)return;
+  replay.classList.add('show');
+}
+play();
 </script>
 </body>
 </html>
