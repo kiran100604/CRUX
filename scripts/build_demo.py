@@ -281,7 +281,6 @@ html = (
     + MENUBAR + "\n"
     + nav + "\n"
     + '<div id="app" class="wrap">' + THREAD + "</div>\n"
-    + '<footer>CRUX · LOCAL-FIRST CONTEXT LAYER · YOUR DATA NEVER LEAVES THIS MACHINE</footer>\n'
     + TERM_HTML + "\n"
     + CURSOR + "\n"
     + '<div class="sub" id="sub"></div>\n'
