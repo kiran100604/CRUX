@@ -7,7 +7,9 @@ faithful Claude Code terminal (matching the app screenshot) and animates the loo
 import re, pathlib
 
 src = pathlib.Path("crux/static/index.html").read_text(encoding="utf-8")
-style = src[src.index("<style>")+7 : src.index("</style>")]
+# tokens now live in a managed file; inline them so the demo is self-contained
+tokens = pathlib.Path("crux/static/tokens.css").read_text(encoding="utf-8")
+style = tokens + "\n" + src[src.index("<style>")+7 : src.index("</style>")]
 nav = src[src.index("<nav>") : src.index("</nav>")+6]
 # open the app on the Working tab, with realistic badge counts
 nav = nav.replace('class="tab on" data-v="overview"', 'class="tab" data-v="overview"')

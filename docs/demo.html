@@ -4,18 +4,88 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>CRUX — product demo</title>
-<style>
-  :root{
-    --canvas:#fdf8ec; --soft:#f4ecd8; --card:#efe6d0; --strong:#e3d9bf; --hair:#d6ccb2;
-    --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f; --on:#fff;
-    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb;
-    --peach:#a8541d; --peach-bg:#fbead8; --peach-line:#eccba9;
-    --coral:#bf3422; --coral-bg:#fbe2dc; --coral-line:#eebcb1;
-    --green:#15833f;
-    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --pill:9999px;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  }
+<style>/* ============================================================================
+   CRUX design tokens — the single source of truth for the visual system.
+   Edit values HERE; every surface (dashboard, setup wizard, demo) reads them.
+
+   Structure:
+     1. Base palette      — raw surface/text/accent values
+     2. Semantic aliases  — role-based names (prefer these in new code)
+     3. Signal tags       — the decision/requirement/constraint taxonomy colors
+     4. Radii / type      — shape + font tokens
+     5. Dark mode         — every token redefined under html.crux-dark
+   Warm, editorial, paper-like: parchment surfaces, near-black ink, three
+   editorial accent inks (teal=trusted, peach=working, coral=conflict).
+   ============================================================================ */
+
+:root {
+  /* 1. Base — surfaces (cream/parchment ramp) */
+  --canvas:#fdf8ec; --soft:#f4ecd8; --card:#efe6d0; --strong:#e3d9bf; --hair:#d6ccb2;
+  --paper:#fffdf7;                 /* near-white for floating cards (was hardcoded #fff) */
+
+  /* Base — text */
+  --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f;
+  --on:#ffffff;                    /* text on an --ink fill (flips in dark mode) */
+
+  /* Base — accents, each a fg / bg / line trio (used as MEANING, not decoration) */
+  --teal:#143030;  --teal-bg:#e3ede9;  --teal-line:#bcd2cb;   /* trusted / main graph */
+  --peach:#a8541d; --peach-bg:#fbead8; --peach-line:#eccba9;  /* working / owned */
+  --coral:#bf3422; --coral-bg:#fbe2dc; --coral-line:#eebcb1;  /* conflict / constraint / danger */
+  --green:#15833f;                 /* live / verified / success */
+
+  /* 2. Semantic aliases — reach for these when the ROLE matters more than the value */
+  --surface:var(--canvas); --surface-card:var(--paper); --surface-sunken:var(--soft);
+  --text:var(--body); --text-strong:var(--ink); --text-dim:var(--muted2);
+  --accent:var(--teal); --accent-bg:var(--teal-bg); --accent-line:var(--teal-line);
+  --danger:var(--coral); --danger-bg:var(--coral-bg); --danger-line:var(--coral-line);
+
+  /* 3. Signal/kind tags — taxonomy colors (tokenized so dark mode can adapt them) */
+  --k-decision-bg:#e3eefb;  --k-decision-fg:#1f5fb0;
+  --k-requirement-bg:#e6efe0; --k-requirement-fg:#3d6b2a;
+  --k-constraint-bg:var(--coral-bg); --k-constraint-fg:var(--coral);
+  --k-insight-bg:#fbf0d0;   --k-insight-fg:#8a6a17;
+  --k-question-bg:var(--coral-bg); --k-question-fg:var(--coral);
+  --k-prompt-bg:#eae3f5;    --k-prompt-fg:#5b3fa0;
+  --k-suggestion-bg:var(--peach-bg); --k-suggestion-fg:var(--peach);
+  --k-result-bg:#e6efe0;    --k-result-fg:#3d6b2a;
+  --k-reference-bg:var(--teal-bg); --k-reference-fg:var(--teal);
+
+  /* 4. Radii + type */
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --pill:9999px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* shadows (borders do most of the work; elevation is rare + flat) */
+  --shadow-card:0 1px 2px rgba(20,16,8,.04);
+  --shadow-pop:0 20px 50px rgba(40,30,10,.14);
+  --ring:0 0 0 3px rgba(20,48,48,.28);
+}
+
+/* 5. Dark mode — near-black ramp, desaturated-but-readable accents.
+   Same token NAMES, so no component CSS changes are needed. */
+html.crux-dark {
+  --canvas:#0f0f0f; --soft:#1a1a1a; --card:#242424; --strong:#303030; --hair:#404040;
+  --paper:#1f1f1f;
+  --ink:#fafaf8; --body:#e8e6e2; --muted:#a6a39a; --muted2:#8b8876;
+  --on:#0f0f0f;
+
+  --teal:#6fb3b0;  --teal-bg:#15302e;  --teal-line:#2d5550;
+  --peach:#d4915c; --peach-bg:#33240f; --peach-line:#5a3f2a;
+  --coral:#ff6b5b; --coral-bg:#3a201c; --coral-line:#5a3a30;
+  --green:#52d45a;
+
+  --k-decision-bg:#16263a;  --k-decision-fg:#88b6ec;
+  --k-requirement-bg:#1b2e19; --k-requirement-fg:#84c46f;
+  --k-insight-bg:#33290f;   --k-insight-fg:#dcbb5e;
+  --k-prompt-bg:#241a33;    --k-prompt-fg:#b89ae4;
+  --k-result-bg:#1b2e19;    --k-result-fg:#84c46f;
+
+  --shadow-card:0 1px 2px rgba(0,0,0,.4);
+  --shadow-pop:0 20px 50px rgba(0,0,0,.55);
+  --ring:0 0 0 3px rgba(111,179,176,.35);
+}
+
+
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{background:var(--canvas); color:var(--body); font-family:var(--sans); font-size:16px;
@@ -31,8 +101,9 @@
     padding:0 28px; background:var(--canvas); border-bottom:1px solid var(--hair)}
   .brand{display:flex; align-items:center; gap:10px; margin-right:22px}
   .brand .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
-    background:var(--ink)}
+    background:var(--ink); color:var(--on)}
   .brand .logo svg{width:18px;height:18px}
+  .brand .logo svg path{stroke:currentColor} .brand .logo svg circle{fill:currentColor}
   .brand .name{font-weight:700; letter-spacing:.16em; font-size:14px; color:var(--ink)}
   .brand .sub{font-size:9px; letter-spacing:.22em; color:var(--muted2); margin-top:1px}
   .tabs{display:flex; gap:4px}
@@ -47,6 +118,9 @@
   .tab.on .badge{background:rgba(255,255,255,.2); color:#fff}
   .tab.alert .badge{background:var(--coral); color:#fff}
   .navright{margin-left:auto; display:flex; align-items:center; gap:14px}
+  .themebtn{width:30px; height:30px; border:1px solid var(--hair); background:var(--canvas); color:var(--muted);
+    border-radius:var(--pill); font-size:15px; line-height:1; display:grid; place-items:center; transition:.15s}
+  .themebtn:hover{border-color:var(--muted2); color:var(--ink)}
   .status{font-family:var(--mono); font-size:11px; color:var(--muted); border:1px solid var(--hair);
     border-radius:var(--pill); padding:5px 11px}
   .status b{color:var(--green)}
@@ -117,6 +191,15 @@
   .ev .when{font-family:var(--mono); font-size:11px; color:var(--muted2)}
   .ev .txt{font-size:13.5px; color:var(--body); margin-top:7px; line-height:1.5}
   .ev .txt b{color:var(--ink); font-weight:600}
+  .ev2{display:flex; align-items:center; gap:12px; padding:12px 0; border-top:1px solid var(--hair)}
+  .ev2:first-of-type{border-top:none}
+  .ev2 .evk{font-family:var(--mono); font-size:10px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--pill); font-weight:700; flex:none}
+  .ev2 .evtxt{flex:1; min-width:0; font-size:13.5px; color:var(--body); line-height:1.45; overflow:hidden; text-overflow:ellipsis}
+  .ev2 .evtxt b{color:var(--ink); font-weight:600}
+  .ev2 .evwhen{font-size:11px; color:var(--muted2); flex:none}
+  .ev2 .evopen{font-size:12px; color:var(--teal); cursor:pointer; flex:none; white-space:nowrap}
+  .ev2 .evopen:hover{text-decoration:underline}
+  .dumpcard.hl{box-shadow:0 0 0 3px rgba(20,48,48,.28); border-color:var(--teal-line)}
 
   /* stat strip */
   .strip{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--hair);
@@ -204,7 +287,7 @@
   .lens{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:var(--pill);
     padding:6px 14px; font-size:13px; cursor:pointer}
   .lens:hover{border-color:var(--muted2)}
-  .lens.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .lens.on{background:var(--ink); color:var(--on); border-color:var(--ink)}
   .lens.new{border-style:dashed; color:var(--muted)}
   .lens .lx{margin-left:6px; opacity:.55} .lens .lx:hover{opacity:1; color:var(--coral)}
 
@@ -328,7 +411,7 @@
   .hotkeyhint .resum{color:var(--teal); cursor:pointer}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
   .dumplist{display:flex; flex-direction:column; gap:9px}
-  .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--card,#fff); background:#fff; border:1px solid var(--hair);
+  .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--paper); border:1px solid var(--hair);
     border-radius:var(--r-md); padding:12px 12px 11px 12px; box-shadow:0 1px 2px rgba(20,16,8,.04)}
   .dumpcard.sorting{opacity:.7; border-style:dashed}
   .dumpcard.excluded{background:var(--soft); opacity:.62}
@@ -348,13 +431,13 @@
   .dcdel{flex:none; background:none; color:var(--muted2); font-size:18px; line-height:1; padding:0 2px}
   .dcdel:hover{color:var(--coral)}
   .kind{font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:var(--pill); background:var(--soft); color:var(--muted); font-weight:600}
-  .k-reference{background:var(--teal-bg); color:var(--teal)} .k-prompt{background:#eae3f5; color:#5b3fa0}
-  .k-suggestion{background:var(--peach-bg); color:var(--peach)} .k-result{background:#e6efe0; color:#3d6b2a}
-  .k-insight{background:#fbf0d0; color:#8a6a17} .k-question{background:var(--coral-bg); color:var(--coral)}
+  .k-reference{background:var(--k-reference-bg); color:var(--k-reference-fg)} .k-prompt{background:var(--k-prompt-bg); color:var(--k-prompt-fg)}
+  .k-suggestion{background:var(--k-suggestion-bg); color:var(--k-suggestion-fg)} .k-result{background:var(--k-result-bg); color:var(--k-result-fg)}
+  .k-insight{background:var(--k-insight-bg); color:var(--k-insight-fg)} .k-question{background:var(--k-question-bg); color:var(--k-question-fg)}
   /* signals — the high-value entries that drive working memory */
-  .k-decision{background:#e3eefb; color:#1f5fb0; font-weight:700}
-  .k-requirement{background:#e6efe0; color:#3d6b2a; font-weight:700}
-  .k-constraint{background:var(--coral-bg); color:var(--coral); font-weight:700}
+  .k-decision{background:var(--k-decision-bg); color:var(--k-decision-fg); font-weight:700}
+  .k-requirement{background:var(--k-requirement-bg); color:var(--k-requirement-fg); font-weight:700}
+  .k-constraint{background:var(--k-constraint-bg); color:var(--k-constraint-fg); font-weight:700}
   .bgwrap{margin-top:20px} .bgwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
   .bgwrap .bgbox{margin-top:10px}
   .bgbox{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px;
@@ -369,7 +452,7 @@
   .kbhdrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px}
   .kbtoggle{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--hair); border-radius:var(--pill); padding:3px; flex:none}
   .kbtog{border:none; background:none; color:var(--muted); font-size:13px; padding:6px 14px; border-radius:var(--pill)}
-  .kbtog.on{background:var(--ink); color:#fff}
+  .kbtog.on{background:var(--ink); color:var(--on)}
   /* chat fills the viewport: header + input pinned, only the stream scrolls.
      In ask mode the body scroll is locked (see body.kb-ask) so nothing drifts. */
   .askview{display:flex; flex-direction:column; height:calc(100vh - 100px); min-height:440px}
@@ -422,7 +505,7 @@
   .fp-title{font-size:22px; font-weight:600; color:var(--ink); margin:10px 0 12px; line-height:1.2}
   .fp-stmt{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px; font-size:15px; line-height:1.5}
   .fp-meta{display:flex; gap:6px; align-items:center; margin:12px 0}
-  .fp-raw{background:var(--card); background:#fff; border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--body); white-space:pre-wrap}
+  .fp-raw{background:var(--paper); border:1px solid var(--hair); border-radius:var(--r-md); padding:14px 16px; font-size:13.5px; line-height:1.55; color:var(--body); white-space:pre-wrap}
   .edges{display:flex; flex-direction:column; gap:8px}
   .edge{font-size:13px; color:var(--muted)} .el{font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--muted2); margin-right:8px}
   .ep{display:inline-block; background:var(--soft); border:1px solid var(--hair); border-radius:var(--pill); padding:4px 10px; font-size:12.5px; color:var(--ink); margin:0 4px 4px 0; cursor:pointer}
@@ -445,11 +528,11 @@
   .navitem{padding:9px 11px; border-radius:var(--r-sm); cursor:pointer; border:1px solid transparent}
   .navitem:hover{background:var(--soft)}
   .navitem.sel{background:var(--ink)}
-  .navitem.sel .nt{color:#fff}
+  .navitem.sel .nt{color:var(--on)}
   .navitem .nt{font-size:13.5px; color:var(--ink); font-weight:500; line-height:1.35;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .navitem .ni{display:flex; align-items:center; gap:6px; margin-top:5px}
-  .navitem.sel .ipill{background:rgba(255,255,255,.18); color:#fff}
+  .navitem.sel .ipill{background:rgba(255,255,255,.18); color:var(--on)}
   .nbadge{font-family:var(--mono); font-size:10px; color:var(--muted2)}
   .navitem.sel .nbadge{color:rgba(255,255,255,.7)}
   .kbdetail{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-lg); padding:28px 30px}
@@ -477,7 +560,7 @@
   .empty .big{font-size:20px; color:var(--muted); margin-bottom:8px; font-weight:500}
 
   .toast{position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(16px); z-index:60;
-    background:var(--ink); color:#fff; border-radius:var(--r-md); padding:12px 20px; font-size:14px; opacity:0;
+    background:var(--ink); color:var(--on); border-radius:var(--r-md); padding:12px 20px; font-size:14px; opacity:0;
     transition:.3s; pointer-events:none}
   .toast.on{opacity:1; transform:translateX(-50%)}
   footer{background:var(--soft); border-top:1px solid var(--hair); padding:34px 28px; text-align:center;
@@ -619,7 +702,7 @@
 <div class="menubar"><span class="ap">Claude Code</span><span>File</span><span>Edit</span><span>View</span><span class="mr"><span>CRUX ⌁</span><span>100%</span><span>9:41 AM</span></span></div>
 <nav>
   <div class="brand">
-    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z" stroke="#fffaf0" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="#fffaf0"/></svg></span>
+    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z" stroke-width="1.6"/><circle cx="12" cy="12" r="3"/></svg></span>
     <div><div class="name">CRUX</div><div class="sub">CONTEXT BRAIN</div></div>
   </div>
   <div class="tabs" id="tabs">
@@ -630,6 +713,7 @@
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z"/></svg> Activity</button>
   </div>
   <div class="navright">
+    <button class="themebtn" id="themebtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button>
     <span class="status">Local · <b>READY</b></span>
     <span class="who"><span class="av" id="av">U</span><span id="whoname">You</span></span>
   </div>

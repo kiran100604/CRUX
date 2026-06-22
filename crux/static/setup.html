@@ -4,15 +4,11 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>CRUX — Setup</title>
+<link rel="stylesheet" href="/static/tokens.css">
+<script>try{if(localStorage.getItem('crux-theme')==='dark')document.documentElement.classList.add('crux-dark');}catch(e){}</script>
 <style>
-  :root{
-    --canvas:#fdf8ec; --soft:#f4ecd8; --card:#fffdf7; --hair:#d6ccb2;
-    --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f; --on:#fff;
-    --teal:#143030; --teal-bg:#e3ede9; --teal-line:#bcd2cb; --green:#15833f;
-    --r:14px; --pill:9999px;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  }
+  /* setup-specific aliases on top of the shared tokens (tokens.css) */
+  :root{ --card:var(--paper); --r:14px; }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{background:var(--canvas); color:var(--body); font-family:var(--sans); font-size:16px;

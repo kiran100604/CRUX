@@ -148,6 +148,15 @@ def create_app(cfg: Config):
     def setup_page():
         return FileResponse(STATIC_DIR / "setup.html")
 
+    @app.get("/static/{name}")
+    def static_file(name: str):
+        # serve design assets (tokens.css, …) from the static dir; no path traversal
+        from fastapi.responses import FileResponse as _FR
+        p = (STATIC_DIR / name).resolve()
+        if p.parent != STATIC_DIR.resolve() or not p.exists() or not p.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return _FR(p)
+
     class SetupIn(BaseModel):
         anthropic_key: str | None = None
         openai_key: str | None = None
