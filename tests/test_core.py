@@ -705,7 +705,10 @@ def test_hook_capture_files_turn_into_working_memory(tmp_path, monkeypatch, caps
     monkeypatch.setattr("sys.stdin", _FakeStdin(json.dumps(
         {"session_id": "sess1", "transcript_path": str(transcript)})))
     assert hooks.hook_capture() == 0
-    assert capsys.readouterr().out.strip() == "{}"
+    # emits a clickable capture breadcrumb (deep link) back to the agent
+    out = json.loads(capsys.readouterr().out.strip())
+    crumb = out["hookSpecificOutput"]["additionalContext"]
+    assert "captured" in crumb and "/#/project/" + t["id"] in crumb
     s2 = Store(Config.load())
     cards = s2.db.thread_steps(t["id"])
     kinds = {c.kind for c in cards}

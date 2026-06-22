@@ -204,11 +204,20 @@ def hook_capture() -> int:
             store.close()
             print("{}")
             return 0
-        store.ingest_working(text, thread_id=tid, source="agent",
-                             source_ref="claude-code", split=True)
+        res = store.ingest_working(text, thread_id=tid, source="agent",
+                                   source_ref="claude-code", split=True)
         store.db.set_meta(seen_key, uuid or text[:60])
+        n = res.get("count", 0)
+        link = store.deep_link(tid)
         store.close()
-        print("{}")
+        if n:
+            crumb = f"⌁ CRUX · captured {n} signal{'s' if n != 1 else ''} → working memory"
+            if link:
+                crumb += f" · {link}"
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "Stop", "additionalContext": crumb}}))
+        else:
+            print("{}")
         return 0
     except Exception:
         # Never break the user's turn because of CRUX.

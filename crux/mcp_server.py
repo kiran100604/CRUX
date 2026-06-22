@@ -57,7 +57,8 @@ def run() -> None:
         tid = store.current_thread_id()
         if tid:
             pkg = store.assemble_context(tid, query=task, kb_limit=limit)
-            return {"context": pkg["brief"], "count": len(pkg["kb"])}
+            return {"context": pkg["brief"], "count": len(pkg["kb"]),
+                    "open_in_crux": pkg.get("link", "")}
         from .hooks import _format
         results, links = store.retrieve(task, limit=limit, user=cfg.user)
         if not results:

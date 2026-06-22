@@ -607,17 +607,26 @@ class Store:
             parts.append(kb_text)
         elif t.get("background"):                       # fall back to the seed
             parts.append("[FROM MY KNOWLEDGE BASE]\n" + t["background"].strip())
+
+        bits = []
+        if kb: bits.append(f"{len(kb)} fact{'s' if len(kb)!=1 else ''}")
+        if memory: bits.append("working memory")
+        if questions: bits.append(f"{len(questions)} open q")
+        link = self.deep_link(thread_id)
+        if parts:
+            # clickable breadcrumb at the top — so the agent (and whoever pastes it)
+            # can see this came from CRUX and jump to the exact project in one click.
+            crumb = "⌁ CRUX · " + (", ".join(bits) or "context")
+            if link:
+                crumb += f" · {link}"
+            parts.insert(0, crumb)
         brief = "\n\n".join(parts)
         if record and brief:
-            bits = []
-            if kb: bits.append(f"{len(kb)} fact{'s' if len(kb)!=1 else ''}")
-            if memory: bits.append("working memory")
-            if questions: bits.append(f"{len(questions)} open q")
             focus = (query or "").strip()
             self.log_event("pull", thread_id=thread_id, title="Context pulled",
                            detail=(", ".join(bits) or "context") + (f" · {focus[:80]}" if focus else ""),
                            count=len(kb))
-        return {"brief": brief, "intent": intent,
+        return {"brief": brief, "intent": intent, "link": link,
                 "working_memory": memory, "open_questions": questions,
                 "recent": recent, "kb": kb}
 
