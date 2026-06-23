@@ -53,6 +53,14 @@ class Store:
             raise ValueError("cannot ingest empty content")
         return self._episode(content, source_type, source_ref, title)
 
+    @staticmethod
+    def _descriptor(*, subject: str, type: str, title: str, summary: str) -> str:
+        """The text we EMBED for a fact: a clean 'about-ness' descriptor
+        (subject · type · meaning) rather than raw prose, so the vector carries the
+        point, not filler. Raw text stays searchable via FTS for recall."""
+        head = f"{(subject or '').strip()} — " if (subject or "").strip() else ""
+        return f"{head}{type}: {title}. {summary}".strip()
+
     def _store_fact(self, *, raw: str, enr: Enrichment, episode_id: str,
                     locator: str | None, source: str | None, scope: str,
                     confidence: float, owner: str | None = None,
@@ -64,12 +72,14 @@ class Store:
         item = ContextItem(
             id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
             type=enr.type, tier=getattr(enr, "tier", "leaf"),
-            domain=getattr(enr, "domain", "other"), tags=enr.tags, source=source,
+            domain=getattr(enr, "domain", "other"), subject=getattr(enr, "subject", ""),
+            tags=enr.tags, source=source,
             scope=scope, owner=owner, proposed=proposed, confidence=confidence,
             promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model, content_hash=h,
             source_episode_id=episode_id, locator=locator or None)
-        vec = self.embedder.embed(f"{enr.title}\n{enr.summary}\n{raw}")
+        vec = self.embedder.embed(self._descriptor(
+            subject=item.subject, type=item.type, title=item.title, summary=item.summary))
         stored = self.db.insert(item, vec)
         self._detect_conflicts(stored)  # flag contradictions at write time
         return stored
@@ -124,11 +134,12 @@ class Store:
 
     def edit(self, item_id: str, *, title: str | None = None, summary: str | None = None,
              type: str | None = None, tags: list | None = None,
-             tier: str | None = None, domain: str | None = None) -> bool:
+             tier: str | None = None, domain: str | None = None,
+             subject: str | None = None) -> bool:
         """Edit a fact's text or filing. Re-embeds and re-checks contradictions
         when text changes so search and conflict detection never go stale.
-        tier/domain are filing-only (no re-embed): they move where a fact lives,
-        not what it says — letting the user correct an auto-classification."""
+        tier/domain are filing-only (no re-embed). subject/title/summary/type feed
+        the embedded descriptor, so changing any of them re-embeds."""
         full = self.db.resolve_id(item_id)
         if not full:
             return False
@@ -140,10 +151,13 @@ class Store:
         if tags is not None: fields["tags"] = tags
         if tier is not None: fields["tier"] = tier
         if domain is not None: fields["domain"] = domain
+        if subject is not None: fields["subject"] = subject.strip().lower()
         self.db.update(full, fields, now_iso())
         updated = self.db.get(full)
-        if title is not None or summary is not None:  # text changed → re-embed
-            vec = self.embedder.embed(f"{updated.title}\n{updated.summary}\n{updated.raw_content}")
+        if any(x is not None for x in (title, summary, type, subject)):  # descriptor changed → re-embed
+            vec = self.embedder.embed(self._descriptor(
+                subject=updated.subject, type=updated.type,
+                title=updated.title, summary=updated.summary))
             self.db.set_embedding(full, vec, self.embedder.model, now_iso())
             self._detect_conflicts(self.db.get(full))
         return True
@@ -178,6 +192,7 @@ class Store:
                 type=d.get("type", "context"),
                 tier=d.get("tier", "leaf"),
                 domain=d.get("domain", "other"),
+                subject=d.get("subject", ""),
                 tags=d.get("tags", []),
                 source=d.get("source"),
                 scope=d.get("scope", "individual"),
@@ -192,7 +207,8 @@ class Store:
                 captured_at=d.get("captured_at") or now_iso(),
                 updated_at=now_iso(),
             )
-            self.db.insert(it, self.embedder.embed(f"{it.title}\n{it.summary}\n{it.raw_content}"))
+            self.db.insert(it, self.embedder.embed(self._descriptor(
+                subject=it.subject, type=it.type, title=it.title, summary=it.summary)))
             n += 1
         return n
 
@@ -920,7 +936,7 @@ class Store:
     def promote(self, item_id: str, *, title: str | None = None,
                 summary: str | None = None, type: str | None = None,
                 tier: str | None = None, domain: str | None = None,
-                confidence: float = 0.95) -> bool:
+                subject: str | None = None, confidence: float = 0.95) -> bool:
         """Move a working item into the verified `main` graph, optionally refining
         its fields. Then auto-link it to genuinely-related verified facts so the
         graph organizes itself (no manual filing)."""
@@ -939,11 +955,14 @@ class Store:
             fields["tier"] = tier
         if domain is not None:
             fields["domain"] = domain
+        if subject is not None:
+            fields["subject"] = subject.strip().lower()
         ok = self.db.update(full, fields, now_iso())
         if ok:
-            if title is not None or summary is not None:  # refined text → re-embed
+            if any(x is not None for x in (title, summary, type, subject)):  # descriptor changed → re-embed
                 it = self.db.get(full)
-                vec = self.embedder.embed(f"{it.title}\n{it.summary}\n{it.raw_content}")
+                vec = self.embedder.embed(self._descriptor(
+                    subject=it.subject, type=it.type, title=it.title, summary=it.summary))
                 self.db.set_embedding(full, vec, self.embedder.model, now_iso())
             self._detect_conflicts(self.db.get(full))  # now verified — recheck vs truth
             self._auto_link(full)                       # connect to related verified facts

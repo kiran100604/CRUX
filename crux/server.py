@@ -121,6 +121,7 @@ def create_app(cfg: Config):
         type: str | None = None
         tier: str | None = None
         domain: str | None = None
+        subject: str | None = None
 
     def _scope(s: str | None):
         return None if s in (None, "all") else s
@@ -241,6 +242,7 @@ def create_app(cfg: Config):
         type: str | None = None
         tier: str | None = None
         domain: str | None = None
+        subject: str | None = None
 
     @app.post("/capture")
     def capture(body: CaptureIn):
@@ -296,7 +298,7 @@ def create_app(cfg: Config):
         _leader(request)
         return {"ok": store.edit(item_id, title=body.title,
                                  summary=body.summary, type=body.type,
-                                 tier=body.tier, domain=body.domain)}
+                                 tier=body.tier, domain=body.domain, subject=body.subject)}
 
     @app.get("/search")
     def search(q: str, limit: int = 5, scope: str | None = None):
@@ -523,7 +525,8 @@ def create_app(cfg: Config):
     def promote(item_id: str, body: PromoteIn, request: Request):
         _leader(request)
         return {"ok": store.promote(item_id, title=body.title, summary=body.summary,
-                                    type=body.type, tier=body.tier, domain=body.domain)}
+                                    type=body.type, tier=body.tier, domain=body.domain,
+                                    subject=body.subject)}
 
     class ExtendIn(BaseModel):
         target_id: str

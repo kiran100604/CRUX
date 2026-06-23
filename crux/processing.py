@@ -22,9 +22,11 @@ _TIER_GUIDE = """- tier: one of core | mid | leaf — the ALTITUDE of the fact (
     market=positioning/go-to-market, process=team workflow/ops)"""
 
 _PROMPT = """You process captured snippets for a developer/company context store.
-Return ONLY minified JSON with keys: title, summary, type, tier, domain, tags.
+Return ONLY minified JSON with keys: title, summary, subject, type, tier, domain, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
+- subject: the specific thing this is ABOUT — a service / component / feature / area
+    (e.g. "sync service", "auth", "pricing", "retrieval"); <=4 words, lowercase; "" if truly general
 - type: one of {types}
 {tier_guide}
 - tags: 2-4 short lowercase tags
@@ -40,9 +42,11 @@ constraint, architectural choice, or important reference — one fact each. Igno
 filler, TODOs, and prose with no lasting signal. If the section holds nothing
 durable, return [].
 
-Return ONLY a minified JSON array; each element has keys: title, summary, type, tier, domain, tags.
+Return ONLY a minified JSON array; each element has keys: title, summary, subject, type, tier, domain, tags.
 - title: <= 8 words, no trailing punctuation
 - summary: exactly one sentence
+- subject: the specific thing it is ABOUT — a service / component / feature / area
+    (e.g. "sync service", "auth", "pricing"); <=4 words, lowercase; "" if truly general
 - type: one of {types}
 {tier_guide}
 - tags: 2-4 short lowercase tags
@@ -249,6 +253,7 @@ class Enrichment:
     tags: list[str]
     tier: str = "leaf"
     domain: str = "other"
+    subject: str = ""   # the specific thing it's about (scoping key for retrieval)
 
 
 class FakeProcessor:
@@ -264,6 +269,7 @@ class FakeProcessor:
             tags=_guess_tags(clean),
             tier=_guess_tier(clean),
             domain=_guess_domain(clean),
+            subject=_guess_subject(clean),
         )
 
     def extract_facts(self, content: str) -> list[Enrichment]:
@@ -510,6 +516,7 @@ def _parse(text: str, content: str) -> Enrichment:
             tags=[str(x).lower() for x in tags],
             tier=_norm_tier(data.get("tier"), content),
             domain=_norm_domain(data.get("domain"), content),
+            subject=_norm_subject(data.get("subject"), content),
         )
     except Exception:
         return FakeProcessor().enrich(content)
@@ -532,6 +539,7 @@ def _parse_many(text: str) -> list[Enrichment]:
                 tags=[str(x).lower() for x in d.get("tags", [])[:4]],
                 tier=_norm_tier(d.get("tier"), str(d.get("summary", ""))),
                 domain=_norm_domain(d.get("domain"), str(d.get("summary", ""))),
+                subject=_norm_subject(d.get("subject"), str(d.get("summary", ""))),
             ))
         return [e for e in out if e.title and e.title != "Untitled"]
     except Exception:
@@ -603,6 +611,18 @@ def _guess_type(text: str) -> str:
         if any(h in low for h in hints):
             return typ
     return "context"
+
+
+def _guess_subject(text: str) -> str:
+    """Offline stand-in for 'what is this about'. The real model does far better;
+    here we take the most salient keyword as a coarse subject (empty = general)."""
+    tags = _guess_tags(text)
+    return tags[0] if tags else ""
+
+
+def _norm_subject(value, content: str) -> str:
+    v = " ".join(str(value or "").split()).strip().lower()[:40]
+    return v or _guess_subject(content)
 
 
 def _guess_tags(text: str) -> list[str]:

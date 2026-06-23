@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS items (
     type            TEXT NOT NULL,
     tier            TEXT NOT NULL DEFAULT 'leaf',
     domain          TEXT NOT NULL DEFAULT 'other',
+    subject         TEXT NOT NULL DEFAULT '',
     tags            TEXT NOT NULL DEFAULT '[]',
     source          TEXT,
     scope           TEXT NOT NULL DEFAULT 'individual',
@@ -207,7 +208,7 @@ CREATE TABLE IF NOT EXISTS lenses (
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
-_UPDATABLE = {"title", "summary", "type", "tier", "domain", "tags", "source", "scope",
+_UPDATABLE = {"title", "summary", "type", "tier", "domain", "subject", "tags", "source", "scope",
               "owner", "proposed", "confidence", "superseded_by", "archived",
               "promoted_at", "version"}
 
@@ -254,6 +255,8 @@ class Database:
             self.conn.execute("ALTER TABLE items ADD COLUMN tier TEXT NOT NULL DEFAULT 'leaf'")
         if "domain" not in cols:
             self.conn.execute("ALTER TABLE items ADD COLUMN domain TEXT NOT NULL DEFAULT 'other'")
+        if "subject" not in cols:
+            self.conn.execute("ALTER TABLE items ADD COLUMN subject TEXT NOT NULL DEFAULT ''")
         if "owner" not in cols:
             self.conn.execute("ALTER TABLE items ADD COLUMN owner TEXT")
         if "proposed" not in cols:
@@ -509,13 +512,13 @@ class Database:
 
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(
-            """INSERT INTO items (id, raw_content, title, summary, type, tier, domain, tags, source,
+            """INSERT INTO items (id, raw_content, title, summary, type, tier, domain, subject, tags, source,
                    scope, owner, proposed, confidence, superseded_by, archived, embedding, embedding_model,
                    content_hash, version, promoted_at, source_episode_id, locator,
                    captured_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (item.id, item.raw_content, item.title, item.summary, item.type, item.tier,
-             item.domain, json.dumps(item.tags), item.source, item.scope, item.owner,
+             item.domain, item.subject, json.dumps(item.tags), item.source, item.scope, item.owner,
              int(item.proposed), item.confidence,
              item.superseded_by, int(item.archived), pack(embedding), item.embedding_model,
              item.content_hash, item.version, item.promoted_at, item.source_episode_id,

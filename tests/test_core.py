@@ -768,3 +768,20 @@ def test_deep_link_uses_localhost(store):
     link = store.deep_link("abc", card_id="xyz")
     assert link.endswith("/#/project/abc/card/xyz")
     assert "localhost" in link
+
+
+def test_subject_scoping_beats_cross_subject_noise(store):
+    a = store.capture("The sync service uses Postgres with incremental replication.",
+                      type_hint="architecture"); store.promote(a.id, subject="sync service")
+    b = store.capture("The billing service uses Postgres for invoice storage.",
+                      type_hint="architecture"); store.promote(b.id, subject="billing service")
+    res = store.search("architecture of the sync service", limit=3)
+    assert res[0].item.id == a.id          # the on-subject fact wins despite shared "Postgres"
+    assert res[0].item.subject == "sync service"
+
+
+def test_subject_enriched_and_editable(store):
+    it = store.capture("Auth tokens expire after 15 minutes.", type_hint="reference")
+    assert isinstance(it.subject, str)     # subject is set at enrichment (offline: keyword)
+    assert store.edit(it.id, subject="Auth Service")
+    assert store.db.get(it.id).subject == "auth service"   # normalized lowercase

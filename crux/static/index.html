@@ -244,6 +244,8 @@
   .fsel .lbl{color:var(--muted2); font-family:var(--mono); font-size:10px; text-transform:uppercase}
   .fsel select{border:none; background:none; color:var(--ink); font-family:var(--sans); font-size:13px;
     font-weight:500; outline:none; cursor:pointer; padding:6px 4px}
+  .fsel .subin{border:none; background:none; color:var(--ink); font-family:var(--sans); font-size:13px;
+    font-weight:500; outline:none; padding:6px 4px; width:150px}
   .fhint{margin-top:10px; font-size:12.5px; color:var(--muted); line-height:1.5;
     background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-md); padding:10px 13px}
   .fhint b{color:var(--teal)}
@@ -583,7 +585,7 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
-  kbSel:null, kbMode:"domain", kbQuery:"", kbRelated:{}, leader:true,
+  kbSel:null, kbMode:"subject", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
   threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"", activity:[], highlightCard:null,
   kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}, kbOpen:{}};
@@ -1095,7 +1097,7 @@ function vKBBrowse(main){
           </div>
           <div class="kbcount" id="kbcount"></div>
           <div class="kbmodes">
-            <button class="kbmode ${state.kbMode==='domain'?'on':''}" onclick="setKbMode('domain')">By topic</button>
+            <button class="kbmode ${state.kbMode==='subject'?'on':''}" onclick="setKbMode('subject')">By subject</button>
             <button class="kbmode ${state.kbMode==='tier'?'on':''}" onclick="setKbMode('tier')">By level</button>
             <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By tag</button>
           </div>
@@ -1133,9 +1135,19 @@ function kbDomainGroups(main){
   return DOMAIN_ORDER.map(d=>[DOMAIN_LABEL[d],'',main.filter(i=>(i.domain||'other')===d)])
     .filter(g=>g[2].length);
 }
+function kbSubjectGroups(main){
+  // group by the free-form SUBJECT (what each fact is about); biggest first,
+  // unlabeled facts fall into "General".
+  const by={};
+  main.forEach(i=>{ const s=(i.subject||'').trim()||'General';
+    const k=s.replace(/\b\w/g,c=>c.toUpperCase()); (by[k]=by[k]||[]).push(i); });
+  return Object.entries(by).map(([label,items])=>[label,'',items])
+    .sort((a,b)=> a[0]==='General'?1 : b[0]==='General'?-1 : b[2].length-a[2].length);
+}
 function kbNav(main){
   const conf=conflictIds();
   const groups = state.kbMode==='topic' ? kbTopicGroups(main)
+               : state.kbMode==='subject' ? kbSubjectGroups(main)
                : state.kbMode==='domain' ? kbDomainGroups(main)
                : kbTierGroups(main);
   // accordion: show the list of topics/levels/tags first; a group opens to reveal
@@ -1198,13 +1210,13 @@ function kbDetail(it){
   const filingBlock = state.leader ? `
     <div class="dsection"><div class="pl">How it's filed — change it anytime</div>
       <div class="filing">
-        <span class="fsel"><span class="lbl">topic</span><select onchange="saveFiling('${it.id}','domain',this.value)">${DOMAIN_ORDER.map(d=>`<option value="${d}" ${(it.domain||'other')===d?'selected':''}>${DOMAIN_LABEL[d]}</option>`).join("")}</select></span>
+        <span class="fsel"><span class="lbl">subject</span><input class="subin" value="${esc(it.subject||'')}" placeholder="what it's about…" onchange="saveFiling('${it.id}','subject',this.value)"/></span>
         <span class="fsel"><span class="lbl">level</span><select onchange="saveFiling('${it.id}','tier',this.value)">${TIER_ORDER.map(t=>`<option value="${t}" ${(it.tier||'leaf')===t?'selected':''}>${TIER_LABEL[t]}</option>`).join("")}</select></span>
       </div>
       <div class="fhint">🛈 <b>CRUX filed this for you.</b> If it landed in the wrong place, pick the right one above — it sticks right away.</div>
     </div>`
     : `<div class="dsection"><div class="pl">How it's filed</div>
-      <div class="filing"><span class="ipill">${DOMAIN_LABEL[it.domain||'other']}</span><span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span></div></div>`;
+      <div class="filing">${it.subject?`<span class="ipill">${esc(it.subject)}</span>`:''}<span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span></div></div>`;
   return `
     <div class="dhead">
       <span class="tier teal">◆ VERIFIED · ${esc(it.type)}${it.promoted_at?` · ${it.promoted_at.slice(0,10)}`:''}</span>
@@ -1304,9 +1316,12 @@ async function saveEdit(id){
   await post(`/items/${id}/edit`,{title:t||null,summary:s||null});
   toast("✓ Edited & re-embedded"); closeDrawer(); await load();}
 async function saveFiling(id,field,value){
-  // moves a fact's filing (topic/level) without touching its text or embedding
+  // change a fact's filing. subject feeds the embedded descriptor → re-embeds;
+  // tier is filing-only. Both re-render so the grouping updates immediately.
   await post(`/items/${id}/edit`,{[field]:value});
-  toast(field==='tier'?"✓ Moved to "+TIER_LABEL[value]:"✓ Filed under "+DOMAIN_LABEL[value]);
+  toast(field==='tier'?"✓ Moved to "+TIER_LABEL[value]
+        : field==='subject'?(value.trim()?"✓ Subject set to “"+value.trim()+"”":"✓ Subject cleared")
+        : "✓ Filed under "+(DOMAIN_LABEL[value]||value));
   await load();}
 window.dismissConflict=dismissConflict; window.saveEdit=saveEdit; window.saveFiling=saveFiling;
 function inboxRow(it){

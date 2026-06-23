@@ -10,6 +10,7 @@ surfaces semantically-near noise; this is the standard fix and it's testable
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -21,6 +22,7 @@ RRF_K = 60          # standard RRF constant
 CANDIDATES = 50     # depth of each list before fusion
 DECAY_HALF_LIFE_DAYS = 30.0  # working (individual) items halve in weight this often
 MAIN_BOOST = 1.5    # verified truth outranks working notes
+SUBJECT_BOOST = 1.7  # a fact whose SUBJECT the query names ranks well above off-subject noise
 
 
 @dataclass
@@ -51,16 +53,30 @@ def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5
     for rank, iid in enumerate(lexical_ids):
         fused[iid] = fused.get(iid, 0.0) + 1.0 / (RRF_K + rank)
 
-    # 4. boosts / penalties by scope + intent + freshness + trust
+    # 4. boosts / penalties by scope + intent + freshness + trust + subject match
     results: list[Result] = []
     for iid, base in fused.items():
         item = db.get(iid)
         if item is None:
             continue
-        results.append(Result(item=item, score=base * _weight(item)))
+        results.append(Result(item=item, score=base * _weight(item) * _subject_boost(item, query_text)))
 
     results.sort(key=lambda r: r.score, reverse=True)
     return results[:limit]
+
+
+def _subject_boost(item: ContextItem, query: str) -> float:
+    """Soft pre-filter: when the query names a fact's SUBJECT, rank that fact above
+    off-subject neighbors — killing cross-service noise without ever excluding
+    anything (recall is preserved; the lexical/semantic channels still apply)."""
+    subj = (item.subject or "").strip().lower()
+    if not subj:
+        return 1.0
+    q = (query or "").lower()
+    toks = [t for t in re.findall(r"[a-z0-9]+", subj) if len(t) > 2]
+    if subj in q or (toks and all(t in q for t in toks)):
+        return SUBJECT_BOOST
+    return 1.0
 
 
 def _weight(item: ContextItem) -> float:
