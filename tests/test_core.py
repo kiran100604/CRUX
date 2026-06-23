@@ -785,3 +785,24 @@ def test_subject_enriched_and_editable(store):
     assert isinstance(it.subject, str)     # subject is set at enrichment (offline: keyword)
     assert store.edit(it.id, subject="Auth Service")
     assert store.db.get(it.id).subject == "auth service"   # normalized lowercase
+
+
+def test_section_heading_becomes_subject(store):
+    doc = ("# Retrieval\nWe fuse vector and keyword search with RRF.\n\n"
+           "# Competition\nHyper is a cloud company brain; Glean is enterprise search.\n\n"
+           "# Storage\nEverything is one SQLite file with embeddings as a BLOB.")
+    res = store.ingest(doc, source_type="file", source_ref="d.md")
+    subs = {f.subject for f in res["facts"]}
+    assert {"retrieval", "competition", "storage"} <= subs   # headings → subjects
+
+
+def test_subject_channel_retrieves_across_word_variants(store):
+    for f in store.ingest(
+        "# Competition\nHyper is a cloud company brain; Glean is enterprise search.\n\n"
+        "# Storage\nEverything is one SQLite file with embeddings as a BLOB.",
+        source_type="file", source_ref="d.md")["facts"]:
+        store.promote(f.id)
+    # 'competitors' must reach the 'competition' fact even with no shared raw words
+    top = store.search("who are our competitors", scope="main", limit=1)
+    assert top and top[0].item.subject == "competition"
+    assert store.search("how is data stored", scope="main", limit=1)[0].item.subject == "storage"

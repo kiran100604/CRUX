@@ -61,6 +61,16 @@ class Store:
         head = f"{(subject or '').strip()} — " if (subject or "").strip() else ""
         return f"{head}{type}: {title}. {summary}".strip()
 
+    @staticmethod
+    def _subject_from_locator(locator: str | None) -> str:
+        """A document section heading IS 'what this is about' — use the deepest
+        heading as the subject when enrichment didn't name one."""
+        if not locator:
+            return ""
+        seg = locator.split("›")[-1].strip()
+        seg = re.sub(r"\s*\(\d+\)$", "", seg)   # drop the "(2)" long-split suffix
+        return seg.lower()[:40]
+
     def _store_fact(self, *, raw: str, enr: Enrichment, episode_id: str,
                     locator: str | None, source: str | None, scope: str,
                     confidence: float, owner: str | None = None,
@@ -69,10 +79,12 @@ class Store:
         existing = self.db.get_by_hash(h)
         if existing:
             return existing  # dedup: same fact, don't duplicate
+        subject = (getattr(enr, "subject", "") or "").strip().lower() \
+            or self._subject_from_locator(locator)
         item = ContextItem(
             id=str(uuid.uuid4()), raw_content=raw, title=enr.title, summary=enr.summary,
             type=enr.type, tier=getattr(enr, "tier", "leaf"),
-            domain=getattr(enr, "domain", "other"), subject=getattr(enr, "subject", ""),
+            domain=getattr(enr, "domain", "other"), subject=subject,
             tags=enr.tags, source=source,
             scope=scope, owner=owner, proposed=proposed, confidence=confidence,
             promoted_at=now_iso() if scope == "main" else None,

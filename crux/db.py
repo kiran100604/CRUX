@@ -625,6 +625,15 @@ class Database:
         )
         self.conn.commit()
 
+    def subjects(self, scope: str | None = None) -> list[tuple[str, str]]:
+        """(id, subject) for live facts — the subject retrieval channel scans this."""
+        q = "SELECT id, subject FROM items WHERE archived=0 AND superseded_by IS NULL"
+        if scope:
+            rows = self.conn.execute(q + " AND scope=?", (scope,))
+        else:
+            rows = self.conn.execute(q)
+        return [(r["id"], r["subject"] or "") for r in rows]
+
     def usage_counts(self) -> dict[str, int]:
         return {r["item_id"]: r["n"] for r in self.conn.execute(
             "SELECT item_id, COUNT(*) n FROM usages GROUP BY item_id")}

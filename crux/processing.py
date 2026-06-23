@@ -269,7 +269,8 @@ class FakeProcessor:
             tags=_guess_tags(clean),
             tier=_guess_tier(clean),
             domain=_guess_domain(clean),
-            subject=_guess_subject(clean),
+            subject="",   # offline can't reliably name a subject; let the section
+                          # heading (locator) or a real model supply it
         )
 
     def extract_facts(self, content: str) -> list[Enrichment]:
@@ -613,16 +614,10 @@ def _guess_type(text: str) -> str:
     return "context"
 
 
-def _guess_subject(text: str) -> str:
-    """Offline stand-in for 'what is this about'. The real model does far better;
-    here we take the most salient keyword as a coarse subject (empty = general)."""
-    tags = _guess_tags(text)
-    return tags[0] if tags else ""
-
-
 def _norm_subject(value, content: str) -> str:
-    v = " ".join(str(value or "").split()).strip().lower()[:40]
-    return v or _guess_subject(content)
+    # only trust an explicit subject (from a real model); a keyword guess is worse
+    # than nothing — the section heading is a far better fallback (see _store_fact).
+    return " ".join(str(value or "").split()).strip().lower()[:40]
 
 
 def _guess_tags(text: str) -> list[str]:

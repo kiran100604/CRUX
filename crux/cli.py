@@ -483,32 +483,86 @@ def cmd_install_mcp(args):
     print("  Open Claude Code in this folder and approve the 'crux' server (/mcp).")
 
 
-# CRUX documenting itself — cross-platform seed (works on Windows/macOS/Linux).
-_SEED = [
-    ("decision", "CRUX is a shared intent graph for AI-built software."),
-    ("constraint", "The problem: AI builds fast but widens the gap between intended and built."),
-    ("reference", "Primary users are software teams with a lead and AI-using developers."),
-    ("decision", "The leader owns verified truth; members propose and use it."),
-    ("architecture", "Two-tier memory: working layer for proposals, main graph for verified truth."),
-    ("decision", "Promotion is the human validation gate; nothing reaches agents unverified."),
-    ("architecture", "Knowledge is tiered by altitude: Core strategy, Mid planning, Leaf operational."),
-    ("decision", "Steer prompts with a directive brief instead of auditing built code."),
-    ("architecture", "Team mode shares one graph via a small server; leader role enforced by token."),
-    ("constraint", "Capture flow is copy-first then hotkey; Windows and Wayland block auto-copy."),
-    ("reference", "On Linux use 'crux bind' (GNOME shortcut); on Windows run 'crux app'."),
-    ("reference", "Agents log decisions via the MCP 'log_work' tool; they land in Review."),
-]
+# CRUX documenting itself — a structured doc so each section heading becomes the
+# fact's SUBJECT (what it's about), exercising the real ingest → subject pipeline.
+_SEED_DOC = """# What is CRUX
+CRUX is a local-first context layer for AI coding agents. It captures what you
+decide and learn, then injects the relevant pieces into Claude Code and Cursor
+automatically, so you stop re-explaining context and agents stop contradicting
+decisions you already made.
+
+# Users
+The primary users are individual developers working with AI coding agents. CRUX
+also supports small software teams, where a leader verifies knowledge and members
+propose and use it.
+
+# Problem
+AI agents are amnesiac — they forget every decision the moment a session ends.
+Developers waste hours re-explaining context, and agents repeat mistakes the team
+already ruled out. The bottleneck is memory, not model quality.
+
+# Competition
+Hyper is a cloud "company brain" that ingests Slack, Gmail and Docs. Glean is
+enterprise search. CRUX differs by being local-first, individual-developer first,
+and intent-aware; your data never leaves your machine.
+
+# Architecture
+CRUX uses a two-tier memory: a working layer for transient proposals and a main
+graph of verified truth. Everything is stored first as an Episode (the raw source
+of truth); atomic facts are extracted from episodes and link back to them.
+
+# Trust gate
+Captured facts start in the working layer as proposals. A human promotes the
+durable ones into the verified main graph — nothing reaches agents as trusted
+until it is promoted. Newer decisions supersede older ones without deleting history.
+
+# Storage
+All data lives in one local SQLite file. Each fact's embedding is stored as a BLOB
+on the row, and an FTS5 virtual table mirrors the facts for keyword search. There
+is no separate vector database to keep in sync.
+
+# Retrieval
+Retrieval fuses semantic vector search with FTS keyword search using reciprocal
+rank fusion, then re-ranks by trust, type, recency and subject. A subject boost
+ranks on-subject facts above cross-subject noise.
+
+# Subjects
+Every fact is tagged with a subject — the specific thing it is about, such as a
+service, feature or area. The knowledge base is browsed by subject, and retrieval
+scopes to the relevant subject so unrelated facts do not leak in.
+
+# Capture and hooks
+Capture happens through a global hotkey and through Claude Code lifecycle hooks.
+The SessionStart hook injects a resume brief, every prompt pulls relevant context,
+and the Stop hook captures the turn's decisions into working memory automatically.
+
+# Working memory and sessions
+A thread is a project: a stable intent plus an evolving working memory of
+decisions, state and open questions. Captures group into sessions, and reopening a
+project resumes from the last checkpoint.
+
+# Privacy
+CRUX is local-first and runs fully offline by default. Your data never leaves your
+machine; API keys are optional and only sharpen enrichment and synthesis.
+"""
 
 
 def cmd_seed_demo(args):
-    """Document CRUX inside CRUX: load its own product knowledge into the KB."""
+    """Document CRUX inside CRUX: ingest its own product knowledge as a structured
+    doc (section headings → subjects) and promote it into the verified graph."""
     store = _store()
-    for typ, txt in _SEED:
-        store.capture(txt, type_hint=typ, scope="main", confidence=0.95,
-                      source="crux-docs", source_type="note")
-        print(f"  + [{typ}] {txt}")
+    res = store.ingest(_SEED_DOC, source_type="file", source_ref="crux-docs.md",
+                       title="CRUX", scope="individual")
+    facts = res.get("facts", [])
+    for f in facts:
+        store.promote(f.id)
+    from collections import Counter
+    groups = Counter((f.subject or "general") for f in facts)
+    print(f"  ingested + verified {len(facts)} facts across {len(groups)} subjects:")
+    for subj, n in groups.most_common():
+        print(f"    {n:2d}  {subj}")
     store.close()
-    print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base.")
+    print("\nDone. Run `crux serve` → open http://127.0.0.1:7432 → Knowledge Base (By subject).")
 
 
 def cmd_use_nvidia(args):

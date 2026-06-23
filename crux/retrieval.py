@@ -46,11 +46,19 @@ def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5
     # 2. lexical candidates
     lexical_ids = db.fts_search(query_text, CANDIDATES, include_archived, scope)
 
-    # 3. RRF fuse
+    # 2b. subject candidates — facts whose SUBJECT the query names. A third channel
+    # (not just a re-rank boost) so a subject-relevant fact is guaranteed into the
+    # pool with real rank, even when the semantic/lexical channels missed it.
+    subject_ids = [iid for iid, subj in db.subjects(scope)
+                   if _subject_matches(subj, query_text)][:CANDIDATES]
+
+    # 3. RRF fuse the three channels
     fused: dict[str, float] = {}
     for rank, iid in enumerate(semantic_ids):
         fused[iid] = fused.get(iid, 0.0) + 1.0 / (RRF_K + rank)
     for rank, iid in enumerate(lexical_ids):
+        fused[iid] = fused.get(iid, 0.0) + 1.0 / (RRF_K + rank)
+    for rank, iid in enumerate(subject_ids):
         fused[iid] = fused.get(iid, 0.0) + 1.0 / (RRF_K + rank)
 
     # 4. boosts / penalties by scope + intent + freshness + trust + subject match
@@ -65,18 +73,42 @@ def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5
     return results[:limit]
 
 
-def _subject_boost(item: ContextItem, query: str) -> float:
-    """Soft pre-filter: when the query names a fact's SUBJECT, rank that fact above
-    off-subject neighbors — killing cross-service noise without ever excluding
-    anything (recall is preserved; the lexical/semantic channels still apply)."""
-    subj = (item.subject or "").strip().lower()
+def _stem_match(a: str, b: str) -> bool:
+    """Loose token match so 'competition' hits 'competitors', 'storage' hits
+    'stored', etc. — share a 4+ char prefix (or be equal when short)."""
+    n = min(len(a), len(b))
+    if n < 4:
+        return a == b
+    i = 0
+    while i < n and a[i] == b[i]:
+        i += 1
+    return i >= 4
+
+
+_SUBJ_STOP = {"the", "and", "for", "with", "that", "this", "into", "about", "what",
+              "are", "how", "does", "crux"}  # generic words don't identify a subject
+
+
+def _subject_matches(subject: str, query: str) -> bool:
+    """Does the query name this subject? True on a substring hit, or when any
+    SIGNIFICANT subject token stem-matches a query token — so 'competition' hits
+    'competitors' and 'working memory and sessions' hits 'sessions', while generic
+    words ('crux', 'what') never trigger a match."""
+    subj = (subject or "").strip().lower()
     if not subj:
-        return 1.0
+        return False
     q = (query or "").lower()
-    toks = [t for t in re.findall(r"[a-z0-9]+", subj) if len(t) > 2]
-    if subj in q or (toks and all(t in q for t in toks)):
-        return SUBJECT_BOOST
-    return 1.0
+    if subj in q:
+        return True
+    sig = [t for t in re.findall(r"[a-z0-9]+", subj) if len(t) >= 4 and t not in _SUBJ_STOP]
+    q_toks = re.findall(r"[a-z0-9]+", q)
+    return any(_stem_match(st, qt) for st in sig for qt in q_toks)
+
+
+def _subject_boost(item: ContextItem, query: str) -> float:
+    """Re-rank lift on top of the subject channel: an on-subject fact ranks above
+    off-subject neighbors (never excludes anything — recall stays intact)."""
+    return SUBJECT_BOOST if _subject_matches(item.subject or "", query or "") else 1.0
 
 
 def _weight(item: ContextItem) -> float:
