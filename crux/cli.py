@@ -582,11 +582,31 @@ def cmd_use_nvidia(args):
     save_env_file(cfg.home, vals)
     print(f"✓ CRUX now uses NVIDIA NIM for enrichment (model: {args.model}).")
     if args.embeddings:
-        print(f"  Embeddings: {args.embed_model}.  ⚠ different vector size than before —")
-        print("  start fresh or re-capture so old/new embeddings don't mix.")
+        print(f"  Embeddings: {args.embed_model}.")
+        # re-embed existing facts with the new provider so old/new vectors don't mix
+        store = _store()
+        existing = len(store.db.list(archived=False, limit=100000))
+        if existing:
+            print(f"  Re-embedding {existing} existing fact(s) with NVIDIA…")
+            try:
+                n = store.reembed_all()
+                print(f"  ✓ re-embedded {n} fact(s).")
+            except Exception as e:
+                print(f"  ⚠ re-embed failed ({e}). Run `crux reembed` once the key/network is reachable.")
+        store.close()
     else:
         print("  Embeddings stay offline (fine for testing). Add --embeddings to use NVIDIA's too.")
     print("  Test it:  crux add \"We chose Stripe over Razorpay for fees.\" --type decision  →  crux query stripe")
+
+
+def cmd_reembed(args):
+    """Recompute every fact's embedding with the current provider (run after
+    switching embedders, e.g. offline→NVIDIA)."""
+    store = _store()
+    print(f"Re-embedding with {store.embedder.model}…")
+    n = store.reembed_all()
+    store.close()
+    print(f"✓ re-embedded {n} fact(s).")
 
 
 def cmd_tidy(args):
@@ -816,6 +836,8 @@ def build_parser() -> argparse.ArgumentParser:
     nv.add_argument("--embeddings", action="store_true", help="also use NVIDIA embeddings (changes vector size)")
     nv.add_argument("--embed-model", default="nvidia/nv-embedqa-e5-v5")
     nv.set_defaults(func=cmd_use_nvidia)
+
+    sub.add_parser("reembed", help="recompute all embeddings with the current provider").set_defaults(func=cmd_reembed)
 
     td = sub.add_parser("tidy", help="archive stale private working memory (backlog hygiene)")
     td.add_argument("--days", type=int, default=7)

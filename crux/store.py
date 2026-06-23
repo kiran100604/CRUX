@@ -698,9 +698,21 @@ class Store:
 
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
-        qvec = self.embedder.embed(query)
+        qvec = self.embedder.embed(query, input_type="query")  # asymmetric models want this
         return search(self.db, qvec, query, limit=limit,
                       include_archived=include_archived, scope=scope)
+
+    def reembed_all(self) -> int:
+        """Recompute every fact's embedding with the CURRENT provider — run after
+        switching embedders (e.g. fake→NVIDIA) so old and new vectors don't mix
+        (cosine of mismatched dimensions is 0, which silently breaks retrieval)."""
+        n = 0
+        for it in self.db.list(archived=False, limit=100000):
+            vec = self.embedder.embed(self._descriptor(
+                subject=it.subject, type=it.type, title=it.title, summary=it.summary))
+            self.db.set_embedding(it.id, vec, self.embedder.model, now_iso())
+            n += 1
+        return n
 
     def retrieve(self, query: str, limit: int = 5, *, expand: bool = True,
                  max_links: int = 4, scope: str | None = None, user: str | None = None):

@@ -17,7 +17,7 @@ from typing import Protocol
 class EmbeddingProvider(Protocol):
     model: str
 
-    def embed(self, text: str) -> list[float]: ...
+    def embed(self, text: str, input_type: str = "passage") -> list[float]: ...
 
 
 def pack(vec: list[float]) -> bytes:
@@ -50,7 +50,7 @@ class FakeEmbedding:
     model = "fake-256"
     dim = 256
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, input_type: str = "passage") -> list[float]:
         vec = [0.0] * self.dim
         for tok in _tokens(text):
             h = int.from_bytes(hashlib.md5(tok.encode()).digest()[:4], "little")
@@ -69,9 +69,11 @@ class OpenAIEmbedding:
         self._base = base_url
         self._client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
-    def embed(self, text: str) -> list[float]:
-        # NVIDIA NIM embed models require an input_type; harmless to omit elsewhere.
-        extra = {"extra_body": {"input_type": "passage"}} if self._base and "nvidia" in self._base else {}
+    def embed(self, text: str, input_type: str = "passage") -> list[float]:
+        # NVIDIA NIM embedqa models are ASYMMETRIC: passages and queries must be
+        # embedded with the matching input_type, or retrieval quality drops.
+        extra = {"extra_body": {"input_type": input_type, "truncate": "END"}} \
+            if self._base and "nvidia" in self._base else {}
         resp = self._client.embeddings.create(model=self.model, input=text, **extra)
         return resp.data[0].embedding
 
