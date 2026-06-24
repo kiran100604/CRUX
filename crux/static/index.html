@@ -299,13 +299,6 @@
   .resumebody{font-size:14px; line-height:1.55; color:var(--ink); white-space:pre-wrap}
   .resumeq{margin-top:9px; font-size:13px; color:var(--body)}
   .resumeq b{font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--muted); letter-spacing:.04em}
-  .seswrap{margin-top:20px} .seswrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.06em}
-  .sesitem{display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--hair)}
-  .sesitem:last-child{border-bottom:none}
-  .sesdot{width:9px;height:9px;border-radius:50%;background:var(--strong);margin-top:5px;flex:none}
-  .sesdot.live{background:var(--green)}
-  .sesmeta{font-family:var(--mono); font-size:10px; color:var(--muted2); margin-bottom:3px}
-  .sessum{font-size:13px; line-height:1.5; color:var(--body); white-space:pre-wrap}
   /* thread = stable INTENT (north star) + evolving WORKING MEMORY + a list of dumps */
   /* two-column thread: left = distilled context, right = live activity stream */
   .threadgrid{display:grid; grid-template-columns:360px 1fr; gap:24px; align-items:start; margin-top:6px}
@@ -341,17 +334,7 @@
   .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
-  .dumprow{display:flex; gap:10px; margin:6px 0 6px}
-  .chunkwrap{margin:0 0 18px} .chunkwrap summary{font-family:var(--mono); font-size:11px; color:var(--muted2); cursor:pointer; text-transform:uppercase; letter-spacing:.05em}
-  .chunkbox{width:100%; min-height:110px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md);
-    padding:12px 14px; font-size:13.5px; line-height:1.55; color:var(--ink); outline:none; resize:vertical; margin-top:10px; white-space:pre-wrap}
-  .chunkbox:focus{border-color:var(--teal)}
-  .chunkrow{display:flex; gap:10px; margin-top:8px}
-  .chunksrc{flex:1; height:40px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md); padding:0 12px; font-size:13px; color:var(--ink); outline:none}
-  .chunksrc:focus{border-color:var(--teal)}
-  .hotkeyhint{font-size:11.5px; color:var(--muted2); padding:0 2px; margin:0 0 18px}
-  .hotkeyhint b{color:var(--muted); font-weight:600; font-family:var(--mono)}
-  .hotkeyhint .resum{color:var(--teal); cursor:pointer}
+  .dumprow{display:flex; gap:10px; margin:6px 0 16px}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
   .dumplist{display:flex; flex-direction:column; gap:9px}
   .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--paper); border:1px solid var(--hair);
@@ -771,18 +754,7 @@ function vThread(t){
         ${active?`<div class="dumprow">
           <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
           <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
-        </div>
-        <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere — it lands instantly`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>
-        <details class="chunkwrap"><summary>Paste a transcript or agent output — CRUX splits it into points</summary>
-          <textarea id="chunkin" class="chunkbox" placeholder="Paste a chunk of chat / an agent's output / a block of notes. CRUX pulls out the discrete decisions, requirements, conclusions and open questions — one card each."></textarea>
-          <div class="chunkrow">
-            <input id="chunksrc" class="chunksrc" placeholder="from (optional) — e.g. debug-agent, claude, teammate"/>
-            <button class="btn teal sm" onclick="extractChunk('${t.id}')">Extract points →</button>
-          </div>
-        </details>
-        ${(t.sessions&&t.sessions.length)?`<details class="seswrap"><summary>Sessions — ${t.session_count} work period${t.session_count===1?'':'s'} on this project</summary>
-          ${t.sessions.map(sessionRow).join("")}
-        </details>`:''}`:''}
+        </div>`:''}
 
         <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}${syncing?' · <span class="syncing">sorting…</span>':''}</div>
         ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
@@ -792,18 +764,6 @@ function vThread(t){
           <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}
       </div>
     </div>`);
-}
-function sessionRow(s){
-  const live=s.status==='active';
-  const when=live?`started ${rel(s.started_at)} · live`:`${rel(s.started_at)} → ${rel(s.ended_at||s.last_at)}`;
-  const sum=(s.summary||'').trim();
-  return `<div class="sesitem">
-    <div class="sesdot ${live?'live':''}"></div>
-    <div style="flex:1;min-width:0">
-      <div class="sesmeta">${esc(when)}</div>
-      <div class="sessum">${sum?esc(sum):'<span class="muted2">'+(live?'in progress — checkpoint written when it wraps':'no checkpoint')+'</span>'}</div>
-    </div>
-  </div>`;
 }
 function dumpCard(c){
   const sorting=!c.routed;
@@ -877,15 +837,6 @@ async function dump(id){
   await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
   await refreshThread(); setTimeout(refreshThread,1500);  // context re-refines in the background
 }
-async function extractChunk(id){
-  const ta=document.getElementById('chunkin'); const v=(ta&&ta.value.trim())||'';
-  if(!v){ toast("Paste a chunk first"); return; }
-  const src=(document.getElementById('chunksrc')||{}).value||'';
-  toast("Pulling out the points…");
-  const r=await post('/hook',{content:v,project:id,source:'paste',source_ref:src.trim()||null,split:true});
-  if(ta) ta.value='';
-  toast(`✓ ${r.count||0} point(s) extracted`); await refreshThread(); setTimeout(refreshThread,1200);
-}
 async function toggleInclude(id,inc){ await post(`/cards/${id}/include`,{included:!!inc}); await refreshThread(); }
 async function deleteCard(id){ if(!confirm("Delete this dump? (nothing else is affected)")) return; await fetch(`/cards/${id}`,{method:"DELETE",headers:_token?{"x-crux-token":_token}:{}}); toast("Deleted"); await refreshThread(); }
 async function saveContext(id){
@@ -925,7 +876,6 @@ function intDirty(){ const r=document.getElementById('intsave-link'); if(r) r.st
 window.startThread=startThread; window.openThread=openThread; window.closeThread=closeThread;
 window.toggleCard=toggleCard; window.dump=dump; window.toggleInclude=toggleInclude; window.deleteCard=deleteCard;
 window.saveContext=saveContext; window.refineContext=refineContext; window.saveIntent=saveIntent; window.intDirty=intDirty;
-window.extractChunk=extractChunk;
 window.finishThread=finishThread; window.promoteThread=promoteThread; window.copyBrief=copyBrief; window.copyForTask=copyForTask; window.ctxDirty=ctxDirty;
 
 /* ---------------- OVERVIEW ---------------- */
