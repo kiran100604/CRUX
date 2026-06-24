@@ -271,6 +271,9 @@
   @media(max-width:980px){.tcols{grid-template-columns:1fr}}
   .ownedtag,.autotag{font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:var(--pill); margin-left:6px}
   .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--teal-bg); color:var(--teal)}
+  .livetag{font-family:var(--mono); font-size:10px; color:var(--green)}
+  .syncing{font-family:var(--mono); font-size:10px; color:var(--peach); animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.4}}
   .resum{float:right; cursor:pointer; color:var(--muted2); font-family:var(--sans); text-transform:none;
     letter-spacing:0; font-size:12px} .resum:hover{color:var(--ink)}
   .statebox{width:100%; min-height:150px; border:1px solid var(--hair); background:var(--canvas);
@@ -627,6 +630,30 @@ async function poll(){
   }catch(e){}
 }
 setInterval(poll, 5000);
+
+// Keep the OPEN Working thread live — new dumps get routed and the working memory
+// re-refines in the background; this surfaces both automatically, no refresh/refine
+// needed. Re-renders only when something actually changed, and never while you're
+// typing (so it can't clobber an edit).
+let _threadSig="", _threadBusy=false;
+function _threadSigOf(tv){
+  return [tv.context||"", tv.card_count||0,
+          (tv.cards||[]).map(c=>c.id+"|"+(c.routed?1:0)+"|"+c.kind+"|"+(c.included?1:0)).join(",")
+         ].join("§");
+}
+function setThreadView(tv){ if(tv&&tv.id){ state.threadView=tv; _threadSig=_threadSigOf(tv); } }
+async function pollThread(){
+  if(_threadBusy || document.hidden) return;
+  if(!state.openThread || state.view!=='working') return;
+  const ae=document.activeElement;
+  if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;  // don't disrupt an edit
+  _threadBusy=true;
+  try{
+    const tv=await api(`/threads/${state.openThread}`);
+    if(tv&&tv.id && _threadSigOf(tv)!==_threadSig){ setThreadView(tv); render(); }
+  }catch(e){}finally{ _threadBusy=false; }
+}
+setInterval(pollThread, 2000);
 function setView(v){state.view=v;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.v===v));
   render(); window.scrollTo(0,0);}
@@ -680,6 +707,7 @@ function vThread(t){
   const owned=t.context_owned;
   const cards=t.cards||[];
   const incl=cards.filter(c=>c.included).length;
+  const syncing=active && cards.some(c=>!c.routed);  // a dump is still being sorted/refined
   app(`
     <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
     <div class="threadhd">
@@ -708,25 +736,18 @@ function vThread(t){
     <div class="ctxpanel">
       <div class="ctxhd">
         <span class="ctxlbl">◆ WORKING MEMORY — decisions, current state & what you've learned</span>
-        <span class="ctxtag">${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}</span>
+        <span class="ctxtag">${syncing?'<span class="syncing">● updating…</span>':'<span class="livetag">● live</span>'} ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'}</span>
         <span class="resum" onclick="refineContext('${t.id}')" title="Re-synthesize from your dumps">↻ refine</span>
       </div>
       <textarea id="ctxbox" class="ctxbox" oninput="ctxDirty()" placeholder="As you dump things, CRUX distills them here — the decisions made, where things stand, what you've learned (including what NOT to do). The goal itself stays up in INTENT. Edit anytime; once you do, it's yours until you hit ↻ refine.">${esc(t.context||'')}</textarea>
       <div id="ctxsave" class="savedrow"><button class="btn sm teal" onclick="saveContext('${t.id}')">Save my edits</button><span class="muted2" style="font-size:12px">editing makes this yours — auto-refine pauses until you hit ↻</span></div>
     </div>
 
-    <details class="bgwrap"${t.background?'':''}><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
-      ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
-    </details>
-    ${(t.sessions&&t.sessions.length)?`<details class="seswrap"><summary>Sessions — ${t.session_count} work period${t.session_count===1?'':'s'} on this project</summary>
-      ${t.sessions.map(sessionRow).join("")}
-    </details>`:''}
-
     ${active?`<div class="dumprow">
       <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
       <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
     </div>
-    <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>
+    <div class="hotkeyhint">${state.hotkey?`⌨ <b>${esc(state.hotkey)}</b> dumps straight here from anywhere — it lands instantly`:`<span class="resum" onclick="setView('overview')">Set a capture hotkey →</span> to dump from anywhere`}</div>
     <details class="chunkwrap"><summary>Paste a transcript or agent output — CRUX splits it into points</summary>
       <textarea id="chunkin" class="chunkbox" placeholder="Paste a chunk of chat / an agent's output / a block of notes. CRUX pulls out the discrete decisions, requirements, conclusions and open questions — one card each."></textarea>
       <div class="chunkrow">
@@ -735,9 +756,16 @@ function vThread(t){
       </div>
     </details>`:''}
 
-    <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}</div>
+    <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}${syncing?' · <span class="syncing">sorting…</span>':''}</div>
     ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
       :`<div class="empty"><div class="big">Nothing dumped yet</div>Use your capture hotkey while you work, or drop something in above — CRUX folds it into the context.</div>`}
+
+    <details class="bgwrap"${t.background?'':''}><summary>Background — seeded from your knowledge base (agents can pull more)</summary>
+      ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:13px;padding:8px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
+    </details>
+    ${(t.sessions&&t.sessions.length)?`<details class="seswrap"><summary>Sessions — ${t.session_count} work period${t.session_count===1?'':'s'} on this project</summary>
+      ${t.sessions.map(sessionRow).join("")}
+    </details>`:''}
 
     ${active?`<div class="promote"><button class="btn out sm" onclick="promoteThread('${t.id}')">Save learnings to Review →</button>
       <span class="muted2" style="font-size:12px;margin-left:10px">Pull the durable facts into your knowledge base. The thread stays here.</span></div>`:''}`);
@@ -788,7 +816,7 @@ function openThread(id){
   render();
   // make the thread you're viewing the hotkey target, so captures land here
   post(`/threads/${id}/current`,{}).then(()=>{state.currentThread=id;});
-  api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();}});
+  api(`/threads/${id}`).then(tv=>{ if(tv&&tv.id){setThreadView(tv); if(state.view==='working')render();}});
 }
 function closeThread(){ state.openThread=null; state.threadView=null; history.replaceState(null,'','#/working'); render(); }
 
@@ -806,7 +834,7 @@ function applyRoute(){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.v==='working'));
   if(state.openThread!==r.thread){
     state.openThread=r.thread;
-    api(`/threads/${r.thread}`).then(tv=>{ state.threadView=(tv&&tv.id)?tv:null; if(!state.threadView)state.openThread=null; render(); flashCard(); });
+    api(`/threads/${r.thread}`).then(tv=>{ if(tv&&tv.id){setThreadView(tv);}else{state.threadView=null;state.openThread=null;} render(); flashCard(); });
   } else { render(); flashCard(); }
 }
 function flashCard(){
@@ -818,7 +846,7 @@ function flashCard(){
 function goLink(url){ const i=(url||'').indexOf('#'); location.hash = i>=0 ? url.slice(i+1) : url; }
 window.addEventListener('hashchange', applyRoute);
 window.goLink=goLink;
-async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){state.threadView=tv; if(state.view==='working')render();} }
+async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){setThreadView(tv); if(state.view==='working')render();} }
 function toggleCard(id){ state.expanded['dc-'+id]=!state.expanded['dc-'+id]; render(); }
 async function dump(id){
   const el=document.getElementById('dumpin'); const txt=(el&&el.value.trim())||'';
