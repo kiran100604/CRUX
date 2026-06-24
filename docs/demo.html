@@ -385,6 +385,22 @@ html.crux-dark {
   .sesmeta{font-family:var(--mono); font-size:10px; color:var(--muted2); margin-bottom:3px}
   .sessum{font-size:13px; line-height:1.5; color:var(--body); white-space:pre-wrap}
   /* thread = stable INTENT (north star) + evolving WORKING MEMORY + a list of dumps */
+  /* two-column thread: left = distilled context, right = live activity stream */
+  .threadgrid{display:grid; grid-template-columns:360px 1fr; gap:24px; align-items:start; margin-top:6px}
+  @media(max-width:1000px){.threadgrid{grid-template-columns:1fr}}
+  .thread-aside{position:sticky; top:78px}
+  @media(max-width:1000px){.thread-aside{position:static}}
+  .ctxsummary{background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-lg); overflow:hidden}
+  .cshead{font-weight:600; color:var(--ink); font-size:16px; padding:15px 18px; border-bottom:1px solid var(--hair)}
+  .cssec{padding:14px 18px; border-bottom:1px solid var(--hair)} .cssec:last-child{border-bottom:none}
+  .cslbl{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--muted2); margin-bottom:9px}
+  .cslbl .csright{margin-left:auto; display:flex; gap:8px; align-items:center}
+  .cssec .intbox{min-height:40px; font-size:14px; background:var(--paper)}
+  .cssec .ctxbox{min-height:200px; font-size:13.5px; background:var(--paper)}
+  .cssec .bgbox{max-height:220px; margin:0}
+  .thread-main{min-width:0}
+  .thread-main .threadhd{margin-bottom:14px; align-items:center}
   .intpanel{background:var(--soft); border:1px solid var(--hair); border-left:3px solid var(--ink); border-radius:var(--r-lg); padding:14px 18px; margin-bottom:14px}
   .intlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); flex:1; min-width:0}
   .intbox{width:100%; min-height:46px; border:1px solid var(--hair); background:var(--canvas);
