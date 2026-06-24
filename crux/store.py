@@ -36,6 +36,13 @@ class Store:
     def close(self) -> None:
         self.db.close()
 
+    def reload_providers(self) -> None:
+        """Re-read config.env and rebuild the embedder + processor — so adding a key
+        in the setup wizard goes live without restarting the server."""
+        self.cfg = Config.load()
+        self.embedder = get_embedding_provider(self.cfg)
+        self.processor = get_processor(self.cfg)
+
     # --- ingestion: every input becomes an Episode, then 1..N facts ----------
 
     def _episode(self, content: str, source_type: str, source_ref: str | None,

@@ -159,6 +159,7 @@ def create_app(cfg: Config):
         return _FR(p)
 
     class SetupIn(BaseModel):
+        nvidia_key: str | None = None      # one key → LLM + embeddings (NVIDIA NIM)
         anthropic_key: str | None = None
         openai_key: str | None = None
         install_hook: bool = True
@@ -181,6 +182,7 @@ def create_app(cfg: Config):
             "configured": cfg.is_configured(),
             "has_anthropic": bool(cfg.anthropic_api_key),
             "has_openai": bool(cfg.openai_api_key),
+            "has_nvidia": bool(cfg.openai_api_key) and "nvidia" in (cfg.api_base or ""),
             "hook_installed": hook,
             "default_mods": ["cmd" if plat == "darwin" else "ctrl", "shift"],
             "default_key": "space",
@@ -193,6 +195,17 @@ def create_app(cfg: Config):
         from .install import claude_settings_path, install_claude_hook
 
         vals: dict[str, str] = {}
+        # NVIDIA NIM: one key powers BOTH the LLM and embeddings (OpenAI-compatible)
+        if body.nvidia_key:
+            k = body.nvidia_key.strip()
+            vals.update({
+                "CRUX_PROCESSING_PROVIDER": "openai", "OPENAI_API_KEY": k,
+                "CRUX_OPENAI_BASE_URL": "https://integrate.api.nvidia.com/v1",
+                "CRUX_PROCESSING_MODEL": "meta/llama-3.3-70b-instruct",
+                "CRUX_EMBEDDING_PROVIDER": "openai",
+                "CRUX_EMBEDDING_MODEL": "nvidia/nv-embedqa-e5-v5",
+            })
+        # other providers (override per-channel if given alongside)
         if body.anthropic_key:
             vals["ANTHROPIC_API_KEY"] = body.anthropic_key.strip()
             vals["CRUX_PROCESSING_PROVIDER"] = "anthropic"
@@ -215,6 +228,20 @@ def create_app(cfg: Config):
 
         write_snippets(cfg.home / "hotkey", mods, key)
         cfg.mark_configured()
+
+        # Go live immediately — rebuild the running store's providers from the new
+        # config and re-embed existing facts so old (offline) and new vectors don't
+        # mix. Best-effort: a bad key / network issue must not break setup.
+        provider_status = "offline"
+        if body.nvidia_key or body.anthropic_key or body.openai_key:
+            try:
+                store.reload_providers()
+                provider_status = f"{store.cfg.processing_provider}/{store.embedder.model}"
+                if store.cfg.embedding_provider != "fake":
+                    store.reembed_all()
+            except Exception as e:
+                provider_status = f"saved, applies on restart ({str(e)[:60]})"
+
         # Linux: a changed chord must be re-bound at the compositor level or the
         # old shortcut stays active. Auto-rebind so the new chord works immediately.
         rebound = None
@@ -228,6 +255,7 @@ def create_app(cfg: Config):
             "chord": chord_label(mods, key),
             "chord_rejected": (None if ok else reason),
             "rebound": rebound,
+            "providers": provider_status,
             "keys_saved": [k for k in vals if k.endswith("_API_KEY")],
         }
 

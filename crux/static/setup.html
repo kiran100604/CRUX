@@ -32,6 +32,8 @@
   input[type=text],input[type=password]{width:100%; height:46px; border:1px solid var(--hair); background:var(--canvas);
     border-radius:10px; padding:0 15px; font-size:15px; color:var(--ink); outline:none; font-family:var(--mono)}
   input:focus{border-color:var(--ink)}
+  .adv{margin-top:6px} .adv summary{font-size:13px; color:var(--muted); cursor:pointer; padding:6px 0}
+  .adv[open] summary{margin-bottom:10px}
   .chords{display:flex; flex-wrap:wrap; gap:10px}
   .chord{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:10px;
     padding:11px 15px; font-family:var(--mono); font-size:13px; cursor:pointer; transition:.12s}
@@ -140,13 +142,17 @@ function form(){
       here is optional and stays on this ${plat} machine.</p>
 
     <div class="step">
-      <div class="n">Step 1 · API keys (optional)</div>
-      <h2>Sharper titles & search</h2>
-      <p>Skip both to run fully offline — CRUX still works, just rougher. You can add these later.</p>
-      <label class="field"><span>Anthropic API key</span>
-        <input id="ak" type="password" placeholder="${S.has_anthropic?'• already set — leave blank to keep':'sk-ant-…'}" autocomplete="off"></label>
-      <label class="field"><span>OpenAI API key (embeddings)</span>
-        <input id="ok" type="password" placeholder="${S.has_openai?'• already set — leave blank to keep':'sk-…'}" autocomplete="off"></label>
+      <div class="n">Step 1 · Connect a model — makes CRUX live</div>
+      <h2>One key powers everything</h2>
+      <p>Paste a single <b>NVIDIA API key</b> to run the LLM <i>and</i> embeddings — enrichment, subjects, search and synthesis all go live. Free key at <span class="mono">build.nvidia.com</span>. Skip to run fully offline (rougher); you can add it later.</p>
+      <label class="field"><span>NVIDIA API key — LLM + embeddings</span>
+        <input id="nv" type="password" placeholder="${S.has_nvidia?'• already set — leave blank to keep':'nvapi-…'}" autocomplete="off"></label>
+      <details class="adv"><summary>Use a different provider instead</summary>
+        <label class="field"><span>Anthropic API key (LLM)</span>
+          <input id="ak" type="password" placeholder="${S.has_anthropic?'• already set — leave blank to keep':'sk-ant-…'}" autocomplete="off"></label>
+        <label class="field"><span>OpenAI API key (embeddings)</span>
+          <input id="ok" type="password" placeholder="${S.has_openai?'• already set — leave blank to keep':'sk-…'}" autocomplete="off"></label>
+      </details>
     </div>
 
     <div class="step">
@@ -217,9 +223,11 @@ async function apply(useDefaults){
     } else { mods=presets[sel].mods; key=presets[sel].key; }
   }
   $("#finish").disabled=true; $("#finish").textContent="Saving…";
+  const $v = id => { const el=$("#"+id); return (el && el.value) || null; };
   const payload = useDefaults ? {install_hook:true} : {
-    anthropic_key: $("#ak").value || null,
-    openai_key: $("#ok").value || null,
+    nvidia_key: $v("nv"),
+    anthropic_key: $v("ak"),
+    openai_key: $v("ok"),
     install_hook: hook,
     chord_mods: mods, chord_key: key,
   };
@@ -234,8 +242,8 @@ function done(r){
       <h1>You're ready.</h1>
       <p class="lede" style="margin:0 auto 26px">
         Hotkey set to <b>${r.chord}</b>. Hook ${r.hook==="installed"?"installed":r.hook==="already-installed"?"already on":"skipped"}.
-        ${r.keys_saved&&r.keys_saved.length?"API keys saved — restart CRUX to use them.":"Running on offline models."}<br>
-        Run <span class="mono">crux start</span> (one command, every OS) — then capture is: copy text (Ctrl+C) → press <b>${r.chord}</b>. Restart it if it's already running.
+        ${(r.providers&&r.providers!=="offline")?`<b>Live</b> on ${r.providers} — enrichment, search & synthesis are on.`:"Running on offline models — add a key anytime to go live."}<br>
+        Run <span class="mono">crux start</span> (one command, every OS) — then capture is: copy text (Ctrl+C) → press <b>${r.chord}</b>.
       </p>
       <button class="btn" id="open">Open dashboard →</button>
     </div>`;
