@@ -820,3 +820,23 @@ def test_subject_channel_retrieves_across_word_variants(store):
     top = store.search("who are our competitors", scope="main", limit=1)
     assert top and top[0].item.subject == "competition"
     assert store.search("how is data stored", scope="main", limit=1)[0].item.subject == "storage"
+
+
+def test_route_pending_batches_all_unrouted(store):
+    t = store.create_thread("X", "build a sync engine", seed=False)
+    for txt in ["We decided to use Postgres.", "The API must respond under 200ms.",
+                "How do we handle conflicts?"]:
+        store.add_step(txt, thread_id=t["id"], route=False)   # leave unrouted
+    n = store.route_pending(t["id"])                          # one batch call
+    assert n == 3
+    kinds = {c.kind for c in store.db.thread_steps(t["id"])}
+    assert {"decision", "requirement", "question"} <= kinds
+    assert all(c.routed for c in store.db.thread_steps(t["id"]))
+
+
+def test_query_embedding_is_cached(store):
+    store.capture("The sync engine uses Postgres.", type_hint="decision",
+                  scope="main", proposed=False)
+    store.search("sync engine storage", scope="main")
+    store.search("sync engine storage", scope="main")        # identical → cache hit
+    assert len(store._qcache) == 1

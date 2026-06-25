@@ -133,6 +133,39 @@ Rules:
   note=anything else."""
 
 
+_ROUTE_MANY_PROMPT = """You classify each dumped item in a working thread by KIND.
+
+THE TASK (intent): {intent}
+
+ITEMS (numbered):
+{items}
+
+Return ONLY a minified JSON array — one element per item, IN ORDER:
+[{{"n":1,"kind":"decision|requirement|constraint|insight|question|reference|prompt|suggestion|result|note"}}, ...]
+Prefer a SIGNAL when it fits: decision=a choice made (incl. what's ruled out);
+requirement=must be true/done; constraint=a limit/rule; insight=a conclusion/learning;
+question=an open question. Else: reference=a link/doc/spec; prompt=an instruction to an AI;
+suggestion=an idea not yet acted on; result=an outcome; note=anything else."""
+
+
+def _parse_route_many(text: str, n: int) -> list[dict]:
+    """Parse the batch router's JSON array into exactly n {kind, reason} dicts;
+    any gap/garbage degrades to 'note' so one bad reply never blocks capture."""
+    out = [{"kind": "note", "reason": "batch"} for _ in range(n)]
+    try:
+        m = re.search(r"\[.*\]", text, re.DOTALL)
+        arr = json.loads(m.group(0) if m else text)
+    except Exception:
+        return out
+    if not isinstance(arr, list):
+        return out
+    for i, d in enumerate(arr[:n]):
+        if isinstance(d, dict):
+            k = str(d.get("kind", "note")).lower().strip()
+            out[i] = {"kind": k if k in CARD_KINDS else "note", "reason": "batch"}
+    return out
+
+
 _EXTRACT_PROMPT = """You read a chunk of work — a chat transcript, an agent's
 output, a block of notes — and pull out the discrete points worth remembering for
 an ongoing project's WORKING MEMORY. One entry per distinct point; keep each
@@ -328,6 +361,10 @@ class FakeProcessor:
         return {"kind": kind, "target": "guide" if is_guide else "current",
                 "new_title": None, "confidence": 0.55, "reason": "offline heuristic"}
 
+    def route_many(self, items: list[str], *, intent: str = "") -> list[dict]:
+        # offline: no LLM, so no batching benefit — classify each with the heuristic
+        return [self.route(it, intent=intent) for it in items]
+
     def extract_entries(self, content: str) -> list[dict]:
         # Offline: split a chunk into candidate points and classify each with the
         # same keyword heuristic the router uses. Splits on blank lines, list
@@ -442,6 +479,20 @@ class AnthropicProcessor:
         except Exception:
             return FakeProcessor.route(self, item, intent=intent,
                                        approaches=approaches, recent=recent)
+
+    def route_many(self, items: list[str], *, intent: str = "") -> list[dict]:
+        """Classify many dumped items in ONE call (instead of one call per card)."""
+        if not items:
+            return []
+        if len(items) == 1:
+            return [self.route(items[0], intent=intent)]
+        numbered = "\n".join(f"{i+1}. {it.strip()[:500]}" for i, it in enumerate(items))
+        try:
+            text = self._call(_ROUTE_MANY_PROMPT.format(
+                intent=intent or "(unspecified)", items=numbered), 40 * len(items) + 120)
+            return _parse_route_many(text, len(items))
+        except Exception:
+            return FakeProcessor.route_many(self, items, intent=intent)
 
     def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
         """Re-synthesize the thread's WORKING MEMORY (decisions/state/learnings,

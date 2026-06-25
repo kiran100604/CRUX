@@ -33,6 +33,7 @@ class Store:
         self.embedder = get_embedding_provider(cfg)
         self.processor = get_processor(cfg)
         self._last_refine: dict[str, float] = {}  # thread_id → monotonic ts of last refine
+        self._qcache: dict[str, list] = {}         # query text → embedding (per provider)
 
     def close(self) -> None:
         self.db.close()
@@ -43,6 +44,7 @@ class Store:
         self.cfg = Config.load()
         self.embedder = get_embedding_provider(self.cfg)
         self.processor = get_processor(self.cfg)
+        self._qcache.clear()   # new provider → old query embeddings are invalid
 
     # --- ingestion: every input becomes an Episode, then 1..N facts ----------
 
@@ -474,6 +476,22 @@ class Store:
                        title=f"Captured {n} signal{'s' if n != 1 else ''}",
                        detail=detail, count=n)
 
+    def route_pending(self, thread_id: str) -> int:
+        """Classify ALL still-unrouted cards in a thread in ONE LLM call (instead of
+        one per card), then mark the context stale once. The background path uses
+        this so a burst of dumps costs a single routing call."""
+        cards = [c for c in self.db.thread_steps(thread_id) if not c.routed]
+        if not cards:
+            return 0
+        t = self.db.get_thread(thread_id)
+        decisions = self.processor.route_many(
+            [c.raw_content for c in cards], intent=(t["intent"] if t else "") or "")
+        for c, d in zip(cards, decisions):
+            self.db.update_card(c.id, {"routed": 1, "kind": d.get("kind", "note"),
+                                       "route_reason": d.get("reason")})
+        self._mark_context_stale(thread_id)
+        return len(cards)
+
     def route_card(self, card_id: str) -> dict | None:
         """Tag a dumped card's KIND (reference/prompt/result/…) and mark the thread's
         context stale so it re-refines. No lanes to file into — the dump just feeds
@@ -735,10 +753,21 @@ class Store:
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
         from .embeddings import FakeEmbedding
-        qvec = self.embedder.embed(query, input_type="query")  # asymmetric models want this
+        qvec = self._embed_query(query)
         return search(self.db, qvec, query, limit=limit,
                       include_archived=include_archived, scope=scope,
                       real_embed=not isinstance(self.embedder, FakeEmbedding))
+
+    def _embed_query(self, text: str) -> list:
+        """Embed a query, cached — the agent hook and the 2s poll re-embed the same
+        text repeatedly; embeddings are deterministic per model, so cache by text."""
+        v = self._qcache.get(text)
+        if v is None:
+            if len(self._qcache) > 512:    # cheap bound
+                self._qcache.clear()
+            v = self.embedder.embed(text, input_type="query")
+            self._qcache[text] = v
+        return v
 
     def reembed_all(self) -> int:
         """Recompute every fact's embedding with the CURRENT provider — run after

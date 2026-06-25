@@ -47,16 +47,16 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
         worker.close()
 
 
-def _route_card(cfg: Config, card_id: str) -> None:
-    """Classify a dumped card's kind and re-refine the thread's living context off
-    the request path (own DB connection), so a capture returns instantly and the
-    context updates on the next poll."""
+def _route_pending(cfg: Config, thread_id: str) -> None:
+    """Classify ALL unrouted cards in the thread in one call, then refresh context —
+    off the request path (own DB connection), so capture returns instantly and a
+    burst of dumps costs a single routing call."""
+    if not thread_id:
+        return
     worker = Store(cfg)
     try:
-        worker.route_card(card_id)
-        ep = worker.db.get_episode(card_id)
-        if ep and ep.thread_id:
-            worker.ensure_context(ep.thread_id)
+        worker.route_pending(thread_id)
+        worker.ensure_context(thread_id)
     finally:
         worker.close()
 
@@ -281,9 +281,9 @@ def create_app(cfg: Config):
                                  source_ref=body.source_ref,
                                  thread_id=body.thread_id)
             # route (classify + file) off the request path so capture stays instant;
-            # the card shows as "sorting…" until it lands on the next poll
-            if res.get("thread_id") and res.get("card_id"):
-                app.state.executor.submit(_route_card, cfg, res["card_id"])
+            # batches ALL unrouted cards on the thread → one call for a burst of dumps
+            if res.get("thread_id"):
+                app.state.executor.submit(_route_pending, cfg, res["thread_id"])
             return {"step": True, **res}
         item = store.capture(body.content, source=body.source,
                              type_hint=body.type, scope=body.scope,
