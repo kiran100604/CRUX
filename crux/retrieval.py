@@ -23,18 +23,25 @@ CANDIDATES = 50     # depth of each list before fusion
 DECAY_HALF_LIFE_DAYS = 30.0  # working (individual) items halve in weight this often
 MAIN_BOOST = 1.5    # verified truth outranks working notes
 SUBJECT_BOOST = 1.7  # a fact whose SUBJECT the query names ranks well above off-subject noise
+MIN_RELEVANCE = 0.28  # semantic-cosine floor for "relevant" without lexical/subject overlap
+                      # (tuned for real embeddings; offline relies on lexical/subject overlap)
 
 
 @dataclass
 class Result:
     item: ContextItem
     score: float
+    sim: float = 0.0          # raw semantic cosine (0..1) — for the relevance gate
+    relevant: bool = True     # did this fact really match (overlap or strong similarity)?
 
 
 def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5,
-           include_archived: bool = False, scope: str | None = None) -> list[Result]:
+           include_archived: bool = False, scope: str | None = None,
+           real_embed: bool = True) -> list[Result]:
     """scope=None searches both tiers (main prioritized); "main"/"individual"
-    restricts to one tier."""
+    restricts to one tier. real_embed=False (the offline hash embedder, whose
+    cosine has spurious collisions) makes the relevance gate ignore similarity and
+    rely on subject + significant-word overlap instead."""
     # 1. semantic candidates
     sims = sorted(
         ((cosine(query_vec, vec), iid)
@@ -42,15 +49,18 @@ def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5
         reverse=True,
     )[:CANDIDATES]
     semantic_ids = [iid for _, iid in sims]
+    sim_of = {iid: s for s, iid in sims}
 
     # 2. lexical candidates
     lexical_ids = db.fts_search(query_text, CANDIDATES, include_archived, scope)
+    lexical_set = set(lexical_ids)
 
     # 2b. subject candidates — facts whose SUBJECT the query names. A third channel
     # (not just a re-rank boost) so a subject-relevant fact is guaranteed into the
     # pool with real rank, even when the semantic/lexical channels missed it.
     subject_ids = [iid for iid, subj in db.subjects(scope)
                    if _subject_matches(subj, query_text)][:CANDIDATES]
+    subject_set = set(subject_ids)
 
     # 3. RRF fuse the three channels
     fused: dict[str, float] = {}
@@ -61,16 +71,41 @@ def search(db: Database, query_vec: list[float], query_text: str, limit: int = 5
     for rank, iid in enumerate(subject_ids):
         fused[iid] = fused.get(iid, 0.0) + 1.0 / (RRF_K + rank)
 
-    # 4. boosts / penalties by scope + intent + freshness + trust + subject match
+    # 4. boosts / penalties + a RELEVANCE flag. A fact is relevant only with REAL
+    # topical overlap — a subject match, strong semantic similarity, or a shared
+    # SIGNIFICANT word (not a generic term like "data"/"system"). So an unrelated
+    # KB returns NOTHING instead of low-score noise (the "CRUX background on a
+    # trading thread" bug). Callers gate on `.relevant` when noise hurts.
+    qsig = _significant(query_text)
     results: list[Result] = []
     for iid, base in fused.items():
         item = db.get(iid)
         if item is None:
             continue
-        results.append(Result(item=item, score=base * _weight(item) * _subject_boost(item, query_text)))
+        sim = sim_of.get(iid, 0.0)
+        relevant = ((iid in subject_set)
+                    or (real_embed and sim >= MIN_RELEVANCE)
+                    or bool(qsig & _significant(f"{item.title} {item.summary} {item.subject}")))
+        results.append(Result(item=item, sim=sim, relevant=relevant,
+                              score=base * _weight(item) * _subject_boost(item, query_text)))
 
     results.sort(key=lambda r: r.score, reverse=True)
     return results[:limit]
+
+
+# words too generic to signal that two texts are about the same THING
+_GENERIC = {"data", "system", "build", "make", "made", "used", "using", "work",
+            "working", "thread", "context", "fact", "facts", "project", "task",
+            "tasks", "need", "want", "like", "file", "files", "thing", "things",
+            "this", "that", "with", "from", "into", "your", "their", "about",
+            "should", "could", "would", "have", "https", "http"}
+
+
+def _significant(text: str) -> set[str]:
+    """The meaningful (topic-bearing) words of a text — drops short and generic
+    terms, so 'data'/'system' don't make two unrelated texts look related."""
+    return {t for t in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if len(t) >= 4 and t not in _GENERIC}
 
 
 def _stem_match(a: str, b: str) -> bool:

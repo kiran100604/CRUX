@@ -623,7 +623,7 @@ def test_resume_surfaces_after_idle(store):
 
 def test_assemble_context_is_state_aware(store):
     # verified KB facts the assembler should surface for the current state
-    store.capture("We use PostgreSQL for all persistence.", type_hint="decision",
+    store.capture("The sync engine persists to PostgreSQL.", type_hint="decision",
                   scope="main", proposed=False)
     store.capture("Never deploy on Fridays.", type_hint="constraint",
                   scope="main", proposed=False)
@@ -642,12 +642,26 @@ def test_assemble_context_is_state_aware(store):
 
 
 def test_assemble_records_usage_payoff(store):
-    i = store.capture("Payments go through Stripe.", type_hint="decision",
+    # the fact shares a word ("checkout") with the work, so it passes the relevance
+    # gate offline (real embeddings also catch semantic relations)
+    i = store.capture("The checkout flow uses Stripe.", type_hint="decision",
                       scope="main", proposed=False)
-    t = store.create_thread("Checkout", "Build checkout", seed=False)
-    store.add_step("Working on the payment step.", thread_id=t["id"], route=True)
-    store.assemble_context(t["id"], query="wire up the payment provider")
+    t = store.create_thread("Checkout", "Build the checkout", seed=False)
+    store.add_step("Working on the checkout step.", thread_id=t["id"], route=True)
+    store.assemble_context(t["id"], query="wire up the checkout payment provider")
     assert store.db.usage_counts().get(i.id, 0) >= 1
+
+
+def test_relevance_gate_excludes_unrelated_kb(store):
+    # an UNRELATED verified fact must NOT leak into a project's context (the
+    # 'CRUX background on a trading thread' bug)
+    store.capture("Our marketing tagline is bold and minimal.", type_hint="reference",
+                  scope="main", proposed=False)
+    t = store.create_thread("Sync", "Build the data sync engine", seed=False)
+    store.add_step("Designing incremental sync.", thread_id=t["id"], route=True)
+    pkg = store.assemble_context(t["id"], query="how should the sync engine batch writes")
+    assert pkg["kb"] == []          # nothing relevant → nothing surfaced
+    assert "marketing" not in pkg["brief"].lower()
 
 
 def test_assemble_endpoint(tmp_path, monkeypatch):

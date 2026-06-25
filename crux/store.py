@@ -32,6 +32,7 @@ class Store:
         self.db = Database(cfg.db_path)
         self.embedder = get_embedding_provider(cfg)
         self.processor = get_processor(cfg)
+        self._last_refine: dict[str, float] = {}  # thread_id → monotonic ts of last refine
 
     def close(self) -> None:
         self.db.close()
@@ -276,15 +277,21 @@ class Store:
     # You never organize: every included dump refines the context. The only control
     # is whether a card is IN the context — exclude one and the context forgets it.
 
-    def _seed_background(self, intent: str) -> str:
-        """Assemble the starting context for a thread from the verified KB, so the
-        thread is born with the background you'd otherwise re-type into every tool.
-        Reuses the same directive-brief formatter the agent hook uses."""
-        if not intent.strip():
+    def _kb_connections(self, intent: str, memory: str = "") -> str:
+        """The verified-KB facts RELEVANT to the current work — retrieved live
+        against intent + working memory, and RELEVANCE-GATED so an unrelated KB
+        shows nothing (no more 'CRUX background on a trading thread'). Recomputed
+        whenever the working memory refreshes, so it tracks what you're doing."""
+        q = (intent + "\n" + memory).strip()
+        if not q:
             return ""
         from .hooks import _format  # lazy: hooks imports nothing heavy from store
-        results, links = self.retrieve(intent, limit=6, scope="main")
-        return _format(results, links) if results else ""
+        results, links = self.retrieve(q, limit=6, scope="main")
+        rel = [r for r in results if r.relevant]
+        if not rel:
+            return ""
+        keep = {r.item.id for r in rel}
+        return _format(rel, [(src, it) for src, it in links if src in keep])
 
     def create_thread(self, title: str, intent: str = "", *, seed: bool = True) -> dict:
         title = (title or "").strip() or (intent.strip()[:60] or "Untitled thread")
@@ -292,7 +299,7 @@ class Store:
         # `summary` holds the living CONTEXT (the refined vision); summary_owned/stale
         # track whether the user has taken the pen / whether it needs re-refining.
         t = {"id": str(uuid.uuid4()), "title": title, "intent": intent.strip(),
-             "background": self._seed_background(intent) if seed else "",
+             "background": self._kb_connections(intent) if seed else "",
              "summary": "", "summary_owned": 0, "summary_stale": 0,
              "status": "active", "created_at": ts, "updated_at": ts}
         self.db.insert_thread(t)
@@ -482,9 +489,14 @@ class Store:
         self._mark_context_stale(ep.thread_id)
         return d
 
+    MIN_REFRESH_INTERVAL = 4.0   # rate-limit refines: 1st action refines now, rapid
+                                 # follow-ups coalesce until this interval elapses
+
     def _mark_context_stale(self, thread_id: str) -> None:
-        t = self.db.get_thread(thread_id)
-        if t and not t["summary_owned"]:
+        # Mark on EVERY mutation (dump, delete, include-toggle, intent edit). Bumps
+        # updated_at, which the debounce uses as the "last activity" clock. Stale is
+        # set even when the user owns the summary — so KB connections still refresh.
+        if self.db.get_thread(thread_id):
             self.db.update_thread(thread_id, {"summary_stale": 1}, now_iso())
 
     @staticmethod
@@ -501,21 +513,35 @@ class Store:
         prefix = f"[{' · '.join(tags)}] " if tags else ""
         return f"{prefix}{c.raw_content}"
 
-    def ensure_context(self, thread_id: str) -> dict | None:
-        """Lazily re-refine the living context from the cards still in scope, when
-        it's gone stale and the user hasn't taken the pen. Work happens on view so
-        capture stays instant."""
+    def ensure_context(self, thread_id: str, *, force: bool = False) -> dict | None:
+        """Re-derive the living context when it's stale. RATE-LIMITED: the first
+        action refines right away; rapid follow-ups (or the 2s poll) coalesce until
+        MIN_REFRESH_INTERVAL passes, so a burst of dumps/deletes costs one refine,
+        not five. A manual ↻ passes force. On a refresh we re-refine the working
+        memory (unless the user owns it) AND recompute the relevance-gated KB
+        connections — one consistent reaction per change."""
+        import time
         t = self.db.get_thread(thread_id)
         if not t:
             return None
-        if not t["summary_owned"] and (t["summary_stale"] or not t["summary"]):
-            items = [self._labelled_item(c) for c in self.db.thread_steps(thread_id)
-                     if c.included]
-            if items:
-                ctx = self.processor.refine_context(t["intent"] or "", items, t["summary"] or "")
-                self.db.update_thread(thread_id, {"summary": ctx, "summary_stale": 0}, now_iso())
-                t = self.db.get_thread(thread_id)
-        return t
+        if not (t["summary_stale"] or not t["summary"]):
+            return t
+        last = self._last_refine.get(thread_id, 0.0)
+        if not force and (time.monotonic() - last) < self.MIN_REFRESH_INTERVAL:
+            return t                       # rate-limited; a later poll will catch it
+        fields: dict = {"summary_stale": 0}
+        items = [self._labelled_item(c) for c in self.db.thread_steps(thread_id) if c.included]
+        did_refine = False
+        if not t["summary_owned"]:
+            fields["summary"] = self.processor.refine_context(
+                t["intent"] or "", items, t["summary"] or "") if items else ""
+            did_refine = bool(items)       # only a real synthesis counts as an LLM call
+        memory = fields.get("summary", t["summary"]) or ""
+        fields["background"] = self._kb_connections(t["intent"] or "", memory)
+        self.db.update_thread(thread_id, fields, now_iso())
+        if did_refine:                     # rate-limit the EXPENSIVE part only
+            self._last_refine[thread_id] = time.monotonic()
+        return self.db.get_thread(thread_id)
 
     def thread_view(self, thread_id: str) -> dict | None:
         t = self.ensure_context(thread_id)
@@ -552,9 +578,9 @@ class Store:
                     intent: str | None = None, reseed: bool = False) -> bool:
         fields: dict = {}
         if title is not None: fields["title"] = title.strip()
-        if intent is not None: fields["intent"] = intent.strip()
-        if reseed and intent is not None:
-            fields["background"] = self._seed_background(intent)
+        if intent is not None:
+            fields["intent"] = intent.strip()
+            fields["summary_stale"] = 1   # new goal → re-derive memory + KB connections
         if not fields:
             return False
         return self.db.update_thread(thread_id, fields, now_iso())
@@ -585,9 +611,9 @@ class Store:
             thread_id, {"summary": context, "summary_owned": 1, "summary_stale": 0}, now_iso())
 
     def refine_context_now(self, thread_id: str) -> dict | None:
-        """Hand control back to the AI and re-refine the context from scratch."""
+        """Hand control back to the AI and re-refine NOW (manual ↻ bypasses debounce)."""
         self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
-        return self.ensure_context(thread_id)
+        return self.ensure_context(thread_id, force=True)
 
     def assemble_context(self, thread_id: str, *, query: str | None = None,
                          kb_limit: int = 6, record: bool = True) -> dict:
@@ -619,6 +645,9 @@ class Store:
         results, links, kb_text, kb = [], [], "", []
         if retr_q:
             results, links = self.retrieve(retr_q, limit=kb_limit, scope="main")
+            results = [r for r in results if r.relevant]  # gate out off-topic noise
+            keep = {r.item.id for r in results}
+            links = [(src, it) for src, it in links if src in keep]
             if results:
                 from .hooks import _format  # lazy: hooks pulls nothing heavy
                 kb_text = _format(results, links)
@@ -705,9 +734,11 @@ class Store:
 
     def search(self, query: str, limit: int = 5, include_archived: bool = False,
                scope: str | None = None) -> list[Result]:
+        from .embeddings import FakeEmbedding
         qvec = self.embedder.embed(query, input_type="query")  # asymmetric models want this
         return search(self.db, qvec, query, limit=limit,
-                      include_archived=include_archived, scope=scope)
+                      include_archived=include_archived, scope=scope,
+                      real_embed=not isinstance(self.embedder, FakeEmbedding))
 
     def reembed_all(self) -> int:
         """Recompute every fact's embedding with the CURRENT provider — run after

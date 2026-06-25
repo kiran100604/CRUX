@@ -78,8 +78,20 @@ class OpenAIEmbedding:
         return resp.data[0].embedding
 
 
+# generic words carry no topical signal — dropping them keeps the offline (lexical)
+# similarity about the SUBJECT, so unrelated texts that merely share "data"/"system"
+# don't look similar. (Only affects the deterministic offline embedder.)
+_STOP = {"the", "and", "for", "with", "that", "this", "into", "from", "your", "our",
+         "are", "was", "will", "have", "has", "data", "system", "build", "make",
+         "made", "use", "used", "using", "work", "thread", "context", "fact",
+         "facts", "task", "project", "thing", "things", "need", "want", "like",
+         "file", "files", "about", "what", "how", "should", "could", "would",
+         "http", "https", "www", "com"}
+
+
 def _tokens(text: str) -> list[str]:
-    return [t for t in "".join(c.lower() if c.isalnum() else " " for c in text).split() if len(t) > 1]
+    toks = "".join(c.lower() if c.isalnum() else " " for c in text).split()
+    return [t for t in toks if len(t) > 1 and t not in _STOP]
 
 
 def get_embedding_provider(cfg) -> EmbeddingProvider:
