@@ -632,6 +632,19 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_thread_view_reports_clear_status(store):
+    # An unrouted dump (e.g. from the popup, which bypasses the router) reads as
+    # "sorting"; once classified it settles to updating/ready — never stuck.
+    t = store.create_thread("Sync", "Build a sync engine", seed=False)
+    store.add_step("competitor uses CRDT merge", thread_id=t["id"])  # untagged → unrouted
+    assert store.thread_view(t["id"])["status"] == "sorting"
+    store.route_pending(t["id"])
+    assert store.thread_view(t["id"])["status"] in ("updating", "ready")
+    # a tagged dump is born classified — never shows "sorting"
+    store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
+    assert store.thread_view(t["id"])["status"] != "sorting"
+
+
 def test_popup_save_applies_tag(store):
     # The capture popup writes via _save(cfg, text, kind); a kind tags the card
     # (born classified), so picking a tag in the popup files it by role.

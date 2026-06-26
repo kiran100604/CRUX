@@ -281,6 +281,7 @@
   .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--teal-bg); color:var(--teal)}
   .livetag{font-family:var(--mono); font-size:10px; color:var(--green)}
   .syncing{font-family:var(--mono); font-size:10px; color:var(--peach); animation:pulse 1.1s ease-in-out infinite}
+  .ststeady{font-family:var(--mono); font-size:10px; color:var(--muted2)}
   @keyframes pulse{50%{opacity:.4}}
   .resum{float:right; cursor:pointer; color:var(--muted2); font-family:var(--sans); text-transform:none;
     letter-spacing:0; font-size:12px} .resum:hover{color:var(--ink)}
@@ -652,7 +653,7 @@ setInterval(poll, 5000);
 // typing (so it can't clobber an edit).
 let _threadSig="", _threadBusy=false;
 function _threadSigOf(tv){
-  return [tv.context||"", tv.card_count||0,
+  return [tv.context||"", tv.card_count||0, tv.status||"",
           (tv.cards||[]).map(c=>c.id+"|"+(c.routed?1:0)+"|"+c.kind+"|"+(c.included?1:0)).join(",")
          ].join("§");
 }
@@ -700,7 +701,7 @@ function vWorking(){
     ${done.length?`<div class="sectlabel" style="margin-top:26px">FINISHED · ${done.length}</div>${done.map(threadCard).join("")}`:''}`);
 }
 function threadCard(t){
-  const cur=t.is_current;
+  const cur=(state.currentThread?t.id===state.currentThread:t.is_current);
   return `<div class="tcard ${cur?'cur':''}" onclick="openThread('${t.id}')">
     <div class="tcmain">
       <div class="tctitle">${esc(t.title)} ${cur?'<span class="curpill">current</span>':''}</div>
@@ -722,7 +723,12 @@ function vThread(t){
   const owned=t.context_owned;
   const cards=t.cards||[];
   const incl=cards.filter(c=>c.included).length;
-  const syncing=active && cards.some(c=>!c.routed);  // a dump is still being sorted/refined
+  const sorting=active && cards.some(c=>!c.routed);       // dumps still being classified
+  const updating=active && (t.status==='updating'||t.status==='sorting');  // context being re-derived
+  const memStatus = owned
+    ? '<span class="ststeady">● yours</span>'
+    : (updating ? '<span class="syncing">● updating context…</span>'
+                : `<span class="ststeady">● up to date${t.updated_at?` · ${rel(t.updated_at)}`:''}</span>`);
   app(`
     <div class="crumb"><span class="bk" onclick="closeThread()">← Working</span> <b>//</b> ${esc(t.title)}</div>
 
@@ -745,7 +751,7 @@ function vThread(t){
 
           <div class="cssec">
             <div class="cslbl">◆ Working memory &amp; learnings
-              <span class="csright">${syncing?'<span class="syncing">● updating…</span>':'<span class="livetag">● live</span>'} ${owned?'<span class="ownedtag">yours</span>':'<span class="autotag">auto</span>'} <span class="resum" onclick="refineContext('${t.id}')" title="Re-synthesize from your dumps">↻</span></span></div>
+              <span class="csright">${memStatus} <span class="resum" onclick="refineContext('${t.id}')" title="Re-synthesize from your dumps">↻</span></span></div>
             <textarea id="ctxbox" class="ctxbox" oninput="ctxDirty()" placeholder="As you dump things, CRUX distills them here — decisions, current state, and what you've learned. The goal stays in Current focus.">${esc(t.context||'')}</textarea>
             <div id="ctxsave" class="savedrow"><button class="btn sm teal" onclick="saveContext('${t.id}')">Save my edits</button></div>
           </div>
@@ -777,7 +783,7 @@ function vThread(t){
           <button class="tagchip clear${state.dumpKind?'':' hidden'}" onclick="setDumpKind('')">auto ✕</button>
         </div>`:''}
 
-        <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}${syncing?' · <span class="syncing">sorting…</span>':''}</div>
+        <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}${sorting?' · <span class="syncing">sorting…</span>':''}</div>
         ${cards.length?`<div class="dumplist">${cards.map(dumpCard).join("")}</div>`
           :`<div class="empty"><div class="big">Nothing dumped yet</div>Use your capture hotkey while you work, or drop something in above — CRUX folds it into the context.</div>`}
 
@@ -816,6 +822,7 @@ async function startThread(){
 }
 function openThread(id){
   state.openThread=id; state.view='working';
+  state.currentThread=id;   // optimistic: this thread is now the capture target
   if(location.hash!=='#/project/'+id) history.replaceState(null,'','#/project/'+id);
   render();
   // make the thread you're viewing the hotkey target, so captures land here

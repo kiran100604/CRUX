@@ -18,19 +18,21 @@ from pathlib import Path
 
 
 def _popup_command() -> list[str]:
-    """The command the launcher runs. Prefer the installed `crux` entry point so a
-    packaged build has no console window; fall back to the module form."""
+    """The command the launcher runs. On Windows use pythonw.exe so NO console
+    window appears behind the popup (the `crux.exe` console entry point flashes a
+    black terminal — the 'black screen' bug). Elsewhere the `crux` entry point is
+    fine."""
     import shutil
-    exe = "pythonw.exe" if sys.platform == "win32" else None
+    if sys.platform == "win32":
+        py = sys.executable
+        cand = Path(py).with_name("pythonw.exe")   # windowless interpreter
+        if cand.exists():
+            py = str(cand)
+        return [py, "-m", "crux.cli", "popup"]
     crux = shutil.which("crux")
     if crux:
         return [crux, "popup"]
-    py = sys.executable
-    if exe and py.lower().endswith("python.exe"):
-        cand = Path(py).with_name(exe)
-        if cand.exists():
-            py = str(cand)
-    return [py, "-m", "crux.cli", "popup"]
+    return [sys.executable, "-m", "crux.cli", "popup"]
 
 
 def _render_icon_png(size: int = 128) -> bytes:

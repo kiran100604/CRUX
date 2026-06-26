@@ -9,25 +9,29 @@ Win+Shift+S snip overlay — no "did anything happen?" uncertainty.
 
 from __future__ import annotations
 
-_BG = "#fdf8ec"      # canvas
-_FG = "#2a251e"      # body text
-_MUT = "#83785f"     # muted
-_LINE = "#d6ccb2"    # hairline
-_INK = "#080808"
-
+# CRUX dark palette (mirrors tokens.css html.crux-dark) so the popup feels part
+# of the product, not a stray OS dialog.
+_BG = "#0f0f0f"      # canvas
+_CARD = "#1f1f1f"    # paper (the text well)
+_FG = "#e8e6e2"      # body text
+_INKW = "#fafaf8"    # strong text / caret
+_MUT = "#8b8876"     # muted
+_LINE = "#404040"    # hairline
+_TEAL = "#6fb3b0"    # accent
+_TEAL_BG = "#15302e"
 
 # The tags offered in the popup — what the capture IS, so CRUX treats it right
 # (e.g. competitor info as a Reference, not our own decision). Picking one is the
 # ONLY action: the text already rode in from the clipboard. Each pairs with a
-# 1-key shortcut; "auto" (0 / Enter) lets CRUX classify.
+# 1-key shortcut; "auto" (0 / Enter) lets CRUX classify. Colors are the kind
+# taxonomy from the design tokens, so a Decision looks like a Decision.
 _POPUP_TAGS = [
-    ("1", "decision", "Decision"),
-    ("2", "requirement", "Requirement"),
-    ("3", "constraint", "Constraint"),
-    ("4", "reference", "Reference"),
-    ("5", "question", "Question"),
+    ("1", "decision", "Decision", "#88b6ec", "#16263a"),
+    ("2", "requirement", "Requirement", "#84c46f", "#1b2e19"),
+    ("3", "constraint", "Constraint", "#ff6b5b", "#3a201c"),
+    ("4", "reference", "Reference", "#6fb3b0", "#15302e"),
+    ("5", "question", "Question", "#ff6b5b", "#3a201c"),
 ]
-_TEAL = "#143030"
 
 
 def build_popup(root, initial: str, on_submit, on_cancel):
@@ -47,7 +51,7 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     except Exception:
         pass
 
-    W, H = 600, 300
+    W, H = 660, 330
     win.update_idletasks()
     sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
     win.geometry(f"{W}x{H}+{(sw - W) // 2}+{(sh - H) // 3}")
@@ -56,25 +60,37 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     except Exception:
         pass
 
-    tk.Label(win, text="CAPTURE TO CRUX", bg=_BG, fg=_MUT,
-             font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=20, pady=(18, 8))
+    PAD = 24
+    # Branded header: the CRUX mark (a teal dot) + wordmark, with an Esc hint.
+    head = tk.Frame(win, bg=_BG)
+    head.pack(fill="x", padx=PAD, pady=(18, 4))
+    dot = tk.Canvas(head, width=14, height=14, bg=_BG, highlightthickness=0)
+    dot.create_oval(1, 1, 13, 13, fill=_TEAL, outline="")
+    dot.create_oval(5, 5, 9, 9, fill=_BG, outline="")
+    dot.pack(side="left", pady=2)
+    tk.Label(head, text="CAPTURE TO CRUX", bg=_BG, fg=_TEAL,
+             font=("Segoe UI", 9, "bold")).pack(side="left", padx=(8, 0))
+    tk.Label(head, text="Esc to cancel", bg=_BG, fg=_MUT,
+             font=("Segoe UI", 8)).pack(side="right")
 
     # The clipboard text rode in automatically — show it (editable, in case you
     # want to trim), but it is NOT the thing you act on. The tag is.
-    txt = tk.Text(win, height=4, wrap="word", font=("Segoe UI", 12),
-                  bg="#ffffff", fg=_FG, relief="flat", padx=12, pady=10,
-                  insertbackground=_INK, highlightthickness=1,
-                  highlightbackground=_LINE, highlightcolor=_INK)
-    txt.pack(fill="both", expand=True, padx=20)
+    well = tk.Frame(win, bg=_LINE)                     # 1px frame = hairline border
+    well.pack(fill="both", expand=True, padx=PAD, pady=(8, 4))
+    txt = tk.Text(well, height=4, wrap="word", font=("Segoe UI", 12),
+                  bg=_CARD, fg=_FG, relief="flat", padx=14, pady=12, bd=0,
+                  insertbackground=_TEAL, highlightthickness=0,
+                  selectbackground=_TEAL_BG, selectforeground=_INKW)
+    txt.pack(fill="both", expand=True, padx=1, pady=1)
     if initial:
         txt.insert("1.0", initial)
         txt.focus_set()
 
-    hint = ("Pick a tag — what is this? (or press Enter to let CRUX sort it)"
+    hint = ("What is this? Pick a tag — or press Enter to let CRUX sort it."
             if initial else
-            "Nothing was copied — copy text first and reopen, or type here, then pick a tag.")
-    tk.Label(win, text=hint, bg=_BG, fg=_MUT,
-             font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(12, 6))
+            "Nothing copied yet — copy text first and reopen, or type here, then tag.")
+    tk.Label(win, text=hint, bg=_BG, fg=_MUT, anchor="w",
+             font=("Segoe UI", 9)).pack(fill="x", padx=PAD, pady=(10, 8))
 
     def _destroy():
         try:
@@ -94,23 +110,30 @@ def build_popup(root, initial: str, on_submit, on_cancel):
         return "break"
 
     chips = tk.Frame(win, bg=_BG)
-    chips.pack(anchor="w", padx=18, pady=(0, 14))
+    chips.pack(fill="x", padx=PAD - 2, pady=(0, 18))
 
-    def _chip(parent, text, kind, accent=False):
-        b = tk.Button(parent, text=text, font=("Segoe UI", 10),
-                      bg=(_TEAL if accent else "#ffffff"),
-                      fg=("#ffffff" if accent else _FG),
-                      activebackground=(_TEAL if accent else _BG),
-                      activeforeground=("#ffffff" if accent else _INK),
-                      relief="flat", padx=12, pady=5, cursor="hand2",
-                      highlightthickness=1, highlightbackground=_LINE,
-                      command=lambda: submit(kind))
+    def _chip(parent, label, key, kind, fg, bg):
+        b = tk.Label(parent, text=f"{label} {key}", font=("Segoe UI", 10),
+                     bg=_BG, fg=fg, padx=10, pady=6, cursor="hand2",
+                     highlightthickness=1, highlightbackground=_LINE,
+                     highlightcolor=_LINE)
+        # hover = fill with the tag's own color, so it reads as that kind
+        b.bind("<Enter>", lambda _e: b.configure(bg=bg, highlightbackground=fg))
+        b.bind("<Leave>", lambda _e: b.configure(bg=_BG, highlightbackground=_LINE))
+        b.bind("<Button-1>", lambda _e: submit(kind))
         return b
 
-    for key, kind, label in _POPUP_TAGS:
-        _chip(chips, f"{label}  ·{key}", kind).pack(side="left", padx=(0, 7))
+    for key, kind, label, fg, bg in _POPUP_TAGS:
+        _chip(chips, label, f"·{key}", kind, fg, bg).pack(side="left", padx=4)
         win.bind(key, lambda _e, k=kind: submit(k))
-    _chip(chips, "Auto  ·↵", None, accent=True).pack(side="left", padx=(6, 0))
+    # Auto = the calm default: filled teal so it's the obvious primary action.
+    auto = tk.Label(chips, text="Auto  ↵", font=("Segoe UI", 10, "bold"),
+                    bg=_TEAL, fg=_BG, padx=14, pady=7, cursor="hand2",
+                    highlightthickness=0)
+    auto.bind("<Button-1>", lambda _e: submit(None))
+    auto.bind("<Enter>", lambda _e: auto.configure(bg=_INKW))
+    auto.bind("<Leave>", lambda _e: auto.configure(bg=_TEAL))
+    auto.pack(side="right", padx=4)
 
     # Enter / 0 = auto-classify; Esc cancels. No tag to type, no save button.
     win.bind("<Return>", lambda _e: submit(None))

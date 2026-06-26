@@ -91,6 +91,7 @@ def create_app(cfg: Config):
           file=sys.stderr, flush=True)
     app = FastAPI(title="CRUX")
     app.state.executor = ThreadPoolExecutor(max_workers=1)  # serial background ingest
+    app.state.routing = set()  # thread ids with an in-flight auto-route (dedupe polls)
 
     @app.middleware("http")
     async def _timing(request, call_next):
@@ -443,6 +444,20 @@ def create_app(cfg: Config):
         t = store.thread_view(thread_id)
         if not t:
             raise HTTPException(status_code=404, detail="no such thread")
+        # Auto-sort any unrouted cards in the background — captures from the popup
+        # (and any other direct path) bypass /capture's router, so without this they
+        # would stay "sorting…" forever. Dedupe by thread so a burst of 2s polls
+        # triggers at most one routing call at a time.
+        if any(not c["routed"] for c in t.get("cards", [])) \
+                and thread_id not in app.state.routing:
+            app.state.routing.add(thread_id)
+
+            def _job():
+                try:
+                    _route_pending(cfg, thread_id)
+                finally:
+                    app.state.routing.discard(thread_id)
+            app.state.executor.submit(_job)
         return t
 
     @app.post("/threads/{thread_id}/edit")
