@@ -205,7 +205,8 @@ def hook_capture() -> int:
             print("{}")
             return 0
         res = store.ingest_working(text, thread_id=tid, source="agent",
-                                   source_ref="claude-code", split=True)
+                                   source_ref="claude-code", split=True,
+                                   signals_only=True)  # keep decisions/results, not chatter
         store.db.set_meta(seen_key, uuid or text[:60])
         n = res.get("count", 0)
         link = store.deep_link(tid)

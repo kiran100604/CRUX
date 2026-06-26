@@ -663,6 +663,19 @@ def cmd_popup(args):
     print(run_standalone(Config.load()))
 
 
+def cmd_clean_notes(args):
+    """Remove auto-captured chatter (agent 'note' cards + CRUX echoes) from a
+    thread's working memory — one-shot cleanup for noise filed before the
+    signals-only capture filter."""
+    store = _store()
+    tid = args.thread or store.current_thread_id()
+    if not tid:
+        print("no active thread (open one, or pass a thread id)"); store.close(); return
+    n = store.purge_chatter(tid)
+    print(f"✓ removed {n} chatter card(s) from working memory")
+    store.close()
+
+
 def cmd_install_launcher(args):
     """Add a taskbar/menu launcher for the capture popup. Click it after copying
     text → pick a tag. Same thing the dashboard's 'Add to taskbar' button does."""
@@ -879,6 +892,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("popup", help="open the visible quick-capture box once (test the capture UI)").set_defaults(func=cmd_popup)
     sub.add_parser("install-launcher", help="add a taskbar/menu icon that opens the tag-capture popup").set_defaults(func=cmd_install_launcher)
+    cln = sub.add_parser("clean-notes", help="purge auto-captured chatter from a thread's working memory")
+    cln.add_argument("thread", nargs="?", default=None, help="thread id (defaults to current)")
+    cln.set_defaults(func=cmd_clean_notes)
     sub.add_parser("keytest", help="diagnose the global hotkey: print keys pynput sees + detect your chord").set_defaults(func=cmd_keytest)
     sub.add_parser("bind", help="register a GNOME shortcut → crux capture (reliable on Wayland)").set_defaults(func=cmd_bind)
     return p

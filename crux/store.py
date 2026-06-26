@@ -429,14 +429,32 @@ class Store:
             return self.create_thread(ref, ref, seed=False)["id"]
         return self.current_thread_id()
 
+    # Auto-capture (the Stop hook) keeps only entries that carry real project
+    # signal — decisions, requirements, constraints, conclusions, open questions,
+    # results. Chatty "notes" (acknowledgements, status lines) are dropped so an
+    # agent's conversational prose can't flood working memory.
+    _AUTO_KEEP = frozenset({"decision", "requirement", "constraint", "insight",
+                            "question", "result"})
+
+    @staticmethod
+    def _is_crux_echo(text: str) -> bool:
+        """True for CRUX's own output fed back through the transcript — its
+        breadcrumbs and injected context blocks — so it never re-captures itself."""
+        t = (text or "").lower()
+        return ("⌁ crux" in t or "[crux team context" in t
+                or "[working memory" in t or "[intent —" in t
+                or "additionalcontext" in t)
+
     def ingest_working(self, content: str, *, thread_id: str | None = None,
                        source: str = "agent", source_ref: str | None = None,
-                       split: bool = True) -> dict:
+                       split: bool = True, signals_only: bool = False) -> dict:
         """Bridge a chunk of work (a transcript, an agent's output, a block of
         notes) into a project's working memory. With split=True the chunk is broken
         into discrete, pre-classified typed entries (one card each); otherwise it
-        lands as a single dump that the router classifies. All entries share the
-        same provenance so working memory can attribute them."""
+        lands as a single dump that the router classifies. signals_only=True (the
+        auto-capture path) keeps only signal-bearing entries and drops CRUX's own
+        echoed output — so conversational chatter never pollutes the context. All
+        entries share the same provenance so working memory can attribute them."""
         content = (content or "").strip()
         if not content:
             raise ValueError("cannot ingest empty content")
@@ -444,6 +462,8 @@ class Store:
             thread_id = self.current_thread_id()
         if thread_id and not self.db.get_thread(thread_id):
             thread_id = None
+        if signals_only and self._is_crux_echo(content):
+            return {"thread_id": thread_id, "card_ids": [], "count": 0}
         if not split:
             res = self.add_step(content, source=source, source_ref=source_ref,
                                 thread_id=thread_id, _log=False)
@@ -453,6 +473,12 @@ class Store:
             return {"thread_id": thread_id, "card_ids": [res.get("card_id")], "count": 1}
         entries = self.processor.extract_entries(content) or [
             {"content": content, "kind": "note"}]
+        if signals_only:
+            entries = [e for e in entries
+                       if e.get("kind") in self._AUTO_KEEP
+                       and not self._is_crux_echo(e.get("content", ""))]
+        if not entries:
+            return {"thread_id": thread_id, "card_ids": [], "count": 0}
         session_id = self._active_session(thread_id) if thread_id else None
         card_ids, kinds = [], []
         for e in entries:
@@ -467,6 +493,20 @@ class Store:
             self._mark_context_stale(thread_id)
         self._log_capture(thread_id, source, source_ref, card_ids, kinds)
         return {"thread_id": thread_id, "card_ids": card_ids, "count": len(card_ids)}
+
+    def purge_chatter(self, thread_id: str) -> int:
+        """Remove auto-captured chatter from a thread's working memory: agent-sourced
+        'note' cards and any re-captured CRUX echoes. One-shot cleanup for noise
+        filed before the signals-only auto-capture filter. Forces a full rebuild."""
+        removed = 0
+        for c in self.db.thread_steps(thread_id):
+            if (c.source_type == "agent" and c.kind == "note") \
+                    or self._is_crux_echo(c.raw_content):
+                self.db.delete_episode(c.id)
+                removed += 1
+        if removed:
+            self._mark_context_stale(thread_id, rebuild=True)
+        return removed
 
     def _log_capture(self, thread_id, source, source_ref, card_ids, kinds=None):
         """One activity row for a capture, summarizing what was filed + where from."""

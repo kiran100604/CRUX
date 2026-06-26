@@ -632,6 +632,23 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_auto_capture_keeps_signals_drops_chatter(store):
+    # The Stop hook (signals_only) keeps real signals and drops conversational
+    # chatter, so an agent's prose can't flood working memory.
+    t = store.create_thread("Site", "Build a site", seed=False)
+    text = ("We decided to use Postgres. Standing by for your next instruction. "
+            "No action needed here.")
+    store.ingest_working(text, thread_id=t["id"], source="agent",
+                         source_ref="claude-code", split=True, signals_only=True)
+    cards = store.db.thread_steps(t["id"])
+    assert any(c.kind == "decision" for c in cards)    # the real signal kept
+    assert all(c.kind != "note" for c in cards)        # chatter dropped
+    # CRUX never re-captures its own breadcrumb / injected context
+    res = store.ingest_working("⌁ CRUX · captured 5 signals → working memory",
+                               thread_id=t["id"], source="agent", signals_only=True)
+    assert res["count"] == 0
+
+
 def test_hook_ingest_feeds_role_aware_working_memory(store):
     # The Stop hook path (ingest_working, split) classifies each piece ("what it
     # is") and folds it into the SAME living working memory — born classified,
