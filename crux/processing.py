@@ -265,14 +265,21 @@ once:
    was ruled out, tradeoffs weighed, what changed in the implementation, and what
    was intentionally deferred.
 
-Format: a handful of chronological lines, each
-   "- <what was being done> — <the key outcome / decision / tradeoff / change / what was deferred>"
-Group trivially-related captures into one step; do NOT transcribe every item.
+Format — a chronological list of STEPS, each a HEADLINE plus its DETAILS:
+   - <what was being done — the step, in plain words>
+       - <a key idea, a decision AND what it ruled out, a tradeoff weighed, what
+          changed, or what was deferred — with the SPECIFICS: names, values, the why>
+       - <another such detail, if it matters>
+Every step gets 1-3 indented detail lines. The headline ALONE is not enough — the
+reader must see WHAT was decided/considered/ruled-out and WHY, with concrete
+specifics, not just that a step happened. Group trivially-related captures into one
+step (don't transcribe every item), but do NOT drop the important specifics.
 Treat an [idea] as explored-not-decided, [info] as context-to-be-aware-of (never
-restated as our decision). The LAST line should reflect where things stand RIGHT
+restated as our decision). The LAST step should reflect where things stand RIGHT
 NOW. If any questions are unresolved, end with an "Open questions:" list.
 Plain text only — this renders in a plain box, so NO markdown, NO asterisks, no
-heading like "Working memory:". Be concrete, cite specifics, drop filler."""
+heading like "Working memory:"; use leading spaces to indent the detail lines. Be
+concrete, keep the specifics, cut filler."""
 
 
 _CONTEXT_UPDATE_PROMPT = """You maintain the WORKING MEMORY for a piece of work —
@@ -295,11 +302,15 @@ context, never ours), [idea]/[suggestion]=exploring (not decided),
 
 Fold the new captures into the timeline: continue it — add the next step, or
 enrich/close the current one (e.g. an [idea] that has now become a [decision], or
-[progress] that advances the latest step). Keep earlier steps intact; replace a
-statement only when a new capture supersedes it. The last line should reflect
-where things stand now. Keep/refresh an "Open questions:" list if any remain.
-Plain text only — NO markdown, NO asterisks, no preamble or heading; just the
-timeline."""
+[progress] that advances the latest step). Each step is a HEADLINE line plus 1-3
+indented DETAIL lines carrying the specifics (key idea, decision AND what it ruled
+out, tradeoff, what changed, what was deferred — names/values/the why). When you
+add or enrich a step, include those details — don't reduce it to a bare headline.
+Keep earlier steps (and their details) intact; replace a line only when a new
+capture supersedes it. The last step should reflect where things stand now.
+Keep/refresh an "Open questions:" list if any remain.
+Plain text only — NO markdown, NO asterisks, no preamble or heading; use leading
+spaces to indent detail lines. Just the timeline."""
 
 
 _ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
