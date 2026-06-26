@@ -16,7 +16,7 @@ from .chunk import chunk
 from .config import Config
 from .db import Database
 from .embeddings import get_embedding_provider
-from .models import CARD_KIND_LABELS, ContextItem, Episode, now_iso
+from .models import CARD_KIND_LABELS, CARD_KINDS, ContextItem, Episode, now_iso
 from .processing import Enrichment, get_processor
 from .retrieval import Result, search
 
@@ -372,15 +372,19 @@ class Store:
     def add_step(self, content: str, *, source: str = "note",
                  source_ref: str | None = None,
                  thread_id: str | None = None, route: bool = False,
-                 _log: bool = True) -> dict:
+                 kind: str | None = None, _log: bool = True) -> dict:
         """Dump a card. Lands on the given thread (or the current one); with no
         thread it's a global unsorted capture. Kept raw — never atomized into facts.
         `source` is the channel (note/hotkey/agent/…); `source_ref` is the
         provenance label (which tool/agent it came from), shown on the card and
         used to attribute decisions in working memory.
-        It arrives UNCLASSIFIED ('sorting…'); route_card tags its kind and marks the
-        context stale. route=True classifies inline (CLI/offline); the server does
-        it in the background so capture stays instant."""
+        `kind` lets the user TAG the dump at capture (e.g. flag competitor info as
+        'reference' so it's treated as context to be aware of, never folded into our
+        own decisions). A valid tag is authoritative — the card is born classified
+        and the router is skipped (one fewer LLM call). Untagged dumps arrive
+        UNCLASSIFIED ('sorting…') and route_card tags them; route=True classifies
+        inline (CLI/offline), the server does it in the background so capture stays
+        instant."""
         content = content.strip()
         if not content:
             raise ValueError("cannot capture empty step")
@@ -389,18 +393,24 @@ class Store:
         if thread_id and not self.db.get_thread(thread_id):
             thread_id = None
         session_id = self._active_session(thread_id) if thread_id else None
+        tagged = kind in CARD_KINDS                # user-supplied tag we trust
         ep = self.db.insert_episode(Episode(
             id=str(uuid.uuid4()), raw_content=content, source_type=source,
             source_ref=(source_ref or None), thread_id=thread_id,
-            session_id=session_id, routed=False, included=True))
+            session_id=session_id, included=True,
+            kind=(kind if tagged else "note"),
+            routed=tagged, route_reason=("tagged at capture" if tagged else None)))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
-            if route:
+            if tagged:
+                self._mark_context_stale(thread_id)   # born classified → react now
+            elif route:
                 self.route_card(ep.id)
             if _log:
-                self._log_capture(thread_id, source, source_ref, [ep.id])
+                self._log_capture(thread_id, source, source_ref, [ep.id],
+                                  [kind] if tagged else None)
         return {"episode": self.db.get_episode(ep.id).to_public_dict(),
-                "thread_id": thread_id, "card_id": ep.id}
+                "thread_id": thread_id, "card_id": ep.id, "tagged": tagged}
 
     def resolve_thread(self, ref: str | None, *, create: bool = False) -> str | None:
         """Map a project reference (thread id, or exact active title) to a thread id.

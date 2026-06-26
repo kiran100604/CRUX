@@ -334,7 +334,14 @@
   .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
-  .dumprow{display:flex; gap:10px; margin:6px 0 16px}
+  .dumprow{display:flex; gap:10px; margin:6px 0 8px}
+  .dumptags{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:0 0 16px}
+  .dumptags .tglbl{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin-right:2px}
+  .tagchip{font-size:12px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; transition:.12s}
+  .tagchip:hover{border-color:var(--teal); color:var(--ink)}
+  .tagchip.on{background:var(--teal); border-color:var(--teal); color:#fff}
+  .tagchip.clear{border-style:dashed; color:var(--muted2)}
+  .tagchip.hidden{display:none}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
   .dumplist{display:flex; flex-direction:column; gap:9px}
   .dumpcard{display:flex; align-items:flex-start; gap:11px; background:var(--paper); border:1px solid var(--hair);
@@ -754,6 +761,11 @@ function vThread(t){
         ${active?`<div class="dumprow">
           <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
           <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
+        </div>
+        <div class="dumptags" title="Optional — tag what this is so CRUX treats it right (e.g. competitor info as Reference, not your own decision). Leave blank and CRUX sorts it for you.">
+          <span class="tglbl">treat as</span>
+          ${['decision','requirement','constraint','reference','question'].map(k=>`<button class="tagchip${state.dumpKind===k?' on':''}" onclick="setDumpKind('${k}')">${CARD_KIND_LABELS[k]}</button>`).join('')}
+          <button class="tagchip clear${state.dumpKind?'':' hidden'}" onclick="setDumpKind('')">auto ✕</button>
         </div>`:''}
 
         <div class="dumphd">DUMPS · ${cards.length}${cards.length?` · ${incl} in context`:''}${syncing?' · <span class="syncing">sorting…</span>':''}</div>
@@ -831,10 +843,15 @@ window.addEventListener('hashchange', applyRoute);
 window.goLink=goLink;
 async function refreshThread(){ if(!state.openThread) return; const tv=await api(`/threads/${state.openThread}`); if(tv&&tv.id){setThreadView(tv); if(state.view==='working')render();} }
 function toggleCard(id){ state.expanded['dc-'+id]=!state.expanded['dc-'+id]; render(); }
+function setDumpKind(k){
+  const cur=document.getElementById('dumpin'); const txt=cur?cur.value:'';
+  state.dumpKind=(state.dumpKind===k?'':k); render();
+  const el=document.getElementById('dumpin'); if(el){ el.value=txt; el.focus(); } }
 async function dump(id){
   const el=document.getElementById('dumpin'); const txt=(el&&el.value.trim())||'';
   if(!txt) return; el.value='';
-  await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note'});
+  const kind=state.dumpKind||null;
+  await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note',kind});
   await refreshThread(); setTimeout(refreshThread,1500);  // context re-refines in the background
 }
 async function toggleInclude(id,inc){ await post(`/cards/${id}/include`,{included:!!inc}); await refreshThread(); }

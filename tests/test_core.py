@@ -572,6 +572,35 @@ def test_brief_separates_intent_from_working_memory(store):
     assert brief.index("[INTENT") < brief.index("[WORKING MEMORY")
 
 
+def test_tagged_capture_is_born_classified(store):
+    # A user tag at capture is authoritative: the card skips the router (it's
+    # created already-routed with that kind), so external/competitor info can be
+    # filed as a reference instead of being mistaken for our own decision.
+    t = store.create_thread("Sync", "Build a sync engine", seed=False)
+    res = store.add_step("Competitor X uses a CRDT-based merge engine.",
+                         thread_id=t["id"], kind="reference")
+    assert res["tagged"] is True
+    card = store.db.get_episode(res["card_id"])
+    assert card.routed is True and card.kind == "reference"
+    assert card.route_reason == "tagged at capture"
+
+
+def test_untagged_capture_stays_unrouted_for_the_router(store):
+    t = store.create_thread("Sync", "Build a sync engine", seed=False)
+    res = store.add_step("Competitor X uses a CRDT-based merge engine.",
+                         thread_id=t["id"])
+    assert res["tagged"] is False
+    card = store.db.get_episode(res["card_id"])
+    assert card.routed is False     # left for the (batched) router
+
+
+def test_invalid_tag_falls_back_to_router(store):
+    t = store.create_thread("Sync", "Build a sync engine", seed=False)
+    res = store.add_step("Some note.", thread_id=t["id"], kind="bogus")
+    assert res["tagged"] is False
+    assert store.db.get_episode(res["card_id"]).routed is False
+
+
 def test_resolve_thread_by_title_and_current(store):
     t = store.create_thread("Launch plan", "Plan the launch")
     assert store.resolve_thread("Launch plan") == t["id"]   # exact active title

@@ -247,14 +247,29 @@ PRIOR WORKING MEMORY (refine this; keep what's still true, drop what's been
 superseded):
 {prior}
 
-ITEMS dumped so far (oldest first — references, prompts, results, ideas,
-learnings, from any tool or agent). Synthesize, don't list:
+ITEMS dumped so far (oldest first — from any tool or agent). Each is prefixed
+with a TAG in [brackets] saying what it is: [decision], [requirement],
+[constraint], [conclusion], [open question], [reference], [suggestion],
+[result], [prompt], [note], plus where it came from (e.g. "via competitor.com").
+The tag tells you HOW TO TREAT it — read it before you fold it in:
+- [decision] [requirement] [constraint] [conclusion] are THE PROJECT'S OWN
+  commitments — authoritative. These define what's decided and what matters.
+- [reference] [suggestion] [note] [result] (and anything "via" an external
+  source — a competitor, an article, another team) are CONTEXT TO BE AWARE OF,
+  not the project's own position. Note them as background ("competitor X does
+  Y", "an article suggests Z") — never restate them as OUR decision, and never
+  let them override or conflict with the project's own commitments above. When
+  external context disagrees with a decision, the decision wins; the external
+  note is just something we're aware of.
+- [open question] is unresolved — keep it as a question, don't answer it for them.
+Synthesize, don't list:
 {items}
 
 Rewrite the WORKING MEMORY now as a tight synthesis of:
 - Decisions made and conclusions reached (and what was explicitly ruled out).
 - Requirements, constraints, and preferences that have surfaced.
 - Current state — what's done, what's in progress right now.
+- Relevant external context we're aware of (clearly framed as such, never as ours).
 - Open questions still unresolved.
 If the latest items show a pivot, follow the new direction and drop the
 abandoned one. Be concrete; cite specifics. Do NOT open by restating the goal.
