@@ -649,6 +649,23 @@ def test_auto_capture_keeps_signals_drops_chatter(store):
     assert res["count"] == 0
 
 
+def test_working_memory_reads_as_a_timeline(store):
+    # Working memory should read as a chronological journey (what was being done, in
+    # order) — not a flat fact dump. Offline shows the role-marked skeleton; a real
+    # LLM turns it into a narrative.
+    t = store.create_thread("KB", "Redesign retrieval", seed=False)
+    store.add_step("Looked at Hyper and Glean", thread_id=t["id"], kind="reference")
+    store.add_step("Try subject-scoped retrieval", thread_id=t["id"], kind="suggestion")
+    store.add_step("Go with hybrid RRF + subject channel", thread_id=t["id"], kind="decision")
+    store.add_step("Implemented the subject channel", thread_id=t["id"], kind="result")
+    store.add_step("Tune the relevance floor?", thread_id=t["id"], kind="question")
+    ctx = store.thread_view(t["id"])["context"]
+    assert "exploring:" in ctx and "decided:" in ctx and "progress:" in ctx
+    assert "Open questions:" in ctx
+    # the journey is in order
+    assert ctx.index("exploring:") < ctx.index("decided:") < ctx.index("progress:")
+
+
 def test_hook_ingest_feeds_role_aware_working_memory(store):
     # The Stop hook path (ingest_working, split) classifies each piece ("what it
     # is") and folds it into the SAME living working memory — born classified,

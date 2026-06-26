@@ -234,84 +234,72 @@ def _parse_route(text: str, approach_ids: set[str]) -> dict:
     return out
 
 
-_CONTEXT_PROMPT = """You maintain the WORKING MEMORY for a piece of work: the
-evolving record of what's actually been decided and where things stand, so the
-person (or any AI tool) can resume without re-deriving it. The GOAL is tracked
-separately as INTENT — do NOT restate or paraphrase it. Working memory is the
-*how it's going*, not the *what we're trying to do*.
+_CONTEXT_PROMPT = """You maintain the WORKING MEMORY for a piece of work: a
+concise TIMELINE of how the work has actually unfolded, so anyone opening the
+project later instantly grasps BOTH the journey (what was being done, in order)
+and the outcomes (what was decided, tried, changed, deferred) — not just a pile
+of facts. The GOAL is tracked separately as INTENT — do NOT restate it.
 
-INTENT (the stable goal — given only for context; do NOT repeat it back):
+INTENT (given only for context; do NOT repeat it back):
 {intent}
 
-PRIOR WORKING MEMORY (refine this; keep what's still true, drop what's been
-superseded):
+PRIOR WORKING MEMORY (refine/extend this; keep what's still true, drop superseded):
 {prior}
 
-ITEMS dumped so far (oldest first — from any tool or agent). Each is prefixed
-with a TAG in [brackets] saying what it is: [decision], [requirement],
-[constraint], [conclusion], [open question], [reference], [suggestion],
-[result], [prompt], [note], plus where it came from (e.g. "via competitor.com").
-The tag tells you HOW TO TREAT it — read it before you fold it in:
-- [decision] [requirement] [constraint] [conclusion] are THE PROJECT'S OWN
-  commitments — authoritative. These define what's decided and what matters.
-- [result] is PROGRESS — a status update on the work. Fold it into the current
-  state (what's done, what's in progress now), not into decisions.
-- [suggestion] is an IDEA being EXPLORED, not a decision. Record it as something
-  under consideration ("considering X", "exploring Y") — never state it as a
-  made decision, and don't let it override an actual commitment above.
-- [reference] [note] (and anything "via" an external source — a competitor, an
-  article, another team) are CONTEXT TO BE AWARE OF, not the project's own
-  position. Note them as background ("competitor X does Y") — never restate them
-  as OUR decision. When external context disagrees with a decision, the decision
-  wins; the note is just something we're aware of.
-- [open question] is unresolved — keep it as a question, don't answer it for them.
-Synthesize, don't list:
+ITEMS captured so far, OLDEST FIRST — the chronological trail of the work. Each
+has a [tag] marking its place in the arc (plus where it came from):
+- [prompt] = a directive / what the user asked for
+- [info]/[reference]/[note] = something learned or to be aware of (incl. external
+  /competitor — context, never OUR decision)
+- [idea]/[suggestion] = an option being EXPLORED, not decided
+- [progress]/[result] = work done / a result / where things now stand
+- [decision]/[requirement]/[constraint]/[conclusion] = a settled commitment
 {items}
 
-Rewrite the WORKING MEMORY now as a tight synthesis of:
-- Decisions made and conclusions reached (and what was explicitly ruled out).
-- Requirements, constraints, and preferences that have surfaced.
-- Current state — what's done, what's in progress right now.
-- Relevant external context we're aware of (clearly framed as such, never as ours).
-- Open questions still unresolved.
-If the latest items show a pivot, follow the new direction and drop the
-abandoned one. Be concrete; cite specifics. Do NOT open by restating the goal.
-No preamble, no headings like "Working memory:", just the text."""
+Write the WORKING MEMORY as a short, readable TIMELINE that answers two things at
+once:
+1) WHAT the user was doing — the high-level progression, in order (e.g. "explored
+   competitor architectures → compared retrieval approaches → chose a synthesis →
+   implemented and verified").
+2) WHAT happened at each step — the key ideas discussed, decisions made and what
+   was ruled out, tradeoffs weighed, what changed in the implementation, and what
+   was intentionally deferred.
+
+Format: a handful of chronological lines, each
+   "- <what was being done> — <the key outcome / decision / tradeoff / change / what was deferred>"
+Group trivially-related captures into one step; do NOT transcribe every item.
+Treat an [idea] as explored-not-decided, [info] as context-to-be-aware-of (never
+restated as our decision). The LAST line should reflect where things stand RIGHT
+NOW. If any questions are unresolved, end with an "Open questions:" list.
+Plain text only — this renders in a plain box, so NO markdown, NO asterisks, no
+heading like "Working memory:". Be concrete, cite specifics, drop filler."""
 
 
 _CONTEXT_UPDATE_PROMPT = """You maintain the WORKING MEMORY for a piece of work —
-the evolving record of what's decided and where things stand. It already exists.
-Your job is to UPDATE it with new captures, not rewrite it from scratch.
+a concise TIMELINE of how it has unfolded (the journey) plus the key outcomes. It
+already exists; CONTINUE the story with new captures — don't rewrite from scratch.
 
-INTENT (the stable goal — for context only; do NOT restate it):
+INTENT (context only; do NOT restate it):
 {intent}
 
-CURRENT WORKING MEMORY (this is correct and complete as of the last update — keep
-everything in it that's still true; do NOT drop a fact just because the new
-captures below don't mention it):
+CURRENT WORKING MEMORY (the timeline so far — keep ALL of it that's still true;
+don't drop earlier steps just because the new captures don't mention them):
 {prior}
 
-NEW CAPTURES since the last update (oldest first). Each carries a [tag] saying
-what it is and where it's from. The tag tells you HOW TO FOLD IT IN:
-- [decision] [requirement] [constraint] [conclusion] are the project's OWN
-  commitments — authoritative. Update the memory to reflect them; if one
-  supersedes something already in memory, replace the old statement.
-- [result] is PROGRESS — update the current state (what's done / in progress),
-  not the decisions.
-- [suggestion] is an IDEA being EXPLORED — record it as under consideration
-  ("considering X"), never as a decision; don't let it override a commitment.
-- [reference] [note] (and anything "via" an external source — a competitor, an
-  article, another team) are CONTEXT TO BE AWARE OF. Record them as background
-  ("competitor X does Y") — never as OUR decision, and never let them override a
-  commitment already in memory.
-- [open question] is unresolved — add it as a question, don't answer it.
-NEW CAPTURES:
+NEW CAPTURES since the last update, OLDEST FIRST. Each [tag] marks its place in
+the arc: [prompt]=directive, [info]/[reference]/[note]=learned/aware (external =
+context, never ours), [idea]/[suggestion]=exploring (not decided),
+[progress]/[result]=done/current state, [decision]/[requirement]/[constraint]/
+[conclusion]=settled commitment.
 {items}
 
-Produce the UPDATED working memory: the current memory with these captures folded
-in — new facts added, superseded ones replaced, everything else preserved. Be
-concrete. Do NOT open by restating the goal. No preamble, no headings, just the
-text."""
+Fold the new captures into the timeline: continue it — add the next step, or
+enrich/close the current one (e.g. an [idea] that has now become a [decision], or
+[progress] that advances the latest step). Keep earlier steps intact; replace a
+statement only when a new capture supersedes it. The last line should reflect
+where things stand now. Keep/refresh an "Open questions:" list if any remain.
+Plain text only — NO markdown, NO asterisks, no preamble or heading; just the
+timeline."""
 
 
 _ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
@@ -441,21 +429,45 @@ class FakeProcessor:
             lines.append(f"[{n}] {summary or title}")
         return "\n".join(lines)
 
+    # Offline (no model): we can't truly narrate, but we CAN keep the captures in
+    # chronological order and mark each by role, so working memory still reads as a
+    # journey skeleton (exploring → decided → progress) rather than a flat dump. A
+    # real API key turns this into a proper timeline narrative.
+    _OFFLINE_ROLE = {"suggestion": "exploring", "decision": "decided",
+                     "requirement": "decided", "constraint": "decided",
+                     "conclusion": "decided", "insight": "learned",
+                     "result": "progress", "reference": "noted",
+                     "note": "noted", "prompt": "noted"}
+
+    def _offline_steps(self, items: list[str]) -> tuple[list[str], list[str]]:
+        steps, questions = [], []
+        for it in items:
+            it = it.strip().replace("\n", " ")
+            if not it:
+                continue
+            m = re.match(r"\[([^·\]]+)", it)
+            label = (m.group(1).strip().lower() if m else "note")
+            body = re.sub(r"^\[[^\]]*\]\s*", "", it).strip()[:180]
+            if label.startswith("open question") or label == "question":
+                questions.append(body)
+            else:
+                steps.append(f"- {self._OFFLINE_ROLE.get(label, 'noted')}: {body}")
+        return steps, questions
+
     def refine_context(self, intent: str, items: list[str], prior: str = "",
                        *, incremental: bool = False) -> str:
-        # Offline: no model to synthesize. Full mode = honest list of what's in
-        # scope. Incremental = keep the prior memory and append the new captures,
-        # so continuity is preserved even without a model.
-        kept = [i.strip().replace("\n", " ") for i in items if i.strip()]
+        steps, questions = self._offline_steps(items)
         if incremental and (prior or "").strip():
-            lines = [(prior or "").rstrip()]
-            lines.extend(f"- {i[:200]}" for i in kept[-12:])
-            return "\n".join(lines)
-        if not kept:
+            # continue the timeline: keep prior, append the new step lines
+            return "\n".join([(prior or "").rstrip(), *steps]).strip() if steps \
+                else (prior or "").rstrip()
+        if not steps and not questions:
             return ""
-        lines = ["Captured so far:"]
-        lines.extend(f"- {i[:200]}" for i in kept[-12:])
-        return "\n".join(lines)
+        out = list(steps[-14:])
+        if questions:
+            out.append("Open questions:")
+            out.extend(f"- {q}" for q in questions[-8:])
+        return "\n".join(out).strip()
 
 
 class AnthropicProcessor:
