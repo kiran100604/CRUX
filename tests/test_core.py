@@ -632,6 +632,28 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_first_run_bootstrap_is_once_and_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    # stub the machine-touching steps so the test never writes to ~/.local or ~/.claude
+    import crux.bootstrap as bs
+    calls = {"launcher": 0, "hook": 0}
+    monkeypatch.setattr("crux.launcher.install_launcher",
+                        lambda home: calls.__setitem__("launcher", calls["launcher"] + 1) or {"ok": True})
+    monkeypatch.setattr("crux.install.install_claude_hook",
+                        lambda p: calls.__setitem__("hook", calls["hook"] + 1) or "installed")
+    monkeypatch.setattr("crux.install.claude_settings_path", lambda globally: tmp_path / "settings.json")
+    monkeypatch.setattr("crux.hotkey.write_snippets", lambda *a, **k: None)
+    from crux.config import Config
+    cfg = Config.load()
+    assert not cfg.is_bootstrapped()
+    did = bs.run_first_run(cfg, quiet=True)
+    assert did and cfg.is_bootstrapped()
+    assert calls == {"launcher": 1, "hook": 1}
+    # second run is a no-op — setup never repeats
+    assert bs.run_first_run(cfg, quiet=True) == []
+    assert calls == {"launcher": 1, "hook": 1}
+
+
 def test_thread_view_reports_clear_status(store):
     # An unrouted dump (e.g. from the popup, which bypasses the router) reads as
     # "sorting"; once classified it settles to updating/ready — never stuck.

@@ -76,7 +76,8 @@ def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
     else:
         print("   · skipped — add it later from the dashboard or `crux install-launcher`\n")
 
-    print("  Done. Next:")
-    print("    • crux serve        → open the dashboard (http://127.0.0.1:7432)")
-    print("    • restart Claude Code so the hook loads")
-    print("    • crux add \"...\"   or your hotkey to capture\n")
+    cfg.mark_bootstrapped()   # launcher + hook + hotkey done → bare `crux` won't redo it
+
+    print("  Done. Just run:")
+    print("    • crux              → opens the dashboard; the capture icon is installed")
+    print("    • restart Claude Code so the hook loads\n")

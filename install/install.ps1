@@ -37,8 +37,14 @@ if ($env:CRUX_ANTHROPIC_KEY) { $setupArgs += @("--anthropic-key", $env:CRUX_ANTH
 if ($env:CRUX_OPENAI_KEY)    { $setupArgs += @("--openai-key",    $env:CRUX_OPENAI_KEY) }
 & $py -m crux.cli @setupArgs
 
-Write-Host "`n  CRUX is ready." -ForegroundColor Green
-Write-Host "  Open a NEW terminal, then:"
-Write-Host "    crux serve     # dashboard at http://127.0.0.1:7432"
-Write-Host "    crux app       # tray icon + Ctrl+Shift+Space capture"
+# 5. Launch CRUX now — nothing else for the user to run. The dashboard opens and
+#    the "Capture to CRUX" icon is in the Start Menu (pin it to the taskbar).
+Write-Host "`n  CRUX is ready — launching..." -ForegroundColor Green
+try {
+    Start-Process -FilePath $py -ArgumentList "-m","crux.cli","start" -WindowStyle Hidden
+    Write-Host "  The dashboard is opening in your browser."
+    Write-Host "  The 'Capture to CRUX' icon is in your Start Menu — right-click it to pin to the taskbar."
+} catch {
+    Write-Host "  Start it yourself:  crux"
+}
 Write-Host "  Restart Claude Code so the context hook loads.`n"

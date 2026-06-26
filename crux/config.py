@@ -127,3 +127,17 @@ class Config:
     def mark_configured(self) -> None:
         self.ensure_home()
         self.marker_path.write_text("ok", encoding="utf-8")
+
+    @property
+    def bootstrap_path(self) -> Path:
+        """Flag file written once the one-time machine setup (taskbar launcher,
+        Claude hook, hotkey snippets) has run — so it happens automatically on the
+        first launch and never again."""
+        return self.home / ".bootstrapped"
+
+    def is_bootstrapped(self) -> bool:
+        return self.bootstrap_path.exists()
+
+    def mark_bootstrapped(self) -> None:
+        self.ensure_home()
+        self.bootstrap_path.write_text("ok", encoding="utf-8")

@@ -378,6 +378,10 @@ def cmd_start(args):
     Capture is always: copy text (Ctrl+C) → press your chord.
     """
     cfg = Config.load()
+    # First launch wires up the machine automatically (taskbar icon, hooks,
+    # hotkey) — one time, no extra commands. Idempotent after that.
+    from .bootstrap import run_first_run
+    run_first_run(cfg)
     if sys.platform == "linux":
         import os
         import threading
@@ -426,7 +430,9 @@ def cmd_start(args):
 
 def cmd_serve(args):
     from .server import _admin_token, run
+    from .bootstrap import run_first_run
     cfg = Config.load()
+    run_first_run(cfg)                    # one-time machine setup on first launch
     tok = _admin_token(cfg)
     print(f"CRUX server on http://{cfg.host}:{cfg.port}  (you = leader on this machine)")
     print("Team setup:")
@@ -647,6 +653,8 @@ def cmd_import(args):
 
 def cmd_app(args):
     from .app import run
+    from .bootstrap import run_first_run
+    run_first_run(Config.load())          # one-time machine setup on first launch
     run(open_dashboard=not args.no_open)
 
 
@@ -743,7 +751,11 @@ def _hook_installed(settings: str = ".claude/settings.json") -> bool:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="crux", description="Local context layer for AI coding agents.")
-    sub = p.add_subparsers(dest="command", required=True)
+    p.add_argument("--no-open", action="store_true",
+                   help="with bare `crux`: don't auto-open the dashboard")
+    # No subcommand required: bare `crux` is the one command — first-run setup
+    # (taskbar icon, hooks, hotkey) happens automatically, then the dashboard opens.
+    sub = p.add_subparsers(dest="command", required=False)
 
     a = sub.add_parser("add", help="capture a note, or ingest a document with --file")
     a.add_argument("text", nargs="?", default="")
@@ -831,7 +843,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("hook-inject").set_defaults(func=cmd_hook_inject)
     sub.add_parser("hook-capture").set_defaults(func=cmd_hook_capture)
     sub.add_parser("hook-session-start").set_defaults(func=cmd_hook_session_start)
-    sp = sub.add_parser("start", help="START HERE — dashboard + capture hotkey, works on every OS")
+    sp = sub.add_parser("start", help="same as bare `crux` — first-run setup + dashboard, every OS")
     sp.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
     sp.set_defaults(func=cmd_start)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
@@ -874,6 +886,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if not getattr(args, "command", None):
+        # bare `crux` → the one command: first-run setup + dashboard.
+        return cmd_start(args)
     args.func(args)
 
 

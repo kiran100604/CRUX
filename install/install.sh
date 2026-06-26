@@ -34,9 +34,11 @@ SETUP_ARGS=(setup --yes)
 [ -n "${CRUX_OPENAI_KEY:-}" ]    && SETUP_ARGS+=(--openai-key "$CRUX_OPENAI_KEY")
 $RUN "${SETUP_ARGS[@]}"
 
-printf '\n  CRUX is ready.\n'
-echo "  Open a NEW terminal, then:"
-echo "    crux serve     # dashboard at http://127.0.0.1:7432"
-echo "    crux app       # tray icon + global capture hotkey"
+# 4. Launch CRUX now — nothing else for the user to run. The dashboard opens and
+#    the "Capture to CRUX" icon lands in the app menu (pin it).
+printf '\n  CRUX is ready — launching...\n'
+nohup $RUN start >/dev/null 2>&1 &
+echo "  The dashboard is opening at http://127.0.0.1:7432."
+echo "  'Capture to CRUX' is in your app menu — pin it to your taskbar/dock."
 echo "  Restart Claude Code so the context hook loads."
 printf '\n'

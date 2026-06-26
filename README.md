@@ -39,14 +39,13 @@ curl -fsSL https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bel
 ```powershell
 irm https://raw.githubusercontent.com/kiran100604/crux/claude/pensive-bell-jj7bqr/install/install.ps1 | iex
 ```
-This installs CRUX, puts `crux` on your PATH, and configures it offline. Then:
+The installer does **everything on its own** — installs CRUX, puts `crux` on your
+PATH, configures it offline, **adds the "Capture to CRUX" taskbar icon, installs
+the Claude Code hooks**, and launches the dashboard. Nothing else to run.
 
-```bash
-crux start      # ONE command, every OS — dashboard + capture hotkey
-```
-`crux start` does the right thing per-OS automatically (in-app hotkey on
-Windows/macOS, OS-level shortcut on Linux). **Capture is always the same: copy
-text (Ctrl+C), then press your chord.** No modes to think about.
+After that, the only command you ever need is bare **`crux`** — it opens the
+dashboard (and on first launch automatically wires up anything not already set).
+To capture: **copy text anywhere → click the "Capture to CRUX" icon → pick a tag.**
 
 ## Quickstart (offline, zero keys)
 ```bash
