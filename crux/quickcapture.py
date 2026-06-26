@@ -16,10 +16,26 @@ _LINE = "#d6ccb2"    # hairline
 _INK = "#080808"
 
 
+# The tags offered in the popup — what the capture IS, so CRUX treats it right
+# (e.g. competitor info as a Reference, not our own decision). Picking one is the
+# ONLY action: the text already rode in from the clipboard. Each pairs with a
+# 1-key shortcut; "auto" (0 / Enter) lets CRUX classify.
+_POPUP_TAGS = [
+    ("1", "decision", "Decision"),
+    ("2", "requirement", "Requirement"),
+    ("3", "constraint", "Constraint"),
+    ("4", "reference", "Reference"),
+    ("5", "question", "Question"),
+]
+_TEAL = "#143030"
+
+
 def build_popup(root, initial: str, on_submit, on_cancel):
     """Create the capture window. `root` is a hidden Tk root (app mode) or None
-    (standalone — we create our own Tk). Returns the window so the caller can
-    run/await it."""
+    (standalone — we create our own Tk). The captured text is pre-filled from the
+    clipboard; the user's only action is clicking a TAG (or auto). on_submit is
+    called as on_submit(text, kind) where kind is a card kind or None (auto).
+    Returns the window so the caller can run/await it."""
     import tkinter as tk
 
     standalone = root is None
@@ -31,7 +47,7 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     except Exception:
         pass
 
-    W, H = 580, 230
+    W, H = 600, 300
     win.update_idletasks()
     sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
     win.geometry(f"{W}x{H}+{(sw - W) // 2}+{(sh - H) // 3}")
@@ -43,17 +59,18 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     tk.Label(win, text="CAPTURE TO CRUX", bg=_BG, fg=_MUT,
              font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=20, pady=(18, 8))
 
-    txt = tk.Text(win, height=5, wrap="word", font=("Segoe UI", 12),
+    # The clipboard text rode in automatically — show it (editable, in case you
+    # want to trim), but it is NOT the thing you act on. The tag is.
+    txt = tk.Text(win, height=4, wrap="word", font=("Segoe UI", 12),
                   bg="#ffffff", fg=_FG, relief="flat", padx=12, pady=10,
                   insertbackground=_INK, highlightthickness=1,
                   highlightbackground=_LINE, highlightcolor=_INK)
     txt.pack(fill="both", expand=True, padx=20)
     if initial:
         txt.insert("1.0", initial)
-    txt.focus_force()
 
-    tk.Label(win, text="Enter = save     Shift+Enter = new line     Esc = cancel",
-             bg=_BG, fg=_MUT, font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(10, 16))
+    tk.Label(win, text="Pick a tag — what is this? (or press Enter to let CRUX sort it)",
+             bg=_BG, fg=_MUT, font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(12, 6))
 
     def _destroy():
         try:
@@ -61,10 +78,10 @@ def build_popup(root, initial: str, on_submit, on_cancel):
         except Exception:
             pass
 
-    def submit(_e=None):
+    def submit(kind):
         val = txt.get("1.0", "end").strip()
         _destroy()
-        on_submit(val)
+        on_submit(val, kind)
         return "break"
 
     def cancel(_e=None):
@@ -72,9 +89,28 @@ def build_popup(root, initial: str, on_submit, on_cancel):
         on_cancel()
         return "break"
 
-    # Plain Enter saves; Shift+Enter inserts a newline (default Text behavior).
-    txt.bind("<Return>", submit)
-    txt.bind("<Shift-Return>", lambda _e: None)
+    chips = tk.Frame(win, bg=_BG)
+    chips.pack(anchor="w", padx=18, pady=(0, 14))
+
+    def _chip(parent, text, kind, accent=False):
+        b = tk.Button(parent, text=text, font=("Segoe UI", 10),
+                      bg=(_TEAL if accent else "#ffffff"),
+                      fg=("#ffffff" if accent else _FG),
+                      activebackground=(_TEAL if accent else _BG),
+                      activeforeground=("#ffffff" if accent else _INK),
+                      relief="flat", padx=12, pady=5, cursor="hand2",
+                      highlightthickness=1, highlightbackground=_LINE,
+                      command=lambda: submit(kind))
+        return b
+
+    for key, kind, label in _POPUP_TAGS:
+        _chip(chips, f"{label}  ·{key}", kind).pack(side="left", padx=(0, 7))
+        win.bind(key, lambda _e, k=kind: submit(k))
+    _chip(chips, "Auto  ·↵", None, accent=True).pack(side="left", padx=(6, 0))
+
+    # Enter / 0 = auto-classify; Esc cancels. No tag to type, no save button.
+    win.bind("<Return>", lambda _e: submit(None))
+    win.bind("0", lambda _e: submit(None))
     win.bind("<Escape>", cancel)
     win.protocol("WM_DELETE_WINDOW", cancel)
     try:
@@ -85,15 +121,18 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     return win
 
 
-def _save(cfg, text: str) -> str:
+def _save(cfg, text: str, kind: str | None = None) -> str:
     """Persist captured text into working memory as a raw step on the current
-    thread (kept as narrative, not atomized into facts)."""
+    thread (kept as narrative, not atomized into facts). A `kind` is the user's
+    tag — the card is born classified and treated by role (e.g. a Reference is
+    context to be aware of, not folded in as our own decision)."""
     from .store import Store
     store = Store(cfg)
     try:
-        res = store.add_step(text, source="popup")
+        res = store.add_step(text, source="popup", kind=kind)
         where = "current thread" if res.get("thread_id") else "working memory"
-        return f"Added to {where}: {text.strip()[:44]}"
+        tag = f" [{kind}]" if res.get("tagged") else ""
+        return f"Added to {where}{tag}: {text.strip()[:40]}"
     finally:
         store.close()
 
@@ -205,12 +244,14 @@ def run_standalone(cfg, initial: str | None = None) -> str:
 
     if initial is None:
         initial = (read_clipboard() or "").strip()
-    holder: dict[str, str] = {}
+    if not initial:
+        return "Clipboard is empty — copy some text first, then click the icon."
+    holder: dict = {}
     win = build_popup(None, initial,
-                      lambda v: holder.update(value=v),
+                      lambda v, kind: holder.update(value=v, kind=kind),
                       lambda: None)
     win.mainloop()
-    val = holder.get("value", "").strip()
+    val = (holder.get("value") or "").strip()
     if not val:
         return "Cancelled — nothing captured."
-    return _save(cfg, val)
+    return _save(cfg, val, holder.get("kind"))

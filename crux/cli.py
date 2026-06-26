@@ -655,6 +655,16 @@ def cmd_popup(args):
     print(run_standalone(Config.load()))
 
 
+def cmd_install_launcher(args):
+    """Add a taskbar/menu launcher for the capture popup. Click it after copying
+    text → pick a tag. Same thing the dashboard's 'Add to taskbar' button does."""
+    from .launcher import install_launcher
+    res = install_launcher(Config.load().home)
+    print(("✓ " if res["ok"] else "⚠ ") + res["message"])
+    if res.get("path"):
+        print(f"  ({res['path']})")
+
+
 def cmd_bind(args):
     """Register a GNOME custom shortcut → `crux capture`. This is the reliable
     capture path on Wayland (the compositor grabs the key, regardless of which
@@ -856,6 +866,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.set_defaults(func=cmd_app)
 
     sub.add_parser("popup", help="open the visible quick-capture box once (test the capture UI)").set_defaults(func=cmd_popup)
+    sub.add_parser("install-launcher", help="add a taskbar/menu icon that opens the tag-capture popup").set_defaults(func=cmd_install_launcher)
     sub.add_parser("keytest", help="diagnose the global hotkey: print keys pynput sees + detect your chord").set_defaults(func=cmd_keytest)
     sub.add_parser("bind", help="register a GNOME shortcut → crux capture (reliable on Wayland)").set_defaults(func=cmd_bind)
     return p

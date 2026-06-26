@@ -292,6 +292,13 @@ def create_app(cfg: Config):
                              owner=body.user or cfg.user, proposed=body.proposed)
         return _enrich([item])[0]
 
+    @app.post("/launcher/install")
+    def launcher_install():
+        # "Add to taskbar": drop an OS launcher icon that opens the tag-capture
+        # popup. Click it (after copying text) → pick a tag. Nothing to set up.
+        from .launcher import install_launcher
+        return install_launcher(cfg.home)
+
     class HookIn(BaseModel):
         content: str
         project: str | None = None   # thread id or exact active title; else current

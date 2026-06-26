@@ -632,6 +632,40 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_popup_save_applies_tag(store):
+    # The capture popup writes via _save(cfg, text, kind); a kind tags the card
+    # (born classified), so picking a tag in the popup files it by role.
+    from crux.quickcapture import _save
+    store.create_thread("Sync", "Build a sync engine")
+    msg = _save(store.cfg, "Competitor X uses CRDT merge.", "reference")
+    assert "reference" in msg
+    tid = store.current_thread_id()
+    cards = store.db.thread_steps(tid)
+    ref = [c for c in cards if c.source_type == "popup"][-1]
+    assert ref.kind == "reference" and ref.routed is True
+
+
+def test_launcher_install_writes_a_launcher(tmp_path):
+    from crux.launcher import install_launcher
+    res = install_launcher(tmp_path)
+    # platform-dependent, but on every supported OS it reports a path + message
+    assert "message" in res and "path" in res
+    if res["ok"]:
+        from pathlib import Path
+        assert Path(res["path"]).exists()
+
+
+def test_launcher_endpoint(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    from fastapi.testclient import TestClient
+    from crux.config import Config
+    from crux.server import create_app
+    c = TestClient(create_app(Config.load()))
+    r = c.post("/launcher/install").json()
+    assert "ok" in r and "message" in r
+
+
 def test_resolve_thread_by_title_and_current(store):
     t = store.create_thread("Launch plan", "Plan the launch")
     assert store.resolve_thread("Launch plan") == t["id"]   # exact active title

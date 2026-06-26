@@ -569,6 +569,7 @@
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z"/></svg> Activity</button>
   </div>
   <div class="navright">
+    <button class="themebtn" id="pinbtn" onclick="addToTaskbar()" title="Add a capture icon to your taskbar — copy text anywhere, click it, pick a tag" aria-label="Add to taskbar" style="width:auto;padding:0 10px;gap:6px;font-size:13px">📌 <span class="pinlbl">Add to taskbar</span></button>
     <button class="themebtn" id="themebtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button>
     <span class="status">Local · <b>READY</b></span>
     <span class="who"><span class="av" id="av">U</span><span id="whoname">You</span></span>
@@ -1560,6 +1561,16 @@ function toggleTheme(){
   try{ localStorage.setItem('crux-theme', dark?'dark':'light'); }catch(e){}
 }
 window.toggleTheme=toggleTheme;
+async function addToTaskbar(){
+  const btn=document.getElementById('pinbtn');
+  if(btn) btn.disabled=true;
+  try{
+    const r=await post('/launcher/install',{});
+    toast((r&&r.ok?'✓ ':'⚠ ')+((r&&r.message)||'Could not add the icon.'),r&&r.ok);
+  }catch(e){ toast('⚠ Could not add the icon ('+e+')',false); }
+  if(btn) btn.disabled=false;
+}
+window.addToTaskbar=addToTaskbar;
 function applyRole(){
   // members propose & use; only the leader validates. Hide the Review tab + the
   // role chip reflects it. (The server enforces this regardless of the UI.)
