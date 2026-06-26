@@ -250,6 +250,15 @@ def create_app(cfg: Config):
         if _sys.platform == "linux":
             from .hotkey import bind_gnome
             rebound, _ = bind_gnome(mods, key, f"{_sys.executable} -m crux.cli capture")
+
+        # Drop the taskbar capture icon as part of first-run setup, so it's ready
+        # without a separate step (best-effort — never block setup if it fails).
+        launcher = None
+        try:
+            from .launcher import install_launcher
+            launcher = install_launcher(cfg.home)
+        except Exception:
+            launcher = None
         return {
             "ok": True,
             "hook": hook_status,
@@ -258,6 +267,7 @@ def create_app(cfg: Config):
             "rebound": rebound,
             "providers": provider_status,
             "keys_saved": [k for k in vals if k.endswith("_API_KEY")],
+            "launcher": launcher,
         }
 
     class IngestIn(BaseModel):

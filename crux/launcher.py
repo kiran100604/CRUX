@@ -33,33 +33,75 @@ def _popup_command() -> list[str]:
     return [py, "-m", "crux.cli", "popup"]
 
 
-def _write_icon(home: Path) -> str | None:
-    """Render CRUX's mark to a PNG so the launcher has a real icon. Best-effort —
-    returns the path, or None if Pillow isn't available (launcher still works,
-    just with a generic icon)."""
-    out = home / "crux.png"
-    if out.exists():
-        return str(out)
-    try:
-        from PIL import Image, ImageDraw
-    except Exception:
-        return None
-    img = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.ellipse((10, 10, 118, 118), fill=(20, 48, 48, 255))      # teal disc
-    d.ellipse((50, 50, 78, 78), fill=(253, 248, 236, 255))     # cream core
+def _render_icon_png(size: int = 128) -> bytes:
+    """CRUX's mark as a PNG, drawn in pure Python (no Pillow): a teal disc with a
+    cream core on a transparent ground. Antialiased edges so it looks crisp at
+    taskbar size."""
+    import struct
+    import zlib
+
+    cx = cy = size / 2.0
+    r_out = size * 0.46
+    r_in = size * 0.13
+    teal = (20, 48, 48)
+    cream = (253, 248, 236)
+
+    def _cov(d: float, edge: float) -> float:  # 1px-soft edge coverage
+        return max(0.0, min(1.0, (edge - d) + 0.5))
+
+    raw = bytearray()
+    for y in range(size):
+        raw.append(0)  # PNG filter type 0 for the row
+        for x in range(size):
+            d = ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5
+            a_out = _cov(d, r_out)
+            if a_out <= 0:
+                raw.extend((0, 0, 0, 0)); continue
+            a_in = _cov(d, r_in)
+            r = int(cream[0] * a_in + teal[0] * (1 - a_in))
+            g = int(cream[1] * a_in + teal[1] * (1 - a_in))
+            b = int(cream[2] * a_in + teal[2] * (1 - a_in))
+            raw.extend((r, g, b, int(255 * a_out)))
+
+    def _chunk(typ: bytes, data: bytes) -> bytes:
+        body = typ + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xffffffff)
+
+    return (b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+            + _chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+            + _chunk(b"IEND", b""))
+
+
+def _png_to_ico(png: bytes, size: int = 128) -> bytes:
+    """Wrap a PNG as a single-image .ico (Windows Vista+ reads PNG-in-ICO)."""
+    import struct
+    dim = size if size < 256 else 0
+    header = struct.pack("<HHH", 0, 1, 1)
+    entry = struct.pack("<BBBBHHII", dim, dim, 0, 0, 1, 32, len(png), 22)
+    return header + entry + png
+
+
+def _write_icons(home: Path) -> tuple[str | None, str | None]:
+    """Write the launcher icon as PNG (Linux) and ICO (Windows) into CRUX's data
+    dir. Pure-Python, so it always succeeds; returns (png_path, ico_path)."""
     try:
         home.mkdir(parents=True, exist_ok=True)
-        img.save(out)
-        return str(out)
+        png = _render_icon_png(128)
+        png_path = home / "crux.png"
+        png_path.write_bytes(png)
+        ico_path = home / "crux.ico"
+        ico_path.write_bytes(_png_to_ico(png, 128))
+        return str(png_path), str(ico_path)
     except Exception:
-        return None
+        return None, None
 
 
 def _install_linux(home: Path) -> dict:
     apps = Path.home() / ".local" / "share" / "applications"
     apps.mkdir(parents=True, exist_ok=True)
-    icon = _write_icon(home) or "accessories-text-editor"
+    png, _ = _write_icons(home)
+    icon = png or "accessories-text-editor"
     cmd = " ".join(_quote(a) for a in _popup_command())
     dest = apps / "crux-capture.desktop"
     dest.write_text(
@@ -99,13 +141,13 @@ def _install_windows(home: Path) -> dict:
         "Microsoft" / "Windows" / "Start Menu" / "Programs"
     programs.mkdir(parents=True, exist_ok=True)
     lnk = programs / "Capture to CRUX.lnk"
-    icon = _write_icon(home)
+    _, ico = _write_icons(home)
     ps = (
         "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}');"
         "$s.TargetPath='{target}';$s.Arguments='{args}';"
         "$s.Description='Capture to CRUX';{icon}$s.Save()"
     ).format(lnk=str(lnk), target=target, args=args.replace("'", "''"),
-             icon=(f"$s.IconLocation='{icon}';" if icon and icon.endswith(('.ico',)) else ""))
+             icon=(f"$s.IconLocation='{ico}';" if ico else ""))
     try:
         subprocess.run(["powershell", "-NoProfile", "-Command", ps], timeout=15, check=True)
     except Exception as e:

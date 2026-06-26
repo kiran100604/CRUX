@@ -43,6 +43,14 @@
   .themebtn{width:30px; height:30px; border:1px solid var(--hair); background:var(--canvas); color:var(--muted);
     border-radius:var(--pill); font-size:15px; line-height:1; display:grid; place-items:center; transition:.15s}
   .themebtn:hover{border-color:var(--muted2); color:var(--ink)}
+  .pinbtn{display:inline-flex; align-items:center; gap:7px; height:30px; padding:0 13px;
+    border:1px solid var(--hair); background:var(--canvas); color:var(--muted);
+    border-radius:var(--pill); font-family:inherit; font-size:13px; font-weight:500;
+    line-height:1; cursor:pointer; white-space:nowrap; transition:.15s}
+  .pinbtn svg{flex:none; opacity:.85}
+  .pinbtn:hover{border-color:var(--teal); color:var(--ink); background:var(--paper)}
+  .pinbtn:disabled{opacity:.55; cursor:default}
+  .pinbtn.done{border-color:var(--teal); color:var(--teal)}
   .status{font-family:var(--mono); font-size:11px; color:var(--muted); border:1px solid var(--hair);
     border-radius:var(--pill); padding:5px 11px}
   .status b{color:var(--green)}
@@ -569,7 +577,7 @@
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z"/></svg> Activity</button>
   </div>
   <div class="navright">
-    <button class="themebtn" id="pinbtn" onclick="addToTaskbar()" title="Add a capture icon to your taskbar — copy text anywhere, click it, pick a tag" aria-label="Add to taskbar" style="width:auto;padding:0 10px;gap:6px;font-size:13px">📌 <span class="pinlbl">Add to taskbar</span></button>
+    <button class="pinbtn" id="pinbtn" onclick="addToTaskbar()" title="Add a capture icon to your taskbar — copy text anywhere, click it, pick a tag" aria-label="Add to taskbar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z"/><path d="M12 16v4"/></svg><span class="pinlbl">Add to taskbar</span></button>
     <button class="themebtn" id="themebtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button>
     <span class="status">Local · <b>READY</b></span>
     <span class="who"><span class="av" id="av">U</span><span id="whoname">You</span></span>
@@ -1562,12 +1570,14 @@ function toggleTheme(){
 }
 window.toggleTheme=toggleTheme;
 async function addToTaskbar(){
-  const btn=document.getElementById('pinbtn');
+  const btn=document.getElementById('pinbtn'); const lbl=btn&&btn.querySelector('.pinlbl');
   if(btn) btn.disabled=true;
   try{
     const r=await post('/launcher/install',{});
-    toast((r&&r.ok?'✓ ':'⚠ ')+((r&&r.message)||'Could not add the icon.'),r&&r.ok);
-  }catch(e){ toast('⚠ Could not add the icon ('+e+')',false); }
+    toast((r&&r.ok?'✓ ':'⚠ ')+((r&&r.message)||'Could not add the icon.'));
+    if(r&&r.ok&&btn){ btn.classList.add('done'); if(lbl) lbl.textContent='Added to taskbar';
+      setTimeout(()=>{ btn.classList.remove('done'); if(lbl) lbl.textContent='Add to taskbar'; },4000); }
+  }catch(e){ toast('⚠ Could not add the icon ('+e+')'); }
   if(btn) btn.disabled=false;
 }
 window.addToTaskbar=addToTaskbar;

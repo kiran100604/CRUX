@@ -67,6 +67,15 @@ def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
     else:
         print("   · skipped — run `crux hotkey --install` later\n")
 
+    # 4. Taskbar capture icon (copy text → click → pick a tag)
+    print("4) Taskbar icon for one-click capture (copy text anywhere → click → tag).")
+    if True if non_interactive else _ask("   Add the “Capture to CRUX” icon now?"):
+        from .launcher import install_launcher
+        res = install_launcher(cfg.home)
+        print("   " + ("✓ " if res.get("ok") else "· ") + res.get("message", "") + "\n")
+    else:
+        print("   · skipped — add it later from the dashboard or `crux install-launcher`\n")
+
     print("  Done. Next:")
     print("    • crux serve        → open the dashboard (http://127.0.0.1:7432)")
     print("    • restart Claude Code so the hook loads")
