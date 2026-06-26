@@ -254,13 +254,16 @@ with a TAG in [brackets] saying what it is: [decision], [requirement],
 The tag tells you HOW TO TREAT it — read it before you fold it in:
 - [decision] [requirement] [constraint] [conclusion] are THE PROJECT'S OWN
   commitments — authoritative. These define what's decided and what matters.
-- [reference] [suggestion] [note] [result] (and anything "via" an external
-  source — a competitor, an article, another team) are CONTEXT TO BE AWARE OF,
-  not the project's own position. Note them as background ("competitor X does
-  Y", "an article suggests Z") — never restate them as OUR decision, and never
-  let them override or conflict with the project's own commitments above. When
-  external context disagrees with a decision, the decision wins; the external
-  note is just something we're aware of.
+- [result] is PROGRESS — a status update on the work. Fold it into the current
+  state (what's done, what's in progress now), not into decisions.
+- [suggestion] is an IDEA being EXPLORED, not a decision. Record it as something
+  under consideration ("considering X", "exploring Y") — never state it as a
+  made decision, and don't let it override an actual commitment above.
+- [reference] [note] (and anything "via" an external source — a competitor, an
+  article, another team) are CONTEXT TO BE AWARE OF, not the project's own
+  position. Note them as background ("competitor X does Y") — never restate them
+  as OUR decision. When external context disagrees with a decision, the decision
+  wins; the note is just something we're aware of.
 - [open question] is unresolved — keep it as a question, don't answer it for them.
 Synthesize, don't list:
 {items}
@@ -293,10 +296,14 @@ what it is and where it's from. The tag tells you HOW TO FOLD IT IN:
 - [decision] [requirement] [constraint] [conclusion] are the project's OWN
   commitments — authoritative. Update the memory to reflect them; if one
   supersedes something already in memory, replace the old statement.
-- [reference] [suggestion] [note] [result] (and anything "via" an external
-  source — a competitor, an article, another team) are CONTEXT TO BE AWARE OF.
-  Record them as background ("competitor X does Y") — never as OUR decision, and
-  never let them override a commitment already in memory.
+- [result] is PROGRESS — update the current state (what's done / in progress),
+  not the decisions.
+- [suggestion] is an IDEA being EXPLORED — record it as under consideration
+  ("considering X"), never as a decision; don't let it override a commitment.
+- [reference] [note] (and anything "via" an external source — a competitor, an
+  article, another team) are CONTEXT TO BE AWARE OF. Record them as background
+  ("competitor X does Y") — never as OUR decision, and never let them override a
+  commitment already in memory.
 - [open question] is unresolved — add it as a question, don't answer it.
 NEW CAPTURES:
 {items}

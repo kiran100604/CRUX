@@ -701,6 +701,24 @@ def test_thread_view_reports_clear_status(store):
     assert store.thread_view(t["id"])["status"] != "sorting"
 
 
+def test_popup_role_tags_map_to_valid_kinds(store):
+    # The popup shows user ROLES (Prompt/Info/Idea/Progress/Decision); each must
+    # map to a real engine kind so the capture is born classified and treated by
+    # role (Idea→suggestion = exploring, Info→reference = context-to-be-aware, …).
+    from crux.quickcapture import _POPUP_TAGS
+    from crux.models import CARD_KINDS
+    labels = {label for _k, _kind, label, _fg, _bg in _POPUP_TAGS}
+    assert labels == {"Prompt", "Info", "Idea", "Progress", "Decision"}
+    for _key, kind, _label, _fg, _bg in _POPUP_TAGS:
+        assert kind in CARD_KINDS
+    # Idea must store as a non-decision (exploring), so it never reads as committed
+    idea_kind = next(k for _, k, lbl, *_ in _POPUP_TAGS if lbl == "Idea")
+    assert idea_kind != "decision"
+    t = store.create_thread("X", "Y", seed=False)
+    res = store.add_step("maybe try a graph layout", thread_id=t["id"], kind=idea_kind)
+    assert res["tagged"] and store.db.get_episode(res["card_id"]).kind == idea_kind
+
+
 def test_popup_save_applies_tag(store):
     # The capture popup writes via _save(cfg, text, kind); a kind tags the card
     # (born classified), so picking a tag in the popup files it by role.

@@ -20,17 +20,20 @@ _LINE = "#404040"    # hairline
 _TEAL = "#6fb3b0"    # accent
 _TEAL_BG = "#15302e"
 
-# The tags offered in the popup — what the capture IS, so CRUX treats it right
-# (e.g. competitor info as a Reference, not our own decision). Picking one is the
-# ONLY action: the text already rode in from the clipboard. Each pairs with a
-# 1-key shortcut; "auto" (0 / Enter) lets CRUX classify. Colors are the kind
-# taxonomy from the design tokens, so a Decision looks like a Decision.
+# The tags name the ROLE the user knows but the agent CAN'T infer from the text
+# alone — is this my prompt/directive, info to note, an idea I'm exploring,
+# progress, or a settled decision? (The agent already reads constraint-vs-decision
+# from wording; what confuses it is exploring-vs-decided, mine-vs-pasted.) Each
+# maps to the engine kind whose role-treatment matches, so the living context
+# handles it right: an Idea stays "considering", Info stays context-to-be-aware,
+# a Decision is authoritative. Picking one is the ONLY action; Auto (Enter) lets
+# CRUX classify.  (key, kind, label, fg, bg)
 _POPUP_TAGS = [
-    ("1", "decision", "Decision", "#88b6ec", "#16263a"),
-    ("2", "requirement", "Requirement", "#84c46f", "#1b2e19"),
-    ("3", "constraint", "Constraint", "#ff6b5b", "#3a201c"),
-    ("4", "reference", "Reference", "#6fb3b0", "#15302e"),
-    ("5", "question", "Question", "#ff6b5b", "#3a201c"),
+    ("1", "requirement", "Prompt", "#84c46f", "#1b2e19"),   # my directive → what we want
+    ("2", "reference", "Info", "#6fb3b0", "#15302e"),       # note & be aware of
+    ("3", "suggestion", "Idea", "#d4915c", "#33240f"),      # exploring, not yet decided
+    ("4", "result", "Progress", "#dcbb5e", "#33290f"),      # status / current state
+    ("5", "decision", "Decision", "#88b6ec", "#16263a"),    # settled, authoritative
 ]
 
 

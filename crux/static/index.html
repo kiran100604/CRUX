@@ -718,6 +718,9 @@ function unsortedRow(e){
   </div></div>`;
 }
 const CARD_KIND_LABELS={decision:"Decision",requirement:"Requirement",constraint:"Constraint",insight:"Conclusion",question:"Open question",reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",note:"Note"};
+// Capture roles — what the user knows but the agent can't infer (exploring vs
+// decided, mine vs pasted). Each maps to the engine kind whose treatment matches.
+const CAPTURE_ROLES=[{label:"Prompt",kind:"requirement"},{label:"Info",kind:"reference"},{label:"Idea",kind:"suggestion"},{label:"Progress",kind:"result"},{label:"Decision",kind:"decision"}];
 function vThread(t){
   const active=t.status==='active';
   const owned=t.context_owned;
@@ -777,9 +780,9 @@ function vThread(t){
           <input id="dumpin" class="ntinput" placeholder="Dump anything — a prompt, a link, a result, a chunk of chat, an idea…" onkeydown="if(event.key==='Enter')dump('${t.id}')"/>
           <button class="btn teal" onclick="dump('${t.id}')">Dump →</button>
         </div>
-        <div class="dumptags" title="Optional — tag what this is so CRUX treats it right (e.g. competitor info as Reference, not your own decision). Leave blank and CRUX sorts it for you.">
-          <span class="tglbl">treat as</span>
-          ${['decision','requirement','constraint','reference','question'].map(k=>`<button class="tagchip${state.dumpKind===k?' on':''}" onclick="setDumpKind('${k}')">${CARD_KIND_LABELS[k]}</button>`).join('')}
+        <div class="dumptags" title="Optional — tell CRUX the ROLE it can't infer: is this your prompt, info to note, an idea you're exploring, progress, or a decision? Leave blank and CRUX sorts it for you.">
+          <span class="tglbl">what is this</span>
+          ${CAPTURE_ROLES.map(r=>`<button class="tagchip${state.dumpKind===r.kind?' on':''}" onclick="setDumpKind('${r.kind}')">${r.label}</button>`).join('')}
           <button class="tagchip clear${state.dumpKind?'':' hidden'}" onclick="setDumpKind('')">auto ✕</button>
         </div>`:''}
 
