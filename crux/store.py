@@ -520,12 +520,20 @@ class Store:
     MIN_REFRESH_INTERVAL = 4.0   # rate-limit refines: 1st action refines now, rapid
                                  # follow-ups coalesce until this interval elapses
 
-    def _mark_context_stale(self, thread_id: str) -> None:
+    def _mark_context_stale(self, thread_id: str, *, rebuild: bool = False) -> None:
         # Mark on EVERY mutation (dump, delete, include-toggle, intent edit). Bumps
         # updated_at, which the debounce uses as the "last activity" clock. Stale is
         # set even when the user owns the summary — so KB connections still refresh.
-        if self.db.get_thread(thread_id):
-            self.db.update_thread(thread_id, {"summary_stale": 1}, now_iso())
+        # rebuild=True forces a FULL re-synthesis next refresh: a delete/exclude/
+        # intent change can invalidate prior conclusions, so we can't just fold a new
+        # dump on top — the whole memory is re-derived. A plain new dump (rebuild
+        # False) updates INCREMENTALLY: prior memory + just the new card(s).
+        if not self.db.get_thread(thread_id):
+            return
+        fields = {"summary_stale": 1}
+        if rebuild:
+            fields["summary_rebuild"] = 1
+        self.db.update_thread(thread_id, fields, now_iso())
 
     @staticmethod
     def _labelled_item(c: Episode) -> str:
@@ -557,16 +565,39 @@ class Store:
         last = self._last_refine.get(thread_id, 0.0)
         if not force and (time.monotonic() - last) < self.MIN_REFRESH_INTERVAL:
             return t                       # rate-limited; a later poll will catch it
-        fields: dict = {"summary_stale": 0}
-        items = [self._labelled_item(c) for c in self.db.thread_steps(thread_id) if c.included]
+        fields: dict = {"summary_stale": 0, "summary_rebuild": 0}
+        included = [c for c in self.db.thread_steps(thread_id) if c.included]
+        prior = t["summary"] or ""
+        # FULL rebuild when a delete/exclude/intent change invalidated prior memory
+        # (or there's none yet); otherwise INCREMENTAL — fold only the new, unfolded
+        # cards into the existing memory. The incremental call gets the prior working
+        # memory + just the new dump(s) with their [tags], and reasons about how they
+        # update what we already knew (cheaper, and continuity-preserving).
+        rebuild = bool(t["summary_rebuild"]) or not prior
         did_refine = False
+        folded_ids: list[str] = []
         if not t["summary_owned"]:
-            fields["summary"] = self.processor.refine_context(
-                t["intent"] or "", items, t["summary"] or "") if items else ""
-            did_refine = bool(items)       # only a real synthesis counts as an LLM call
-        memory = fields.get("summary", t["summary"]) or ""
+            if rebuild:
+                items = [self._labelled_item(c) for c in included]
+                fields["summary"] = self.processor.refine_context(
+                    t["intent"] or "", items, "") if items else ""
+                did_refine = bool(items)   # only a real synthesis counts as an LLM call
+            else:
+                fresh = [c for c in included if not c.in_summary]
+                if fresh:
+                    items = [self._labelled_item(c) for c in fresh]
+                    fields["summary"] = self.processor.refine_context(
+                        t["intent"] or "", items, prior, incremental=True)
+                    did_refine = True
+                    folded_ids = [c.id for c in fresh]
+        memory = fields.get("summary", prior) or ""
         fields["background"] = self._kb_connections(t["intent"] or "", memory)
         self.db.update_thread(thread_id, fields, now_iso())
+        if not t["summary_owned"]:          # keep the fold-tracking in step with memory
+            if rebuild:
+                self.db.resync_in_summary(thread_id)  # in_summary mirrors included
+            elif folded_ids:
+                self.db.fold_episodes(folded_ids)
         if did_refine:                     # rate-limit the EXPENSIVE part only
             self._last_refine[thread_id] = time.monotonic()
         return self.db.get_thread(thread_id)
@@ -608,7 +639,8 @@ class Store:
         if title is not None: fields["title"] = title.strip()
         if intent is not None:
             fields["intent"] = intent.strip()
-            fields["summary_stale"] = 1   # new goal → re-derive memory + KB connections
+            fields["summary_stale"] = 1     # new goal → re-derive memory + KB connections
+            fields["summary_rebuild"] = 1   # a changed goal can recast everything: full rebuild
         if not fields:
             return False
         return self.db.update_thread(thread_id, fields, now_iso())
@@ -621,8 +653,8 @@ class Store:
             return False
         ok = self.db.update_card(card_id, {"included": int(included)})
         if ep.thread_id:
-            self._mark_context_stale(ep.thread_id)
-        return ok
+            self._mark_context_stale(ep.thread_id, rebuild=True)  # removing a fact can
+        return ok                                                 # invalidate prior memory
 
     def delete_card(self, card_id: str) -> bool:
         ep = self.db.get_episode(card_id)
@@ -630,7 +662,7 @@ class Store:
             return False
         self.db.delete_episode(card_id)
         if ep.thread_id:
-            self._mark_context_stale(ep.thread_id)
+            self._mark_context_stale(ep.thread_id, rebuild=True)  # full re-derive
         return True
 
     def set_thread_context(self, thread_id: str, context: str) -> bool:

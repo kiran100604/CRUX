@@ -98,6 +98,7 @@ class Episode:
     routed: bool = False           # has the router classified it yet? (else "sorting…")
     route_reason: str | None = None  # short why, for transparency
     included: bool = True          # does this card feed the thread's living context?
+    in_summary: bool = False       # has it been folded into the working memory yet?
     created_at: str = field(default_factory=now_iso)
 
     def to_public_dict(self) -> dict:
@@ -114,6 +115,7 @@ class Episode:
             kind=g("kind") or "note", approach_id=g("approach_id"),
             is_guide=bool(g("is_guide", 0)), routed=bool(g("routed", 0)),
             route_reason=g("route_reason"), included=bool(g("included", 1)),
+            in_summary=bool(g("in_summary", 0)),
             created_at=row["created_at"],
         )
 

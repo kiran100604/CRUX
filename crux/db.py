@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS episodes (
     routed       INTEGER NOT NULL DEFAULT 0,     -- has the router filed it yet?
     route_reason TEXT,
     included     INTEGER NOT NULL DEFAULT 1,     -- does this card feed the thread context?
+    in_summary   INTEGER NOT NULL DEFAULT 0,     -- already folded into working memory?
     created_at   TEXT NOT NULL
 );
 
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS threads (
     summary       TEXT,                          -- living auto-summary of the steps
     summary_owned INTEGER NOT NULL DEFAULT 0,    -- 1 once the user edits it by hand
     summary_stale INTEGER NOT NULL DEFAULT 0,    -- 1 when new steps need re-summarizing
+    summary_rebuild INTEGER NOT NULL DEFAULT 0,  -- 1 → next refresh must FULLY rebuild (a
+                                                 -- delete/exclude/intent change, not just new dumps)
     status        TEXT NOT NULL DEFAULT 'active', -- active | done
     current_approach_id TEXT,                      -- the direction being worked now
     created_at    TEXT NOT NULL,
@@ -281,6 +284,8 @@ class Database:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN included INTEGER NOT NULL DEFAULT 1")
         if "session_id" not in ecols:
             self.conn.execute("ALTER TABLE episodes ADD COLUMN session_id TEXT")
+        if "in_summary" not in ecols:
+            self.conn.execute("ALTER TABLE episodes ADD COLUMN in_summary INTEGER NOT NULL DEFAULT 0")
         # index lives here, not in SCHEMA: on an upgraded db the column only exists
         # after the ALTER above (SCHEMA runs before _migrate).
         self.conn.execute(
@@ -290,6 +295,8 @@ class Database:
         tcols = {r["name"] for r in self.conn.execute("PRAGMA table_info(threads)")}
         if tcols and "current_approach_id" not in tcols:
             self.conn.execute("ALTER TABLE threads ADD COLUMN current_approach_id TEXT")
+        if tcols and "summary_rebuild" not in tcols:
+            self.conn.execute("ALTER TABLE threads ADD COLUMN summary_rebuild INTEGER NOT NULL DEFAULT 0")
 
     def close(self) -> None:
         c = getattr(self._local, "conn", None)
@@ -303,12 +310,12 @@ class Database:
         self.conn.execute(
             """INSERT INTO episodes (id, raw_content, source_type, source_ref, title,
                    added_by, thread_id, session_id, kind, approach_id, is_guide, routed,
-                   route_reason, included, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   route_reason, included, in_summary, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (ep.id, ep.raw_content, ep.source_type, ep.source_ref, ep.title,
              ep.added_by, ep.thread_id, ep.session_id, ep.kind, ep.approach_id,
              int(ep.is_guide), int(ep.routed), ep.route_reason, int(ep.included),
-             ep.created_at),
+             int(ep.in_summary), ep.created_at),
         )
         self.conn.commit()
         return ep
@@ -421,7 +428,8 @@ class Database:
 
     def update_thread(self, thread_id: str, fields: dict, updated_at: str) -> bool:
         allowed = {"title", "intent", "background", "summary",
-                   "summary_owned", "summary_stale", "status", "current_approach_id"}
+                   "summary_owned", "summary_stale", "summary_rebuild", "status",
+                   "current_approach_id"}
         cols = {k: v for k, v in fields.items() if k in allowed}
         cols["updated_at"] = updated_at
         assignment = ", ".join(f"{c}=?" for c in cols)
@@ -429,6 +437,23 @@ class Database:
             f"UPDATE threads SET {assignment} WHERE id=?", (*cols.values(), thread_id))
         self.conn.commit()
         return cur.rowcount > 0
+
+    def fold_episodes(self, ids: list[str]) -> None:
+        """Mark these cards as folded into the working memory (incremental update)."""
+        ids = [i for i in ids if i]
+        if not ids:
+            return
+        qs = ",".join("?" * len(ids))
+        self.conn.execute(
+            f"UPDATE episodes SET in_summary=1 WHERE id IN ({qs})", ids)
+        self.conn.commit()
+
+    def resync_in_summary(self, thread_id: str) -> None:
+        """After a FULL rebuild, the working memory reflects exactly the included
+        cards — so in_summary mirrors included for every card on the thread."""
+        self.conn.execute(
+            "UPDATE episodes SET in_summary=included WHERE thread_id=?", (thread_id,))
+        self.conn.commit()
 
     def delete_thread(self, thread_id: str) -> None:
         # steps (episodes) survive; just detach them from the thread + its sessions

@@ -276,6 +276,37 @@ abandoned one. Be concrete; cite specifics. Do NOT open by restating the goal.
 No preamble, no headings like "Working memory:", just the text."""
 
 
+_CONTEXT_UPDATE_PROMPT = """You maintain the WORKING MEMORY for a piece of work —
+the evolving record of what's decided and where things stand. It already exists.
+Your job is to UPDATE it with new captures, not rewrite it from scratch.
+
+INTENT (the stable goal — for context only; do NOT restate it):
+{intent}
+
+CURRENT WORKING MEMORY (this is correct and complete as of the last update — keep
+everything in it that's still true; do NOT drop a fact just because the new
+captures below don't mention it):
+{prior}
+
+NEW CAPTURES since the last update (oldest first). Each carries a [tag] saying
+what it is and where it's from. The tag tells you HOW TO FOLD IT IN:
+- [decision] [requirement] [constraint] [conclusion] are the project's OWN
+  commitments — authoritative. Update the memory to reflect them; if one
+  supersedes something already in memory, replace the old statement.
+- [reference] [suggestion] [note] [result] (and anything "via" an external
+  source — a competitor, an article, another team) are CONTEXT TO BE AWARE OF.
+  Record them as background ("competitor X does Y") — never as OUR decision, and
+  never let them override a commitment already in memory.
+- [open question] is unresolved — add it as a question, don't answer it.
+NEW CAPTURES:
+{items}
+
+Produce the UPDATED working memory: the current memory with these captures folded
+in — new facts added, superseded ones replaced, everything else preserved. Be
+concrete. Do NOT open by restating the goal. No preamble, no headings, just the
+text."""
+
+
 _ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
 ONLY the numbered FACTS below — they are the team's verified knowledge. Cite the
 facts you rely on inline as [n]. If the facts don't cover the question, say so
@@ -403,10 +434,16 @@ class FakeProcessor:
             lines.append(f"[{n}] {summary or title}")
         return "\n".join(lines)
 
-    def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
-        # Offline: no model to synthesize, so present an honest working memory =
-        # the points kept in scope. The goal lives in INTENT, kept out of here.
+    def refine_context(self, intent: str, items: list[str], prior: str = "",
+                       *, incremental: bool = False) -> str:
+        # Offline: no model to synthesize. Full mode = honest list of what's in
+        # scope. Incremental = keep the prior memory and append the new captures,
+        # so continuity is preserved even without a model.
         kept = [i.strip().replace("\n", " ") for i in items if i.strip()]
+        if incremental and (prior or "").strip():
+            lines = [(prior or "").rstrip()]
+            lines.extend(f"- {i[:200]}" for i in kept[-12:])
+            return "\n".join(lines)
         if not kept:
             return ""
         lines = ["Captured so far:"]
@@ -509,17 +546,22 @@ class AnthropicProcessor:
         except Exception:
             return FakeProcessor.route_many(self, items, intent=intent)
 
-    def refine_context(self, intent: str, items: list[str], prior: str = "") -> str:
-        """Re-synthesize the thread's WORKING MEMORY (decisions/state/learnings,
-        distinct from the stable intent) from the items still in scope — the heart
-        of 'just keep dumping, AI keeps it sharp'."""
+    def refine_context(self, intent: str, items: list[str], prior: str = "",
+                       *, incremental: bool = False) -> str:
+        """Maintain the thread's WORKING MEMORY (decisions/state/learnings, distinct
+        from the stable intent) — the heart of 'just keep dumping, AI keeps it
+        sharp'. incremental=True folds just the NEW captures into the prior memory
+        (cheaper, continuity-preserving); otherwise it's a full re-synthesis."""
         joined = "\n".join(f"- {i.strip()}" for i in items if i.strip())[:8000] or "(nothing yet)"
+        prompt = (_CONTEXT_UPDATE_PROMPT if incremental and (prior or "").strip()
+                  else _CONTEXT_PROMPT)
         try:
-            return self._call(_CONTEXT_PROMPT.format(
+            return self._call(prompt.format(
                 intent=intent or "(unspecified)", prior=(prior or "(none yet)")[:3000],
                 items=joined), 600).strip()
         except Exception:
-            return FakeProcessor.refine_context(self, intent, items, prior)
+            return FakeProcessor.refine_context(self, intent, items, prior,
+                                                incremental=incremental)
 
     def extract_entries(self, content: str) -> list[dict]:
         """Split a chunk (transcript, agent output, notes) into discrete typed

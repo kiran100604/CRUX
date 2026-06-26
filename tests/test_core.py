@@ -601,6 +601,37 @@ def test_invalid_tag_falls_back_to_router(store):
     assert store.db.get_episode(res["card_id"]).routed is False
 
 
+def test_working_memory_updates_incrementally(store):
+    # A new dump folds INTO the existing memory: prior cards stay folded, only the
+    # new card is fed to the update call (in_summary tracks what's been folded).
+    t = store.create_thread("Site", "Build a marketing site", seed=False)
+    store.add_step("We decided on a one-page layout.", thread_id=t["id"], kind="decision")
+    store.ensure_context(t["id"], force=True)
+    cards = {c.raw_content: c for c in store.db.thread_steps(t["id"])}
+    assert cards["We decided on a one-page layout."].in_summary is True
+    # second dump — only this one is "fresh" (unfolded) for the incremental call
+    store.add_step("Adding a pricing section.", thread_id=t["id"], kind="decision")
+    fresh = [c for c in store.db.thread_steps(t["id"])
+             if c.included and not c.in_summary]
+    assert [c.raw_content for c in fresh] == ["Adding a pricing section."]
+    store.ensure_context(t["id"], force=True)
+    # after folding, everything included is marked folded
+    assert all(c.in_summary for c in store.db.thread_steps(t["id"]) if c.included)
+
+
+def test_delete_forces_full_rebuild(store):
+    # Removing a card invalidates prior memory → the thread is flagged for a FULL
+    # rebuild, not an incremental fold.
+    t = store.create_thread("Site", "Build a marketing site", seed=False)
+    a = store.add_step("Use Postgres.", thread_id=t["id"], kind="decision")["card_id"]
+    store.add_step("Use Redis for cache.", thread_id=t["id"], kind="decision")
+    store.ensure_context(t["id"], force=True)
+    store.delete_card(a)
+    assert store.db.get_thread(t["id"])["summary_rebuild"] == 1
+    store.ensure_context(t["id"], force=True)
+    assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
+
+
 def test_resolve_thread_by_title_and_current(store):
     t = store.create_thread("Launch plan", "Plan the launch")
     assert store.resolve_thread("Launch plan") == t["id"]   # exact active title
