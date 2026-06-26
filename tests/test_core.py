@@ -632,6 +632,23 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_hook_ingest_feeds_role_aware_working_memory(store):
+    # The Stop hook path (ingest_working, split) classifies each piece ("what it
+    # is") and folds it into the SAME living working memory — born classified,
+    # never stuck "sorting", and incrementally folded on refresh.
+    t = store.create_thread("Site", "Build a site", seed=False)
+    res = store.ingest_working(
+        "We decided to use Postgres. Acme (a competitor) uses MySQL.",
+        thread_id=t["id"], source="agent", source_ref="claude-code", split=True)
+    assert res["count"] >= 1
+    cards = store.db.thread_steps(t["id"])
+    assert cards and all(c.routed for c in cards)          # each piece classified
+    assert all(not c.in_summary for c in cards)            # fresh → fold incrementally
+    tv = store.thread_view(t["id"])
+    assert tv["status"] != "sorting"                       # already classified
+    assert all(c.in_summary for c in store.db.thread_steps(t["id"]) if c.included)
+
+
 def test_first_run_bootstrap_is_once_and_idempotent(tmp_path, monkeypatch):
     monkeypatch.setenv("CRUX_HOME", str(tmp_path))
     # stub the machine-touching steps so the test never writes to ~/.local or ~/.claude

@@ -39,6 +39,29 @@ def run() -> None:
                              owner=cfg.user, proposed=proposed)
         return {"title": item.title}
 
+    # Type hints from log_work map onto the card-kind taxonomy so an MCP capture is
+    # treated by role exactly like a hook/popup one (decision = ours/authoritative,
+    # reference/knowledge = context to be aware of, never our decision).
+    _MCP_KIND = {"decision": "decision", "constraint": "constraint",
+                 "requirement": "requirement", "context": "insight",
+                 "reference": "reference", None: None}
+
+    def _to_working(content: str, type_hint: str | None) -> None:
+        """Also fold an agent capture into the ACTIVE project's LIVE working memory
+        (local mode) — same path as the Stop hook: born classified by its kind, so
+        the living context updates incrementally and role-aware. No-op in team mode
+        or with no active project."""
+        if cfg.server or not store:
+            return
+        tid = store.current_thread_id()
+        if not tid:
+            return
+        try:
+            store.add_step(content, source="agent", source_ref="mcp",
+                           thread_id=tid, kind=_MCP_KIND.get(type_hint))
+        except Exception:
+            pass  # working-memory update is best-effort; never fail the agent's call
+
     @mcp.tool()
     def get_context(task: str, limit: int = 6) -> dict:
         """Pull the team's relevant knowledge for the task you're about to do.
@@ -85,15 +108,19 @@ def run() -> None:
         staged, titles = 0, []
         for c in decisions:
             if c and c.strip():
-                titles.append(_stage(c, "decision", True)["title"]); staged += 1
+                titles.append(_stage(c, "decision", True)["title"])
+                _to_working(c, "decision"); staged += 1
         for c in constraints:
             if c and c.strip():
-                titles.append(_stage(c, "constraint", True)["title"]); staged += 1
+                titles.append(_stage(c, "constraint", True)["title"])
+                _to_working(c, "constraint"); staged += 1
         for c in knowledge:
             if c and c.strip():
-                titles.append(_stage(c, "context", True)["title"]); staged += 1
+                titles.append(_stage(c, "context", True)["title"])
+                _to_working(c, "context"); staged += 1
         return {"staged": staged, "titles": titles,
-                "note": "Proposed to Review — a human will validate before it's trusted."}
+                "note": "Proposed to Review (durable knowledge) and folded into the "
+                        "active project's working memory, classified by role."}
 
     @mcp.tool()
     def remember(notes: list[str] = []) -> dict:
@@ -105,7 +132,8 @@ def run() -> None:
         n = 0
         for c in notes:
             if c and c.strip():
-                _stage(c, None, False); n += 1
+                _stage(c, None, False)
+                _to_working(c, None); n += 1   # also fold into the live working context (auto-classified)
         return {"remembered": n, "note": "Private working memory (not reviewed, expires)."}
 
     mcp.run()
