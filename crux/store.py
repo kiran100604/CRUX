@@ -505,12 +505,17 @@ class Store:
     _CHATTER = ("```", "git pull", "pip install", "standing by", "no action needed",
                 "ambient crux", "ready when you", "ready for your", "i'll wait",
                 "i'll stay quiet", "let me know", "ps c:\\", "http://localhost",
-                "127.0.0.1", "tests green", "committed and pushed", "| tag |", "→")
+                "127.0.0.1", "tests green", "committed and pushed", "| tag |", "→",
+                "let me ", "i'll ", "want me to", "to see it", "e.g.", "i agree",
+                "you're right", "good catch", "pushed (", "i can ", "next step")
 
     @classmethod
     def _looks_like_chatter(cls, text: str) -> bool:
+        # only applied to AGENT auto-captures, so markdown/code fences/these phrases
+        # are strong signals of assistant prose rather than a real project signal.
         t = (text or "").lower()
-        return cls._is_crux_echo(text) or t.count("**") >= 2 or any(s in t for s in cls._CHATTER)
+        return (cls._is_crux_echo(text) or "**" in text or "`" in text
+                or any(s in t for s in cls._CHATTER))
 
     def purge_chatter(self, thread_id: str) -> int:
         """Remove auto-captured chatter from a thread's working memory. Targets ONLY

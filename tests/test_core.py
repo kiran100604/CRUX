@@ -680,6 +680,22 @@ def test_auto_capture_keeps_signals_drops_chatter(store):
     assert res["count"] == 0
 
 
+def test_offline_timeline_fallback_is_class_independent(store):
+    # Regression: the real LLM processors fall back to the offline timeline on a
+    # timeout. That path must NOT reference attributes that only exist on
+    # FakeProcessor (the bug was self._offline_steps → AttributeError → 500).
+    from crux.processing import FakeProcessor, _offline_timeline
+    items = ["[decision · via x] Use Postgres", "[suggestion · via y] try a graph layout",
+             "[open question] tune the floor?"]
+    out = _offline_timeline(items, "", False)
+    assert "decided:" in out and "exploring:" in out and "Open questions:" in out
+
+    class NotAFakeProcessor:  # stand-in for the real OpenAI/Anthropic processor
+        pass
+    # calling the fallback with a non-Fake `self` must work, not crash
+    assert FakeProcessor.refine_context(NotAFakeProcessor(), "intent", items, "") == out
+
+
 def test_working_memory_reads_as_a_timeline(store):
     # Working memory should read as a chronological journey (what was being done, in
     # order) — not a flat fact dump. Offline shows the role-marked skeleton; a real

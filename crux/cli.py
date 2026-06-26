@@ -676,11 +676,16 @@ def cmd_clean_notes(args):
     total = 0
     for tid in tids:
         n = store.purge_chatter(tid)
+        # always rebuild — the polluted text may be frozen in the summary even when
+        # no cards match (e.g. a stale summary from before a fix).
+        try:
+            store.refine_context_now(tid)
+        except Exception as e:
+            print(f"  {tid[:8]}: rebuild skipped ({str(e)[:50]})")
         if n:
-            store.refine_context_now(tid)   # rebuild the summary clean
             print(f"  {tid[:8]}: removed {n}")
         total += n
-    print(f"✓ removed {total} chatter card(s) across {len(tids)} thread(s)")
+    print(f"✓ removed {total} chatter card(s) and rebuilt {len(tids)} thread(s)")
     store.close()
 
 

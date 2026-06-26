@@ -330,6 +330,49 @@ class Enrichment:
     subject: str = ""   # the specific thing it's about (scoping key for retrieval)
 
 
+# Offline working-memory synthesis (no model): we can't truly narrate, but we keep
+# the captures in chronological order and mark each by role, so working memory
+# reads as a journey skeleton (exploring → decided → progress) rather than a flat
+# dump. Module-level (not a method) so EVERY processor — including the real LLM
+# ones falling back on a timeout/error — can use it. A real key turns this into a
+# proper narrative.
+_OFFLINE_ROLE = {"suggestion": "exploring", "decision": "decided",
+                 "requirement": "decided", "constraint": "decided",
+                 "conclusion": "decided", "insight": "learned",
+                 "result": "progress", "reference": "noted",
+                 "note": "noted", "prompt": "noted"}
+
+
+def _offline_steps(items: list[str]) -> tuple[list[str], list[str]]:
+    steps, questions = [], []
+    for it in items:
+        it = (it or "").strip().replace("\n", " ")
+        if not it:
+            continue
+        m = re.match(r"\[([^·\]]+)", it)
+        label = (m.group(1).strip().lower() if m else "note")
+        body = re.sub(r"^\[[^\]]*\]\s*", "", it).strip()[:180]
+        if label.startswith("open question") or label == "question":
+            questions.append(body)
+        else:
+            steps.append(f"- {_OFFLINE_ROLE.get(label, 'noted')}: {body}")
+    return steps, questions
+
+
+def _offline_timeline(items: list[str], prior: str = "", incremental: bool = False) -> str:
+    steps, questions = _offline_steps(items)
+    if incremental and (prior or "").strip():
+        return "\n".join([(prior or "").rstrip(), *steps]).strip() if steps \
+            else (prior or "").rstrip()
+    if not steps and not questions:
+        return ""
+    out = list(steps[-14:])
+    if questions:
+        out.append("Open questions:")
+        out.extend(f"- {q}" for q in questions[-8:])
+    return "\n".join(out).strip()
+
+
 class FakeProcessor:
     def enrich(self, content: str) -> Enrichment:
         clean = " ".join(content.split())
@@ -429,45 +472,9 @@ class FakeProcessor:
             lines.append(f"[{n}] {summary or title}")
         return "\n".join(lines)
 
-    # Offline (no model): we can't truly narrate, but we CAN keep the captures in
-    # chronological order and mark each by role, so working memory still reads as a
-    # journey skeleton (exploring → decided → progress) rather than a flat dump. A
-    # real API key turns this into a proper timeline narrative.
-    _OFFLINE_ROLE = {"suggestion": "exploring", "decision": "decided",
-                     "requirement": "decided", "constraint": "decided",
-                     "conclusion": "decided", "insight": "learned",
-                     "result": "progress", "reference": "noted",
-                     "note": "noted", "prompt": "noted"}
-
-    def _offline_steps(self, items: list[str]) -> tuple[list[str], list[str]]:
-        steps, questions = [], []
-        for it in items:
-            it = it.strip().replace("\n", " ")
-            if not it:
-                continue
-            m = re.match(r"\[([^·\]]+)", it)
-            label = (m.group(1).strip().lower() if m else "note")
-            body = re.sub(r"^\[[^\]]*\]\s*", "", it).strip()[:180]
-            if label.startswith("open question") or label == "question":
-                questions.append(body)
-            else:
-                steps.append(f"- {self._OFFLINE_ROLE.get(label, 'noted')}: {body}")
-        return steps, questions
-
     def refine_context(self, intent: str, items: list[str], prior: str = "",
                        *, incremental: bool = False) -> str:
-        steps, questions = self._offline_steps(items)
-        if incremental and (prior or "").strip():
-            # continue the timeline: keep prior, append the new step lines
-            return "\n".join([(prior or "").rstrip(), *steps]).strip() if steps \
-                else (prior or "").rstrip()
-        if not steps and not questions:
-            return ""
-        out = list(steps[-14:])
-        if questions:
-            out.append("Open questions:")
-            out.extend(f"- {q}" for q in questions[-8:])
-        return "\n".join(out).strip()
+        return _offline_timeline(items, prior, incremental)
 
 
 class AnthropicProcessor:
@@ -579,8 +586,9 @@ class AnthropicProcessor:
                 intent=intent or "(unspecified)", prior=(prior or "(none yet)")[:3000],
                 items=joined), 600).strip()
         except Exception:
-            return FakeProcessor.refine_context(self, intent, items, prior,
-                                                incremental=incremental)
+            # LLM unreachable/slow (timeout) → degrade to the offline timeline
+            # instead of failing the request.
+            return _offline_timeline(items, prior, incremental)
 
     def extract_entries(self, content: str) -> list[dict]:
         """Split a chunk (transcript, agent output, notes) into discrete typed
