@@ -500,14 +500,29 @@ class Store:
         self._log_capture(thread_id, source, source_ref, card_ids, kinds)
         return {"thread_id": thread_id, "card_ids": card_ids, "count": len(card_ids)}
 
+    # Signatures of assistant conversational prose (vs a real project signal) — used
+    # only to clean up agent AUTO-captures filed before the signals-only filter.
+    _CHATTER = ("```", "git pull", "pip install", "standing by", "no action needed",
+                "ambient crux", "ready when you", "ready for your", "i'll wait",
+                "i'll stay quiet", "let me know", "ps c:\\", "http://localhost",
+                "127.0.0.1", "tests green", "committed and pushed", "| tag |", "→")
+
+    @classmethod
+    def _looks_like_chatter(cls, text: str) -> bool:
+        t = (text or "").lower()
+        return cls._is_crux_echo(text) or t.count("**") >= 2 or any(s in t for s in cls._CHATTER)
+
     def purge_chatter(self, thread_id: str) -> int:
-        """Remove auto-captured chatter from a thread's working memory: agent-sourced
-        'note' cards and any re-captured CRUX echoes. One-shot cleanup for noise
-        filed before the signals-only auto-capture filter. Forces a full rebuild."""
+        """Remove auto-captured chatter from a thread's working memory. Targets ONLY
+        agent auto-captures (source_type='agent') that look conversational — CRUX
+        echoes, 'note' cards, and prose mis-classified as decisions/requirements —
+        so genuine signals (a real decision you dumped) are kept. One-shot cleanup
+        for noise filed before the signals-only filter; forces a full rebuild."""
         removed = 0
         for c in self.db.thread_steps(thread_id):
-            if (c.source_type == "agent" and c.kind == "note") \
-                    or self._is_crux_echo(c.raw_content):
+            agent = c.source_type == "agent"
+            if self._is_crux_echo(c.raw_content) or (
+                    agent and (c.kind == "note" or self._looks_like_chatter(c.raw_content))):
                 self.db.delete_episode(c.id)
                 removed += 1
         if removed:
@@ -724,8 +739,12 @@ class Store:
             thread_id, {"summary": context, "summary_owned": 1, "summary_stale": 0}, now_iso())
 
     def refine_context_now(self, thread_id: str) -> dict | None:
-        """Hand control back to the AI and re-refine NOW (manual ↻ bypasses debounce)."""
-        self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1}, now_iso())
+        """Hand control back to the AI and re-synthesize NOW from scratch. The manual
+        ↻ is a FULL REBUILD (summary_rebuild=1), not an incremental fold — so it
+        discards a stale/polluted prior summary and rewrites cleanly from the cards
+        in scope, instead of preserving the old text."""
+        self.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1,
+                                          "summary_rebuild": 1}, now_iso())
         return self.ensure_context(thread_id, force=True)
 
     def assemble_context(self, thread_id: str, *, query: str | None = None,

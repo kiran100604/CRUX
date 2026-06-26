@@ -632,6 +632,37 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
+def test_purge_chatter_keeps_signals_removes_agent_prose(store):
+    # cleanup must drop agent chatter (incl. prose mis-classified as a decision) but
+    # keep genuine signals — what the user dumped, and clean agent decisions.
+    t = store.create_thread("Site", "Build a site", seed=False)
+    user_dec = store.add_step("We chose Postgres.", thread_id=t["id"],
+                              kind="decision", source="note")["card_id"]
+    agent_dec = store.add_step("Use Redis for cache.", thread_id=t["id"],
+                               kind="decision", source="agent")["card_id"]
+    chat1 = store.add_step("Standing by for your next instruction.",
+                           thread_id=t["id"], source="agent")["card_id"]
+    chat2 = store.add_step("**git pull** then **pip install** — 78 tests green",
+                           thread_id=t["id"], kind="decision", source="agent")["card_id"]
+    n = store.purge_chatter(t["id"])
+    ids = {c.id for c in store.db.thread_steps(t["id"])}
+    assert user_dec in ids and agent_dec in ids        # real signals kept
+    assert chat1 not in ids and chat2 not in ids       # chatter removed (incl. misclassified)
+    assert n == 2
+
+
+def test_resynthesize_discards_stale_summary(store):
+    # the manual ↻ is a FULL rebuild — it must throw away a stale/polluted summary
+    # and rewrite from the cards, not preserve the old text.
+    t = store.create_thread("X", "Y", seed=False)
+    store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
+    store.db.update_thread(t["id"], {"summary": "OLD POLLUTED TEXT",
+                                     "summary_owned": 0}, "2024-01-01T00:00:00+00:00")
+    res = store.refine_context_now(t["id"])
+    assert "OLD POLLUTED TEXT" not in (res["summary"] or "")
+    assert "Postgres" in (res["summary"] or "")
+
+
 def test_auto_capture_keeps_signals_drops_chatter(store):
     # The Stop hook (signals_only) keeps real signals and drops conversational
     # chatter, so an agent's prose can't flood working memory.

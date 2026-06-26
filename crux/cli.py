@@ -664,15 +664,23 @@ def cmd_popup(args):
 
 
 def cmd_clean_notes(args):
-    """Remove auto-captured chatter (agent 'note' cards + CRUX echoes) from a
-    thread's working memory — one-shot cleanup for noise filed before the
-    signals-only capture filter."""
+    """Remove auto-captured chatter (agent echoes / notes / mis-classified prose)
+    from working memory — one-shot cleanup for noise filed before the signals-only
+    capture filter. With no thread arg, cleans EVERY thread (the noise is usually
+    not on the one you're looking at), then resynthesizes each."""
     store = _store()
-    tid = args.thread or store.current_thread_id()
-    if not tid:
-        print("no active thread (open one, or pass a thread id)"); store.close(); return
-    n = store.purge_chatter(tid)
-    print(f"✓ removed {n} chatter card(s) from working memory")
+    if args.thread:
+        tids = [args.thread]
+    else:
+        tids = [t["id"] for t in store.db.list_threads()]
+    total = 0
+    for tid in tids:
+        n = store.purge_chatter(tid)
+        if n:
+            store.refine_context_now(tid)   # rebuild the summary clean
+            print(f"  {tid[:8]}: removed {n}")
+        total += n
+    print(f"✓ removed {total} chatter card(s) across {len(tids)} thread(s)")
     store.close()
 
 
