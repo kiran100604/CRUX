@@ -651,6 +651,30 @@ def test_purge_chatter_keeps_signals_removes_agent_prose(store):
     assert n == 2
 
 
+def test_thread_view_fast_path_skips_the_llm(store):
+    # the server's page-load path must NOT refine inline (no blocking LLM call);
+    # it returns the stored summary, and a background/forced refine fills it in.
+    t = store.create_thread("X", "Y", seed=False)
+    store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
+    fast = store.thread_view(t["id"], refine_llm=False)
+    assert fast["context"] == "" and fast["status"] != "ready"   # not refined yet
+    store.ensure_context(t["id"], force=True)                    # background does the work
+    assert "Postgres" in store.thread_view(t["id"], refine_llm=False)["context"]
+
+
+def test_purge_removes_claude_code_channel(store):
+    # the Stop hook files everything as source_ref="claude-code"; cleanup clears that
+    # whole channel (assistant prose) but keeps manual captures.
+    t = store.create_thread("X", "Y", seed=False)
+    keep = store.add_step("We chose Postgres.", thread_id=t["id"],
+                          kind="decision", source="note")["card_id"]
+    junk = store.add_step("Here's the plan, looks good to me", thread_id=t["id"],
+                          kind="decision", source="agent", source_ref="claude-code")["card_id"]
+    n = store.purge_chatter(t["id"])
+    ids = {c.id for c in store.db.thread_steps(t["id"])}
+    assert keep in ids and junk not in ids and n == 1
+
+
 def test_resynthesize_discards_stale_summary(store):
     # the manual ↻ is a FULL rebuild — it must throw away a stale/polluted summary
     # and rewrite from the cards, not preserve the old text.

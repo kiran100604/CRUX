@@ -495,7 +495,9 @@ class AnthropicProcessor:
         self.model = model
         # Bounded timeout + no retries: a missing/blocked key must fail fast, never
         # hang the app (a misconfigured provider once stalled a request for ~80s).
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=20.0, max_retries=0)
+        # Refine/enrich run in the BACKGROUND now, so give a slow model room to
+        # finish (a 70B on a free tier can exceed 20s) without blocking any UI.
+        self._client = anthropic.Anthropic(api_key=api_key, timeout=45.0, max_retries=0)
 
     def _call(self, prompt: str, max_tokens: int) -> str:
         msg = self._client.messages.create(
@@ -634,8 +636,9 @@ class OpenAICompatProcessor(AnthropicProcessor):
     def __init__(self, model: str, api_key: str | None, base_url: str | None):
         from openai import OpenAI  # lazy, optional
         self.model = model
-        # bounded timeout + no retries — fail fast instead of hanging the app
-        kw = {"api_key": api_key, "timeout": 20.0, "max_retries": 0}
+        # bounded timeout + no retries; refine runs in the background so a slow
+        # model (e.g. a 70B on a free tier) gets room without blocking the UI
+        kw = {"api_key": api_key, "timeout": 45.0, "max_retries": 0}
         if base_url:
             kw["base_url"] = base_url
         self._client = OpenAI(**kw)

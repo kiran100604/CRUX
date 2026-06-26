@@ -526,7 +526,11 @@ class Store:
         removed = 0
         for c in self.db.thread_steps(thread_id):
             agent = c.source_type == "agent"
-            if self._is_crux_echo(c.raw_content) or (
+            # the Stop hook files everything as source_ref="claude-code"; ALL of that
+            # channel is auto-captured assistant prose, so clear it wholesale (manual
+            # dumps and seeded 'debug-agent' facts are kept). Plus any other agent
+            # echoes/notes/chatter.
+            if c.source_ref == "claude-code" or self._is_crux_echo(c.raw_content) or (
                     agent and (c.kind == "note" or self._looks_like_chatter(c.raw_content))):
                 self.db.delete_episode(c.id)
                 removed += 1
@@ -615,19 +619,26 @@ class Store:
         prefix = f"[{' · '.join(tags)}] " if tags else ""
         return f"{prefix}{c.raw_content}"
 
-    def ensure_context(self, thread_id: str, *, force: bool = False) -> dict | None:
+    def ensure_context(self, thread_id: str, *, force: bool = False,
+                       refine_llm: bool = True) -> dict | None:
         """Re-derive the living context when it's stale. RATE-LIMITED: the first
         action refines right away; rapid follow-ups (or the 2s poll) coalesce until
         MIN_REFRESH_INTERVAL passes, so a burst of dumps/deletes costs one refine,
         not five. A manual ↻ passes force. On a refresh we re-refine the working
         memory (unless the user owns it) AND recompute the relevance-gated KB
-        connections — one consistent reaction per change."""
+        connections — one consistent reaction per change.
+        refine_llm=False is the FAST PATH (page loads, hook injection): it does NO
+        model/embedding calls — returns the stored summary as-is — so the UI never
+        blocks on a slow LLM. The server schedules the real refresh in the
+        background; the next poll picks it up."""
         import time
         t = self.db.get_thread(thread_id)
         if not t:
             return None
         if not (t["summary_stale"] or not t["summary"]):
             return t
+        if not refine_llm:
+            return t                        # fast path: stored summary, no API calls
         last = self._last_refine.get(thread_id, 0.0)
         if not force and (time.monotonic() - last) < self.MIN_REFRESH_INTERVAL:
             return t                       # rate-limited; a later poll will catch it
@@ -668,8 +679,11 @@ class Store:
             self._last_refine[thread_id] = time.monotonic()
         return self.db.get_thread(thread_id)
 
-    def thread_view(self, thread_id: str) -> dict | None:
-        t = self.ensure_context(thread_id)
+    def thread_view(self, thread_id: str, *, refine_llm: bool = True) -> dict | None:
+        # refine_llm=False is the server's FAST PATH: return the stored summary
+        # instantly (no model/embedder call) and let the server refresh in the
+        # background. CLI/tests/hooks use the default (synchronous) refine.
+        t = self.ensure_context(thread_id, refine_llm=refine_llm)
         if not t:
             return None
         cards = [c.to_public_dict() for c in reversed(self.db.thread_steps(thread_id))]

@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .config import Config
+from .models import now_iso
 from .store import Store
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -90,8 +91,9 @@ def create_app(cfg: Config):
           f"| processing={cfg.processing_provider} embedding={cfg.embedding_provider}",
           file=sys.stderr, flush=True)
     app = FastAPI(title="CRUX")
-    app.state.executor = ThreadPoolExecutor(max_workers=1)  # serial background ingest
-    app.state.routing = set()  # thread ids with an in-flight auto-route (dedupe polls)
+    app.state.executor = ThreadPoolExecutor(max_workers=4)  # background ingest/route/refine
+    app.state.routing = set()    # thread ids with an in-flight auto-route (dedupe polls)
+    app.state.refreshing = set() # thread ids with an in-flight summary refresh
 
     @app.middleware("http")
     async def _timing(request, call_next):
@@ -443,7 +445,7 @@ def create_app(cfg: Config):
 
     @app.get("/threads/{thread_id}")
     def get_thread(thread_id: str):
-        t = store.thread_view(thread_id)
+        t = store.thread_view(thread_id, refine_llm=False)   # fast: no blocking LLM
         if not t:
             raise HTTPException(status_code=404, detail="no such thread")
         # Auto-sort any unrouted cards in the background — captures from the popup
@@ -460,7 +462,24 @@ def create_app(cfg: Config):
                 finally:
                     app.state.routing.discard(thread_id)
             app.state.executor.submit(_job)
+        # Refresh the working-memory summary in the BACKGROUND when it's stale, so a
+        # slow LLM never blocks this page load. The fast path returned the stored
+        # summary; the next poll will show the refreshed one.
+        if t.get("summary_stale") and thread_id not in app.state.refreshing:
+            _schedule_refresh(thread_id)
         return t
+
+    def _schedule_refresh(thread_id: str) -> None:
+        app.state.refreshing.add(thread_id)
+
+        def _job():
+            try:
+                store.ensure_context(thread_id, force=True)   # real LLM refine + KB
+            except Exception as e:
+                print(f"[crux] background refresh failed: {e}", file=sys.stderr)
+            finally:
+                app.state.refreshing.discard(thread_id)
+        app.state.executor.submit(_job)
 
     @app.post("/threads/{thread_id}/edit")
     def edit_thread(thread_id: str, body: ThreadIn):
@@ -475,8 +494,14 @@ def create_app(cfg: Config):
 
     @app.post("/threads/{thread_id}/refine")
     def refine_context(thread_id: str):
-        # hand control back to the AI and re-refine from the in-scope cards
-        return store.refine_context_now(thread_id) or {}
+        # Hand control back to the AI and re-synthesize from scratch — in the
+        # BACKGROUND so the ↻ button returns instantly. Flag a full rebuild now;
+        # the worker does the LLM call; the poll shows the result.
+        store.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1,
+                                           "summary_rebuild": 1}, now_iso())
+        if thread_id not in app.state.refreshing:
+            _schedule_refresh(thread_id)
+        return store.thread_view(thread_id) or {}
 
     @app.post("/cards/{card_id}/include")
     def card_include(card_id: str, body: IncludeIn):
