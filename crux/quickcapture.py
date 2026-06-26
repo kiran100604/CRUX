@@ -68,9 +68,13 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     txt.pack(fill="both", expand=True, padx=20)
     if initial:
         txt.insert("1.0", initial)
+        txt.focus_set()
 
-    tk.Label(win, text="Pick a tag — what is this? (or press Enter to let CRUX sort it)",
-             bg=_BG, fg=_MUT, font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(12, 6))
+    hint = ("Pick a tag — what is this? (or press Enter to let CRUX sort it)"
+            if initial else
+            "Nothing was copied — copy text first and reopen, or type here, then pick a tag.")
+    tk.Label(win, text=hint, bg=_BG, fg=_MUT,
+             font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(12, 6))
 
     def _destroy():
         try:
@@ -232,25 +236,60 @@ def hint_toast(root, text: str):
     return win
 
 
+def _read_captured_text(root) -> str:
+    """Get the text to capture from wherever the user put it. A taskbar/.desktop
+    launch can't always read the clipboard the way a terminal can, so we try every
+    source: the system clipboard tools, then tkinter's own clipboard, then (Linux)
+    the PRIMARY selection — i.e. whatever is highlighted, no Ctrl+C needed."""
+    from .cli import read_clipboard
+    val = (read_clipboard() or "").strip()
+    if val:
+        return val
+    for sel in ("CLIPBOARD", "PRIMARY"):
+        try:
+            v = (root.selection_get(selection=sel) or "").strip()
+            if v:
+                return v
+        except Exception:
+            pass
+    return ""
+
+
 def run_standalone(cfg, initial: str | None = None) -> str:
-    """`crux popup`: open the capture box once, save on Enter, return a status."""
+    """`crux popup`: open the capture box once. The popup ALWAYS appears (so a
+    taskbar click always gives visible feedback); it's pre-filled with whatever
+    you copied/selected. Pick a tag to save, Esc to cancel."""
     try:
-        import tkinter  # noqa: F401
+        import tkinter as tk
     except Exception as e:  # pragma: no cover
         raise SystemExit(
             f"The capture popup needs tkinter ({e}). On most systems it ships with "
             "Python; on Linux: sudo apt install python3-tk.")
-    from .cli import read_clipboard
 
+    # ONE hidden root owns the process — reused for the clipboard read and as the
+    # parent of the popup (multiple tk.Tk() roots in one process are fragile).
+    root = tk.Tk()
+    root.withdraw()
     if initial is None:
-        initial = (read_clipboard() or "").strip()
-    if not initial:
-        return "Clipboard is empty — copy some text first, then click the icon."
+        initial = _read_captured_text(root)
     holder: dict = {}
-    win = build_popup(None, initial,
-                      lambda v, kind: holder.update(value=v, kind=kind),
-                      lambda: None)
-    win.mainloop()
+
+    def _finish():
+        try:
+            root.quit()
+        except Exception:
+            pass
+
+    build_popup(root, initial,
+                lambda v, kind: (holder.update(value=v, kind=kind), _finish()),
+                _finish)
+    try:
+        root.mainloop()
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
     val = (holder.get("value") or "").strip()
     if not val:
         return "Cancelled — nothing captured."
