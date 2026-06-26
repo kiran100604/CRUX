@@ -116,6 +116,7 @@ def create_app(cfg: Config):
         as_step: bool = False   # True → land in working memory as a thread step (raw)
         thread_id: str | None = None
         kind: str | None = None  # user tag (decision/reference/…) → born classified, treated by role
+        role: str | None = None  # the user-facing role word (Prompt/Info/Idea/…) shown on the card
 
     class PromoteIn(BaseModel):
         title: str | None = None
@@ -291,7 +292,8 @@ def create_app(cfg: Config):
         if body.as_step or body.thread_id:
             res = store.add_step(body.content, source=body.source or "note",
                                  source_ref=body.source_ref,
-                                 thread_id=body.thread_id, kind=body.kind)
+                                 thread_id=body.thread_id, kind=body.kind,
+                                 role=body.role)
             # route (classify + file) off the request path so capture stays instant;
             # batches ALL unrouted cards on the thread → one call for a burst of dumps.
             # A user-tagged dump is born classified, so there's nothing to route.

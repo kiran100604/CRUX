@@ -797,7 +797,10 @@ function vThread(t){
 }
 function dumpCard(c){
   const sorting=!c.routed;
-  const label=sorting?'sorting…':(CARD_KIND_LABELS[c.kind]||c.kind);
+  // user-tagged captures carry the role they were filed under ("role:Idea") so the
+  // card shows the role word; agent-classified cards keep their kind label.
+  const roleM=(c.route_reason||'').match(/^role:(.+)$/);
+  const label=sorting?'sorting…':(roleM?roleM[1]:(CARD_KIND_LABELS[c.kind]||c.kind));
   const open=!!state.expanded['dc-'+c.id];
   const full=(c.raw_content||'');
   const text=open?full:full.slice(0,200);
@@ -870,7 +873,8 @@ async function dump(id){
   const el=document.getElementById('dumpin'); const txt=(el&&el.value.trim())||'';
   if(!txt) return; el.value='';
   const kind=state.dumpKind||null;
-  await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note',kind});
+  const role=kind?((CAPTURE_ROLES.find(r=>r.kind===kind)||{}).label||null):null;
+  await post('/capture',{content:txt,as_step:true,thread_id:id,source:'note',kind,role});
   await refreshThread(); setTimeout(refreshThread,1500);  // context re-refines in the background
 }
 async function toggleInclude(id,inc){ await post(`/cards/${id}/include`,{included:!!inc}); await refreshThread(); }

@@ -101,10 +101,10 @@ def build_popup(root, initial: str, on_submit, on_cancel):
         except Exception:
             pass
 
-    def submit(kind):
+    def submit(kind, role=None):
         val = txt.get("1.0", "end").strip()
         _destroy()
-        on_submit(val, kind)
+        on_submit(val, kind, role)
         return "break"
 
     def cancel(_e=None):
@@ -123,12 +123,12 @@ def build_popup(root, initial: str, on_submit, on_cancel):
         # hover = fill with the tag's own color, so it reads as that kind
         b.bind("<Enter>", lambda _e: b.configure(bg=bg, highlightbackground=fg))
         b.bind("<Leave>", lambda _e: b.configure(bg=_BG, highlightbackground=_LINE))
-        b.bind("<Button-1>", lambda _e: submit(kind))
+        b.bind("<Button-1>", lambda _e: submit(kind, label))
         return b
 
     for key, kind, label, fg, bg in _POPUP_TAGS:
         _chip(chips, label, f"·{key}", kind, fg, bg).pack(side="left", padx=4)
-        win.bind(key, lambda _e, k=kind: submit(k))
+        win.bind(key, lambda _e, k=kind, r=label: submit(k, r))
     # Auto = the calm default: filled teal so it's the obvious primary action.
     auto = tk.Label(chips, text="Auto  ↵", font=("Segoe UI", 10, "bold"),
                     bg=_TEAL, fg=_BG, padx=14, pady=7, cursor="hand2",
@@ -151,17 +151,17 @@ def build_popup(root, initial: str, on_submit, on_cancel):
     return win
 
 
-def _save(cfg, text: str, kind: str | None = None) -> str:
+def _save(cfg, text: str, kind: str | None = None, role: str | None = None) -> str:
     """Persist captured text into working memory as a raw step on the current
-    thread (kept as narrative, not atomized into facts). A `kind` is the user's
-    tag — the card is born classified and treated by role (e.g. a Reference is
-    context to be aware of, not folded in as our own decision)."""
+    thread (kept as narrative, not atomized into facts). `kind` is the engine kind
+    (treatment); `role` is the user-facing word (Prompt/Info/Idea/…) shown on the
+    card. The card is born classified and treated by role."""
     from .store import Store
     store = Store(cfg)
     try:
-        res = store.add_step(text, source="popup", kind=kind)
+        res = store.add_step(text, source="popup", kind=kind, role=role)
         where = "current thread" if res.get("thread_id") else "working memory"
-        tag = f" [{kind}]" if res.get("tagged") else ""
+        tag = f" [{role or kind}]" if res.get("tagged") else ""
         return f"Added to {where}{tag}: {text.strip()[:40]}"
     finally:
         store.close()
@@ -307,7 +307,7 @@ def run_standalone(cfg, initial: str | None = None) -> str:
             pass
 
     build_popup(root, initial,
-                lambda v, kind: (holder.update(value=v, kind=kind), _finish()),
+                lambda v, kind, role: (holder.update(value=v, kind=kind, role=role), _finish()),
                 _finish)
     try:
         root.mainloop()
@@ -319,4 +319,4 @@ def run_standalone(cfg, initial: str | None = None) -> str:
     val = (holder.get("value") or "").strip()
     if not val:
         return "Cancelled — nothing captured."
-    return _save(cfg, val, holder.get("kind"))
+    return _save(cfg, val, holder.get("kind"), holder.get("role"))

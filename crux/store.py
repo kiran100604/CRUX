@@ -372,7 +372,8 @@ class Store:
     def add_step(self, content: str, *, source: str = "note",
                  source_ref: str | None = None,
                  thread_id: str | None = None, route: bool = False,
-                 kind: str | None = None, _log: bool = True) -> dict:
+                 kind: str | None = None, role: str | None = None,
+                 _log: bool = True) -> dict:
         """Dump a card. Lands on the given thread (or the current one); with no
         thread it's a global unsorted capture. Kept raw — never atomized into facts.
         `source` is the channel (note/hotkey/agent/…); `source_ref` is the
@@ -394,12 +395,17 @@ class Store:
             thread_id = None
         session_id = self._active_session(thread_id) if thread_id else None
         tagged = kind in CARD_KINDS                # user-supplied tag we trust
+        # `role` is the user-facing word they picked (Prompt/Info/Idea/Progress/
+        # Decision); we map it to `kind` for treatment but remember the role so the
+        # card displays it. Stored as a "role:" sentinel in route_reason.
+        reason = (f"role:{role}" if tagged and role else
+                  ("tagged at capture" if tagged else None))
         ep = self.db.insert_episode(Episode(
             id=str(uuid.uuid4()), raw_content=content, source_type=source,
             source_ref=(source_ref or None), thread_id=thread_id,
             session_id=session_id, included=True,
             kind=(kind if tagged else "note"),
-            routed=tagged, route_reason=("tagged at capture" if tagged else None)))
+            routed=tagged, route_reason=reason))
         if thread_id:
             self.db.update_thread(thread_id, {}, now_iso())  # bump updated_at
             if tagged:

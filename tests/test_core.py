@@ -719,6 +719,20 @@ def test_popup_role_tags_map_to_valid_kinds(store):
     assert res["tagged"] and store.db.get_episode(res["card_id"]).kind == idea_kind
 
 
+def test_role_is_stored_for_display(store):
+    # The user picks a ROLE word (Idea); it maps to kind=suggestion for treatment
+    # but is remembered (route_reason "role:Idea") so the card shows "Idea".
+    t = store.create_thread("X", "Y", seed=False)
+    res = store.add_step("try a radial layout", thread_id=t["id"],
+                         kind="suggestion", role="Idea")
+    card = store.db.get_episode(res["card_id"])
+    assert card.kind == "suggestion"            # treatment by kind
+    assert card.route_reason == "role:Idea"     # display by role
+    # no role given → falls back to the generic tagged marker
+    res2 = store.add_step("use Postgres", thread_id=t["id"], kind="decision")
+    assert store.db.get_episode(res2["card_id"]).route_reason == "tagged at capture"
+
+
 def test_popup_save_applies_tag(store):
     # The capture popup writes via _save(cfg, text, kind); a kind tags the card
     # (born classified), so picking a tag in the popup files it by role.
