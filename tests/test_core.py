@@ -652,6 +652,23 @@ def test_purge_keeps_manual_and_seeds_removes_agent_autocaptures(store):
     assert n == 2 and breakdown.get("agent") == 3 and breakdown.get("note") == 1
 
 
+def test_ai_degraded_flag_surfaces_on_timeout(store, monkeypatch):
+    # when the model times out and the refine falls back to the offline timeline,
+    # thread_view exposes ai_degraded=True so the UI can say so.
+    from crux.processing import _offline_timeline
+    t = store.create_thread("X", "Y", seed=False)
+    store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
+
+    class TimingOut:
+        last_degraded = False
+        def refine_context(self, intent, items, prior="", *, incremental=False):
+            self.last_degraded = True                 # mimic the except branch
+            return _offline_timeline(items, prior, incremental)
+    monkeypatch.setattr(store, "processor", TimingOut())
+    store.ensure_context(t["id"], force=True)
+    assert store.thread_view(t["id"], refine_llm=False)["ai_degraded"] is True
+
+
 def test_thread_view_fast_path_skips_the_llm(store):
     # the server's page-load path must NOT refine inline (no blocking LLM call);
     # it returns the stored summary, and a background/forced refine fills it in.

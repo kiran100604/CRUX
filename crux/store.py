@@ -33,6 +33,7 @@ class Store:
         self.embedder = get_embedding_provider(cfg)
         self.processor = get_processor(cfg)
         self._last_refine: dict[str, float] = {}  # thread_id → monotonic ts of last refine
+        self._degraded: dict[str, bool] = {}      # thread_id → last refine fell back (AI timeout)
         self._qcache: dict[str, list] = {}         # query text → embedding (per provider)
 
     def close(self) -> None:
@@ -680,6 +681,8 @@ class Store:
                 self.db.fold_episodes(folded_ids)
         if did_refine:                     # rate-limit the EXPENSIVE part only
             self._last_refine[thread_id] = time.monotonic()
+            # remember whether the model actually answered (vs timed out → offline)
+            self._degraded[thread_id] = bool(getattr(self.processor, "last_degraded", False))
         return self.db.get_thread(thread_id)
 
     def thread_view(self, thread_id: str, *, refine_llm: bool = True) -> dict | None:
@@ -706,6 +709,7 @@ class Store:
         return {**t, "context": t.get("summary") or "",
                 "context_owned": bool(t["summary_owned"]),
                 "status": status, "updated_at": t["updated_at"],
+                "ai_degraded": self._degraded.get(thread_id, False),
                 "cards": cards, "card_count": len(cards),
                 "sessions": list(reversed(sessions)),  # newest first for display
                 "session_count": len(sessions),

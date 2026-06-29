@@ -493,6 +493,7 @@ class AnthropicProcessor:
         import anthropic  # lazy, optional dependency
 
         self.model = model
+        self.last_degraded = False   # True after a refine that fell back (timeout)
         # Bounded timeout + no retries: a missing/blocked key must fail fast, never
         # hang the app (a misconfigured provider once stalled a request for ~80s).
         # Refine/enrich run in the BACKGROUND now, so give a slow model room to
@@ -594,14 +595,17 @@ class AnthropicProcessor:
         joined = "\n".join(f"- {i.strip()}" for i in items if i.strip())[:8000] or "(nothing yet)"
         prompt = (_CONTEXT_UPDATE_PROMPT if incremental and (prior or "").strip()
                   else _CONTEXT_PROMPT)
+        self.last_degraded = False        # did this refine actually use the model?
         try:
             return self._call(prompt.format(
                 intent=intent or "(unspecified)", prior=(prior or "(none yet)")[:3000],
                 items=joined), 600).strip()
         except Exception as e:
             # LLM unreachable/slow (timeout) → degrade to the offline timeline
-            # instead of failing the request. Log it so a persistent timeout (e.g. a
-            # slow corporate network to the model) is visible, not silent.
+            # instead of failing the request. Flag it (so the UI can say "AI
+            # unavailable") and log it (so a persistent slow-model problem is
+            # visible, not silent).
+            self.last_degraded = True
             import sys as _sys
             print(f"[crux] working-memory refine fell back to offline "
                   f"({type(e).__name__}: {str(e)[:80]})", file=_sys.stderr, flush=True)
@@ -640,6 +644,7 @@ class OpenAICompatProcessor(AnthropicProcessor):
     def __init__(self, model: str, api_key: str | None, base_url: str | None):
         from openai import OpenAI  # lazy, optional
         self.model = model
+        self.last_degraded = False
         # bounded timeout + no retries; refine runs in the background so a slow
         # model (e.g. a 70B on a free tier) gets room without blocking the UI
         kw = {"api_key": api_key, "timeout": 45.0, "max_retries": 0}
