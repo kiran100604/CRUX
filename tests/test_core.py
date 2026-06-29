@@ -675,7 +675,7 @@ def test_thread_view_fast_path_skips_the_llm(store):
     t = store.create_thread("X", "Y", seed=False)
     store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
     fast = store.thread_view(t["id"], refine_llm=False)
-    assert fast["context"] == "" and fast["status"] != "ready"   # not refined yet
+    assert fast["context"] == "" and fast["wm_status"] != "ready"   # not refined yet
     store.ensure_context(t["id"], force=True)                    # background does the work
     assert "Postgres" in store.thread_view(t["id"], refine_llm=False)["context"]
 
@@ -768,7 +768,7 @@ def test_hook_ingest_feeds_role_aware_working_memory(store):
     assert cards and all(c.routed for c in cards)          # each piece classified
     assert all(not c.in_summary for c in cards)            # fresh → fold incrementally
     tv = store.thread_view(t["id"])
-    assert tv["status"] != "sorting"                       # already classified
+    assert tv["wm_status"] != "sorting"                    # already classified
     assert all(c.in_summary for c in store.db.thread_steps(t["id"]) if c.included)
 
 
@@ -799,12 +799,12 @@ def test_thread_view_reports_clear_status(store):
     # "sorting"; once classified it settles to updating/ready — never stuck.
     t = store.create_thread("Sync", "Build a sync engine", seed=False)
     store.add_step("competitor uses CRDT merge", thread_id=t["id"])  # untagged → unrouted
-    assert store.thread_view(t["id"])["status"] == "sorting"
+    assert store.thread_view(t["id"])["wm_status"] == "sorting"
     store.route_pending(t["id"])
-    assert store.thread_view(t["id"])["status"] in ("updating", "ready")
+    assert store.thread_view(t["id"])["wm_status"] in ("updating", "ready")
     # a tagged dump is born classified — never shows "sorting"
     store.add_step("We chose Postgres.", thread_id=t["id"], kind="decision")
-    assert store.thread_view(t["id"])["status"] != "sorting"
+    assert store.thread_view(t["id"])["wm_status"] != "sorting"
 
 
 def test_popup_role_tags_map_to_valid_kinds(store):

@@ -658,7 +658,7 @@ setInterval(poll, 5000);
 // typing (so it can't clobber an edit).
 let _threadSig="", _threadBusy=false;
 function _threadSigOf(tv){
-  return [tv.context||"", tv.card_count||0, tv.status||"", tv.ai_degraded?1:0,
+  return [tv.context||"", tv.card_count||0, tv.wm_status||"", tv.ai_degraded?1:0,
           (tv.cards||[]).map(c=>c.id+"|"+(c.routed?1:0)+"|"+c.kind+"|"+(c.included?1:0)).join(",")
          ].join("§");
 }
@@ -732,7 +732,7 @@ function vThread(t){
   const cards=t.cards||[];
   const incl=cards.filter(c=>c.included).length;
   const sorting=active && cards.some(c=>!c.routed);       // dumps still being classified
-  const updating=active && (t.status==='updating'||t.status==='sorting');  // context being re-derived
+  const updating=active && (t.wm_status==='updating'||t.wm_status==='sorting');  // context being re-derived
   const degraded=!owned && t.ai_degraded;                 // last AI synthesis timed out
   const memStatus = owned
     ? '<span class="ststeady">● yours</span>'

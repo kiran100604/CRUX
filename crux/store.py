@@ -700,15 +700,16 @@ class Store:
         last_closed = next((s for s in reversed(sessions) if s["status"] == "closed"), None)
         resuming = bool(last_closed) and (
             active is None or self._age_seconds(active["last_at"]) > self.IDLE_GAP_SECONDS)
-        # One honest status the UI can show plainly. "sorting" = cards still being
-        # classified; "updating" = working memory needs a re-synthesis; else "ready"
-        # (settled). The user-owned summary never auto-updates, so it's always ready.
+        # One honest WORKING-MEMORY status the UI can show. "sorting" = cards still
+        # being classified; "updating" = working memory needs a re-synthesis; else
+        # "ready" (settled). NOTE: must NOT be called "status" — the thread record
+        # already has `status` (active/done); clobbering it broke active-detection.
         sorting = any(not c["routed"] for c in cards)
         updating = (not t["summary_owned"]) and bool(t["summary_stale"])
-        status = "sorting" if sorting else ("updating" if updating else "ready")
+        wm_status = "sorting" if sorting else ("updating" if updating else "ready")
         return {**t, "context": t.get("summary") or "",
                 "context_owned": bool(t["summary_owned"]),
-                "status": status, "updated_at": t["updated_at"],
+                "wm_status": wm_status, "updated_at": t["updated_at"],
                 "ai_degraded": self._degraded.get(thread_id, False),
                 "cards": cards, "card_count": len(cards),
                 "sessions": list(reversed(sessions)),  # newest first for display
