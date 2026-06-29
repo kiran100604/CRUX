@@ -79,7 +79,7 @@ def run() -> None:
         # open questions + KB relevant to the task); else a bare KB lookup.
         tid = store.current_thread_id()
         if tid:
-            pkg = store.assemble_context(tid, query=task, kb_limit=limit)
+            pkg = store.assemble_context(tid, query=task, kb_limit=limit, refine_llm=False)
             return {"context": pkg["brief"], "count": len(pkg["kb"]),
                     "open_in_crux": pkg.get("link", "")}
         from .hooks import _format

@@ -87,7 +87,9 @@ def hook_inject() -> int:
         # prompt, not just a bare KB lookup. Otherwise fall back to plain retrieval.
         tid = store.current_thread_id()
         if tid:
-            ctx = store.assemble_context(tid, query=prompt, kb_limit=MAX_ITEMS)["brief"]
+            # per-prompt → fast path: never block the turn on a slow refine
+            ctx = store.assemble_context(tid, query=prompt, kb_limit=MAX_ITEMS,
+                                         refine_llm=False)["brief"]
             store.close()
             print(json.dumps({"additionalContext": ctx}) if ctx else "{}")
             return 0

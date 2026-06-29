@@ -94,6 +94,7 @@ def create_app(cfg: Config):
     app.state.executor = ThreadPoolExecutor(max_workers=4)  # background ingest/route/refine
     app.state.routing = set()    # thread ids with an in-flight auto-route (dedupe polls)
     app.state.refreshing = set() # thread ids with an in-flight summary refresh
+    app.state.bg_lock = __import__("threading").Lock()  # guards the dedupe sets
 
     @app.middleware("http")
     async def _timing(request, call_next):
@@ -300,7 +301,8 @@ def create_app(cfg: Config):
             # batches ALL unrouted cards on the thread → one call for a burst of dumps.
             # A user-tagged dump is born classified, so there's nothing to route.
             if res.get("thread_id") and not res.get("tagged"):
-                app.state.executor.submit(_route_pending, cfg, res["thread_id"])
+                tid = res["thread_id"]
+                _schedule_bg(tid, app.state.routing, lambda: _route_pending(cfg, tid))
             return {"step": True, **res}
         item = store.capture(body.content, source=body.source,
                              type_hint=body.type, scope=body.scope,
@@ -450,36 +452,39 @@ def create_app(cfg: Config):
             raise HTTPException(status_code=404, detail="no such thread")
         # Auto-sort any unrouted cards in the background — captures from the popup
         # (and any other direct path) bypass /capture's router, so without this they
-        # would stay "sorting…" forever. Dedupe by thread so a burst of 2s polls
-        # triggers at most one routing call at a time.
-        if any(not c["routed"] for c in t.get("cards", [])) \
-                and thread_id not in app.state.routing:
-            app.state.routing.add(thread_id)
-
-            def _job():
-                try:
-                    _route_pending(cfg, thread_id)
-                finally:
-                    app.state.routing.discard(thread_id)
-            app.state.executor.submit(_job)
+        # would stay "sorting…" forever.
+        if any(not c["routed"] for c in t.get("cards", [])):
+            _schedule_bg(thread_id, app.state.routing,
+                         lambda: _route_pending(cfg, thread_id))
         # Refresh the working-memory summary in the BACKGROUND when it's stale, so a
         # slow LLM never blocks this page load. The fast path returned the stored
         # summary; the next poll will show the refreshed one.
-        if t.get("summary_stale") and thread_id not in app.state.refreshing:
+        if t.get("summary_stale"):
             _schedule_refresh(thread_id)
         return t
 
-    def _schedule_refresh(thread_id: str) -> None:
-        app.state.refreshing.add(thread_id)
+    def _schedule_bg(key: str, inflight: set, fn) -> None:
+        """Run fn in the background, but at most ONE per key at a time — the
+        check-and-claim is locked so two near-simultaneous polls can't both fire it
+        (the source of duplicate LLM calls)."""
+        with app.state.bg_lock:
+            if key in inflight:
+                return
+            inflight.add(key)
 
         def _job():
             try:
-                store.ensure_context(thread_id, force=True)   # real LLM refine + KB
+                fn()
             except Exception as e:
-                print(f"[crux] background refresh failed: {e}", file=sys.stderr)
+                print(f"[crux] background task failed ({key[:8]}): {e}", file=sys.stderr)
             finally:
-                app.state.refreshing.discard(thread_id)
+                with app.state.bg_lock:
+                    inflight.discard(key)
         app.state.executor.submit(_job)
+
+    def _schedule_refresh(thread_id: str) -> None:
+        _schedule_bg(thread_id, app.state.refreshing,
+                     lambda: store.ensure_context(thread_id, force=True))
 
     @app.post("/threads/{thread_id}/edit")
     def edit_thread(thread_id: str, body: ThreadIn):
@@ -499,9 +504,11 @@ def create_app(cfg: Config):
         # the worker does the LLM call; the poll shows the result.
         store.db.update_thread(thread_id, {"summary_owned": 0, "summary_stale": 1,
                                            "summary_rebuild": 1}, now_iso())
-        if thread_id not in app.state.refreshing:
-            _schedule_refresh(thread_id)
-        return store.thread_view(thread_id) or {}
+        _schedule_refresh(thread_id)          # deduped: one in-flight refine per thread
+        # refine_llm=False → return instantly; the scheduled worker is the ONLY LLM
+        # call. (Without this the default thread_view would refine synchronously too,
+        # blocking the request AND duplicating the call.)
+        return store.thread_view(thread_id, refine_llm=False) or {}
 
     @app.post("/cards/{card_id}/include")
     def card_include(card_id: str, body: IncludeIn):

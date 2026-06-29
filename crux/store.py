@@ -774,14 +774,17 @@ class Store:
         return self.ensure_context(thread_id, force=True)
 
     def assemble_context(self, thread_id: str, *, query: str | None = None,
-                         kb_limit: int = 6, record: bool = True) -> dict:
+                         kb_limit: int = 6, record: bool = True,
+                         refine_llm: bool = True) -> dict:
         """Flow B — the state-aware injection. Given where the work stands RIGHT NOW
         (intent + working memory + recent signals + open questions) and, optionally,
         the agent's immediate task (`query`), pull the KB knowledge relevant to this
         moment and assemble a focused, paste-ready package. Unlike the seeded
         background (fixed at thread creation), the KB section is retrieved fresh
-        against the current state, so it tracks the work as it moves."""
-        t = self.ensure_context(thread_id)
+        against the current state, so it tracks the work as it moves.
+        refine_llm=False (the per-PROMPT hook / MCP pull) uses the stored working
+        memory — never blocks the agent's turn on a slow refine."""
+        t = self.ensure_context(thread_id, refine_llm=refine_llm)
         if not t:
             return {"brief": "", "intent": "", "working_memory": "",
                     "open_questions": [], "recent": [], "kb": []}
