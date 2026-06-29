@@ -598,9 +598,13 @@ class AnthropicProcessor:
             return self._call(prompt.format(
                 intent=intent or "(unspecified)", prior=(prior or "(none yet)")[:3000],
                 items=joined), 600).strip()
-        except Exception:
+        except Exception as e:
             # LLM unreachable/slow (timeout) → degrade to the offline timeline
-            # instead of failing the request.
+            # instead of failing the request. Log it so a persistent timeout (e.g. a
+            # slow corporate network to the model) is visible, not silent.
+            import sys as _sys
+            print(f"[crux] working-memory refine fell back to offline "
+                  f"({type(e).__name__}: {str(e)[:80]})", file=_sys.stderr, flush=True)
             return _offline_timeline(items, prior, incremental)
 
     def extract_entries(self, content: str) -> list[dict]:

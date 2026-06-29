@@ -517,26 +517,29 @@ class Store:
         return (cls._is_crux_echo(text) or "**" in text or "`" in text
                 or any(s in t for s in cls._CHATTER))
 
-    def purge_chatter(self, thread_id: str) -> int:
-        """Remove auto-captured chatter from a thread's working memory. Targets ONLY
-        agent auto-captures (source_type='agent') that look conversational — CRUX
-        echoes, 'note' cards, and prose mis-classified as decisions/requirements —
-        so genuine signals (a real decision you dumped) are kept. One-shot cleanup
-        for noise filed before the signals-only filter; forces a full rebuild."""
+    # Sources whose captures are MANUAL/curated and must be kept by cleanup. Anything
+    # else that's agent-sourced (source_type="agent") is auto-captured prose — the
+    # Stop hook / MCP / older hook versions — i.e. the noise.
+    _KEEP_SOURCES = frozenset({"debug-agent"})
+
+    def purge_chatter(self, thread_id: str) -> tuple[int, dict]:
+        """Remove auto-captured agent prose from a thread's working memory: any
+        card whose source_type is 'agent' (the Stop hook / MCP / old hook versions),
+        EXCEPT curated sources (the demo seed), plus any CRUX echoes. Manual captures
+        (dumps/popup/hotkey) are always kept. Returns (removed, breakdown) where
+        breakdown counts cards by source_type for diagnostics. Forces a full rebuild."""
+        from collections import Counter
+        before = Counter()
         removed = 0
         for c in self.db.thread_steps(thread_id):
-            agent = c.source_type == "agent"
-            # the Stop hook files everything as source_ref="claude-code"; ALL of that
-            # channel is auto-captured assistant prose, so clear it wholesale (manual
-            # dumps and seeded 'debug-agent' facts are kept). Plus any other agent
-            # echoes/notes/chatter.
-            if c.source_ref == "claude-code" or self._is_crux_echo(c.raw_content) or (
-                    agent and (c.kind == "note" or self._looks_like_chatter(c.raw_content))):
+            before[c.source_type or "?"] += 1
+            auto_agent = c.source_type == "agent" and c.source_ref not in self._KEEP_SOURCES
+            if auto_agent or self._is_crux_echo(c.raw_content):
                 self.db.delete_episode(c.id)
                 removed += 1
         if removed:
             self._mark_context_stale(thread_id, rebuild=True)
-        return removed
+        return removed, dict(before)
 
     def _log_capture(self, thread_id, source, source_ref, card_ids, kinds=None):
         """One activity row for a capture, summarizing what was filed + where from."""

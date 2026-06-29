@@ -675,17 +675,20 @@ def cmd_clean_notes(args):
         tids = [t["id"] for t in store.db.list_threads()]
     total = 0
     for tid in tids:
-        n = store.purge_chatter(tid)
+        t = store.db.get_thread(tid)
+        title = (t["title"] if t else tid)[:24]
+        n, breakdown = store.purge_chatter(tid)
+        srcs = " ".join(f"{k}:{v}" for k, v in sorted(breakdown.items()))
         # always rebuild — the polluted text may be frozen in the summary even when
         # no cards match (e.g. a stale summary from before a fix).
         try:
             store.refine_context_now(tid)
         except Exception as e:
-            print(f"  {tid[:8]}: rebuild skipped ({str(e)[:50]})")
-        if n:
-            print(f"  {tid[:8]}: removed {n}")
+            print(f"  {tid[:8]} {title}: rebuild skipped ({str(e)[:50]})")
+        print(f"  {tid[:8]} {title}: {sum(breakdown.values())} cards [{srcs or 'none'}] → removed {n}")
         total += n
-    print(f"✓ removed {total} chatter card(s) and rebuilt {len(tids)} thread(s)")
+    print(f"✓ removed {total} auto-captured card(s) across {len(tids)} thread(s) "
+          f"(kept manual dumps + seeds)")
     store.close()
 
 

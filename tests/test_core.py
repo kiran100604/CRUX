@@ -632,23 +632,24 @@ def test_delete_forces_full_rebuild(store):
     assert store.db.get_thread(t["id"])["summary_rebuild"] == 0
 
 
-def test_purge_chatter_keeps_signals_removes_agent_prose(store):
-    # cleanup must drop agent chatter (incl. prose mis-classified as a decision) but
-    # keep genuine signals — what the user dumped, and clean agent decisions.
+def test_purge_keeps_manual_and_seeds_removes_agent_autocaptures(store):
+    # cleanup removes ALL agent auto-captures (Stop hook / MCP / old hooks) — which
+    # is what reliably clears assistant prose regardless of how it was classified —
+    # while keeping manual dumps and curated seed sources.
     t = store.create_thread("Site", "Build a site", seed=False)
-    user_dec = store.add_step("We chose Postgres.", thread_id=t["id"],
-                              kind="decision", source="note")["card_id"]
-    agent_dec = store.add_step("Use Redis for cache.", thread_id=t["id"],
-                               kind="decision", source="agent")["card_id"]
+    manual = store.add_step("We chose Postgres.", thread_id=t["id"],
+                            kind="decision", source="note")["card_id"]
+    seed = store.add_step("Seeded fact.", thread_id=t["id"],
+                          kind="decision", source="agent", source_ref="debug-agent")["card_id"]
     chat1 = store.add_step("Standing by for your next instruction.",
-                           thread_id=t["id"], source="agent")["card_id"]
-    chat2 = store.add_step("**git pull** then **pip install** — 78 tests green",
-                           thread_id=t["id"], kind="decision", source="agent")["card_id"]
-    n = store.purge_chatter(t["id"])
+                           thread_id=t["id"], source="agent", source_ref="claude-code")["card_id"]
+    chat2 = store.add_step("Here's the plan, looks good", thread_id=t["id"],
+                           kind="decision", source="agent")["card_id"]
+    n, breakdown = store.purge_chatter(t["id"])
     ids = {c.id for c in store.db.thread_steps(t["id"])}
-    assert user_dec in ids and agent_dec in ids        # real signals kept
-    assert chat1 not in ids and chat2 not in ids       # chatter removed (incl. misclassified)
-    assert n == 2
+    assert manual in ids and seed in ids           # manual + curated seed kept
+    assert chat1 not in ids and chat2 not in ids   # agent auto-captures removed
+    assert n == 2 and breakdown.get("agent") == 3 and breakdown.get("note") == 1
 
 
 def test_thread_view_fast_path_skips_the_llm(store):
@@ -670,7 +671,7 @@ def test_purge_removes_claude_code_channel(store):
                           kind="decision", source="note")["card_id"]
     junk = store.add_step("Here's the plan, looks good to me", thread_id=t["id"],
                           kind="decision", source="agent", source_ref="claude-code")["card_id"]
-    n = store.purge_chatter(t["id"])
+    n, _ = store.purge_chatter(t["id"])
     ids = {c.id for c in store.db.thread_steps(t["id"])}
     assert keep in ids and junk not in ids and n == 1
 
