@@ -143,12 +143,28 @@ The tree is no longer just a backend concept — the whole loop uses it:
   committed `crux_kb.json` (filed under `crux/<area>`), so the demo KB ships with a
   working tree. `export_items` now includes the field, so future exports keep it.
 
+## Onboarding + robustness (this change)
+
+- **Doc / PDF / URL onboarding** (`crux/ingest_sources.py`, `/ingest/url`,
+  `/ingest/file`): paste a link or upload a PDF/markdown/HTML/text file and CRUX
+  extracts the text, runs it through the normal pipeline (chunk → extract → place
+  in the tree → conflict-check), and stages the facts in Review. HTML is stripped
+  to text (headings kept so the tree nests); PDFs use `pypdf` (`pip install
+  'crux[pdf]'`) and degrade with a clear message if it's missing or a scan. The KB
+  Browse view has an "＋ Add knowledge" bar (URL + file).
+- **Unsorted captures are no longer a dead end**: a capture taken with no active
+  thread (popup/hotkey, or a paste before any thread) used to be display-only.
+  It's now expandable with **Extract to knowledge** (ingest → tree → Review),
+  **Start a thread** (becomes the thread's first dump), and **Delete**
+  (`/unsorted/{id}/ingest|to-thread`, `DELETE /unsorted/{id}`).
+- **Render robustness**: every view render is wrapped in a boundary — if one bad
+  field throws, the user gets a recovery panel (with the stack) instead of a
+  frozen, unresponsive page. That silent freeze was the "clicks do nothing / it
+  keeps breaking".
+
 ## Candidate next experiments (not done here)
 
-- **LLM-quality placement on the demo data**: the committed tree is filed by domain
-  (offline). Running `crux build-tree` with a real provider would deepen it
-  (`crux/features/…`, `crux/design-system/…`).
-- **Doc/PDF/URL onboarding**: text extraction in front of the existing ingest →
-  value-rich facts → placed in the tree → conflict-checked per node.
+- **OCR for scanned PDFs** (currently text-layer only).
+- **Background-job status surface** for long ingests (beyond the current poll).
 - **A `reference`/spec ingest path** that keeps a token list verbatim as one
   pullable reference rather than atomizing it at all.

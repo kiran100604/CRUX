@@ -213,6 +213,17 @@
   .acts .btn{justify-content:center; width:100%}
 
   /* lenses (emergent topics) */
+  .srcbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 14px; padding:12px 14px;
+    background:var(--soft); border:1px solid var(--hair); border-radius:var(--r-lg)}
+  .srclbl{font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); flex:none}
+  .srcurl{flex:1; min-width:220px; border:1px solid var(--hair); background:var(--canvas); color:var(--ink);
+    border-radius:var(--r-sm); padding:8px 12px; font-size:13.5px; font-family:var(--sans)}
+  .srcurl:focus{outline:none; border-color:var(--teal-line)}
+  .filebtn{font-size:13px; color:var(--teal); border:1px solid var(--teal-line); background:var(--teal-bg);
+    border-radius:var(--r-sm); padding:7px 12px; cursor:pointer; flex:none}
+  .filebtn:hover{filter:brightness(.97)}
+  .srcstatus{font-size:12px; color:var(--muted2); flex-basis:100%; min-height:0}
+  .srcstatus.busy{color:var(--peach)} .srcstatus.ok{color:var(--teal)} .srcstatus.err{color:var(--coral)}
   .lensbar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 14px}
   .lens{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:var(--pill);
     padding:6px 14px; font-size:13px; cursor:pointer}
@@ -689,8 +700,24 @@ document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.cl
 
 function render(){
   document.body.classList.toggle('kb-ask', state.view==='kb' && state.kbView==='ask');
-  ({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();
+  // Robustness: never let one bad field freeze the whole app. If a view throws,
+  // show a recovery panel (data is safe) instead of leaving stale, unresponsive
+  // DOM — that silent freeze was the "clicks do nothing / it keeps breaking".
+  try{
+    ({overview:vOverview,kb:vKB,working:vWorking,decisions:vDecisions,activity:vActivity}[state.view])();
+  }catch(err){
+    console.error('[crux] render failed for view', state.view, err);
+    app(`<div class="card" style="margin-top:24px;max-width:760px"><div class="tagline coral">⚠ DISPLAY ERROR</div>
+      <h3>Couldn't render this view</h3>
+      <div class="desc">CRUX hit an error showing your data — nothing was lost. Switch tabs or reload.</div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn out sm" onclick="location.reload()">Reload</button>
+        <button class="btn ghost sm" onclick="setView('overview')">Overview</button>
+        <button class="btn ghost sm" onclick="setView('kb')">Knowledge Base</button></div>
+      <pre class="raw" style="margin-top:12px;white-space:pre-wrap;font-size:11px;max-height:200px;overflow:auto">${esc(String((err&&err.stack)||err))}</pre></div>`);
+  }
 }
+window.addEventListener('error',e=>console.error('[crux] uncaught',e.error||e.message));
 
 /* ---------------- WORKING MEMORY = THREADS ("what I'm doing now") ---------- */
 function vWorking(){
@@ -723,12 +750,44 @@ function threadCard(t){
   </div>`;
 }
 function unsortedRow(e){
-  return `<div class="irow s-clean"><div class="ihead">
-    <span class="cdot c-attention"></span>
-    <div class="imain"><div class="ititle" style="font-weight:400">${esc((e.raw_content||'').slice(0,160))}</div></div>
-    <span class="iwhen mono">${rel(e.created_at)}</span>
-  </div></div>`;
+  const open=!!state.expanded['u-'+e.id];
+  const full=(e.raw_content||'');
+  const text=open?full:full.slice(0,160);
+  return `<div class="irow s-clean ${open?'open':''}">
+    <div class="ihead" onclick="toggleU('${e.id}')">
+      <span class="cdot c-attention"></span>
+      <div class="imain"><div class="ititle" style="font-weight:400">${esc(text)}${(!open&&full.length>160)?'…':''}</div></div>
+      <span class="iwhen mono">${rel(e.created_at)}</span>
+      <span class="chev">${open?'▴':'▾'}</span>
+    </div>
+    ${open?`<div class="ideep">
+      <div class="raw">${esc(full)}</div>
+      <div class="dfoot"><span class="muted2" style="font-size:12px">Captured with no active thread. Send it somewhere:</span>
+        <div class="dactions">
+          <button class="btn sm danger" onclick="event.stopPropagation();delUnsorted('${e.id}')">Delete</button>
+          <button class="btn sm out" onclick="event.stopPropagation();unsortedToThread('${e.id}')">Start a thread</button>
+          <button class="btn sm teal" onclick="event.stopPropagation();extractUnsorted('${e.id}')">Extract to knowledge →</button>
+        </div></div></div>`:''}
+  </div>`;
 }
+function toggleU(id){state.expanded['u-'+id]=!state.expanded['u-'+id]; render();}
+async function extractUnsorted(id){
+  toast('● Extracting to knowledge…');
+  const r=await post(`/unsorted/${id}/ingest`,{});
+  toast(r&&r.ok?`✓ ${r.facts||0} fact(s) staged in Review`:'Could not extract that');
+  await load(); if(r&&r.ok) setView('decisions');
+}
+async function unsortedToThread(id){
+  const t=await post(`/unsorted/${id}/to-thread`,{});
+  if(t&&t.id){ state.openThread=t.id; state.currentThread=t.id; toast('✓ Thread started from capture'); setView('working'); }
+  await load();
+}
+async function delUnsorted(id){
+  await fetch(`/unsorted/${id}`,{method:'DELETE',headers:_token?{'x-crux-token':_token}:{}});
+  toast('Deleted'); await load();
+}
+window.toggleU=toggleU; window.extractUnsorted=extractUnsorted;
+window.unsortedToThread=unsortedToThread; window.delUnsorted=delUnsorted;
 const CARD_KIND_LABELS={decision:"Decision",requirement:"Requirement",constraint:"Constraint",insight:"Conclusion",question:"Open question",reference:"Reference",prompt:"Prompt",suggestion:"Suggestion",result:"Result",note:"Note"};
 // Capture roles — what the user knows but the agent can't infer (exploring vs
 // decided, mine vs pasted). Each maps to the engine kind whose treatment matches.
@@ -1142,7 +1201,15 @@ function vKBBrowse(main){
   app(`
     <div class="crumb">WORKSPACE <b>//</b> LOCAL <b>//</b> KNOWLEDGE BASE</div>
     <div class="kbhdrow"><h1 class="head display">Browse knowledge</h1>${kbToggle('browse')}</div>
-    <p class="sub">Everything your team has verified, grouped by what it's about. Or switch to Ask to query it in plain language.</p>
+    <p class="sub">Everything your team has verified, organized as a tree by what it's about. Add a doc, PDF or link and CRUX files the facts into the tree for you. Or switch to Ask to query it in plain language.</p>
+    ${state.leader?`<div class="srcbar">
+      <span class="srclbl">＋ Add knowledge</span>
+      <input id="srcurl" class="srcurl" placeholder="Paste a link — docs, a wiki page, a PDF URL…" onkeydown="if(event.key==='Enter')ingestUrl()"/>
+      <button class="btn out sm" onclick="ingestUrl()">Fetch &amp; extract</button>
+      <label class="filebtn" title="Upload a PDF, markdown, HTML or text file">Upload file
+        <input type="file" accept=".pdf,.md,.markdown,.txt,.html,.htm" onchange="ingestFile(this)" hidden></label>
+      <span id="srcstatus" class="srcstatus"></span>
+    </div>`:''}
     <div class="lensbar">
       <button class="lens ${state.kbLens==null?'on':''}" onclick="selectLens(null)">All</button>
       ${state.lenses.map(l=>`<button class="lens ${state.kbLens===l.id?'on':''}" onclick="selectLens(${l.id})" title="${esc(l.intent||'')}">${esc(l.name)}${state.leader?` <span class="lx" onclick="event.stopPropagation();delLens(${l.id})">×</span>`:''}</button>`).join("")}
@@ -1581,6 +1648,33 @@ async function doSeed(){
 function copyInvite(){const c=document.getElementById("invitecmd");
   navigator.clipboard.writeText(c.textContent).then(()=>toast("✓ Copied — share with your team")).catch(()=>{});}
 window.doSeed=doSeed; window.copyInvite=copyInvite;
+
+/* ---- doc / PDF / URL onboarding: pull a source into the KB tree ---- */
+function srcStatus(msg,cls){const s=document.getElementById('srcstatus'); if(s){s.textContent=msg||''; s.className='srcstatus '+(cls||'');}}
+async function _afterIngest(promise,label){
+  srcStatus(`Fetching ${label}…`,'busy');
+  let r; try{ r=await promise; }catch(e){ srcStatus('Network error',''); toast('Could not reach that source'); return; }
+  if(r&&r.detail){ srcStatus(r.detail,'err'); toast('⚠ '+r.detail); return; }
+  srcStatus(`✓ Extracting "${(r&&r.title)||label}" (${r&&r.chars||0} chars) → Review…`,'ok');
+  toast('● Extracting knowledge — filing into the tree…');
+  setView('decisions');
+  for(let k=0;k<6;k++){await new Promise(r=>setTimeout(r,1300)); await load();}
+  srcStatus('','');
+}
+async function ingestUrl(){
+  const i=document.getElementById('srcurl'); const url=(i&&i.value.trim())||'';
+  if(!url){toast('Paste a URL first');return;}
+  i.value='';
+  await _afterIngest(post('/ingest/url',{url}), url.replace(/^https?:\/\/(www\.)?/,'').slice(0,40));
+}
+async function ingestFile(input){
+  const f=input&&input.files&&input.files[0]; if(!f) return;
+  const fd=new FormData(); fd.append('file',f);
+  const opts={method:'POST',body:fd,headers:_token?{'x-crux-token':_token}:{}};
+  await _afterIngest(fetch('/ingest/file',opts).then(r=>r.json()), f.name);
+  input.value='';
+}
+window.ingestUrl=ingestUrl; window.ingestFile=ingestFile;
 let stmr; function wireSearch(){const i=document.getElementById("cap"); if(!i)return;
   i.addEventListener("input",e=>{clearTimeout(stmr);const q=e.target.value.trim();const box=document.getElementById("res");
     if(q.length<3){box.classList.remove("on");return;}
