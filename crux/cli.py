@@ -615,6 +615,17 @@ def cmd_reembed(args):
     print(f"✓ re-embedded {n} fact(s).")
 
 
+def cmd_build_tree(args):
+    """Place every still-unfiled fact into the KB taxonomy tree (and build its
+    nodes). Run once after upgrading a pre-tree database, or again after switching
+    to a real provider so placement improves. --root puts orphans under a top node."""
+    store = _store()
+    n = store.backfill_tree(root=args.root or "")
+    nodes = len(store.db.list_nodes())
+    store.close()
+    print(f"✓ filed {n} fact(s) into the tree · {nodes} node(s) total")
+
+
 def cmd_tidy(args):
     """Archive private working memory older than --days (keeps the backlog clean;
     nominations and verified facts are never touched)."""
@@ -889,6 +900,10 @@ def build_parser() -> argparse.ArgumentParser:
     nv.set_defaults(func=cmd_use_nvidia)
 
     sub.add_parser("reembed", help="recompute all embeddings with the current provider").set_defaults(func=cmd_reembed)
+
+    bt = sub.add_parser("build-tree", help="file unplaced facts into the KB taxonomy tree (run after upgrading)")
+    bt.add_argument("--root", default="", help="put any orphan facts under this top node, e.g. crux")
+    bt.set_defaults(func=cmd_build_tree)
 
     td = sub.add_parser("tidy", help="archive stale private working memory (backlog hygiene)")
     td.add_argument("--days", type=int, default=7)

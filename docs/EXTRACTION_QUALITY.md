@@ -119,16 +119,35 @@ has a *place* and contradictions are checked *in context*.
 - **Cross-branch relations** still live in `relations` (the existing graph edges):
   the tree is for navigation/placement, the graph for "this also relates to that."
 
+## Wired through the product (this change)
+
+The tree is no longer just a backend concept — the whole loop uses it:
+
+- **KB browsing** (`static/index.html`): a new **Tree** mode (now the default) in
+  Browse renders the taxonomy as a collapsible doc tree (nested counts roll up);
+  "By subject"/"By tag" remain. A fact's detail shows a **breadcrumb of where it
+  lives** (`Crux › Features › Review`) and an editable **path** field — re-file by
+  typing `crux/design-system/color`; ancestors are created and it moves at once.
+- **Review** shows each pending fact's **FILES INTO** path, so you see where a
+  learning will land (and what node it'll be conflict-checked against) before you
+  promote.
+- **`Save learnings to Review`** is fixed: it runs in the **background** (no more
+  hanging on a slow model — that was the "nothing happened"), gives immediate
+  feedback and jumps you to Review, and stages **one tree-placed fact per signal
+  card** (decisions/constraints/requirements/insights/results/references), skipping
+  prompts/notes/questions — instead of collapsing the thread into one blob.
+- **Editing/import/round-trip** all carry `subject_path`; `import_items`
+  rebuilds the node tree as facts land, and `crux build-tree [--root crux]`
+  back-fills a pre-tree database.
+- **Data migration**: `scripts/migrate_kb_tree.py` stamped `subject_path` onto the
+  committed `crux_kb.json` (filed under `crux/<area>`), so the demo KB ships with a
+  working tree. `export_items` now includes the field, so future exports keep it.
+
 ## Candidate next experiments (not done here)
 
-- **Browsable tree UI** in the dashboard (render `/tree`, click a node → its facts).
-- **Fix `Save learnings to Review`** (`promote_thread`): it runs the LLM
-  **synchronously on the request thread**, so a slow/unreachable model hangs the
-  button with no feedback ("nothing happened"), and it collapses the whole thread
-  into one over-merged fact. Background it like `/ingest`, show a pending→result
-  state, and place each learning in the tree.
-- **Visibility**: a pending/result indicator on every slow action (promote, ingest,
-  refine) so a click is never silent.
+- **LLM-quality placement on the demo data**: the committed tree is filed by domain
+  (offline). Running `crux build-tree` with a real provider would deepen it
+  (`crux/features/…`, `crux/design-system/…`).
 - **Doc/PDF/URL onboarding**: text extraction in front of the existing ingest →
   value-rich facts → placed in the tree → conflict-checked per node.
 - **A `reference`/spec ingest path** that keeps a token list verbatim as one

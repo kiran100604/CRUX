@@ -482,6 +482,13 @@
   .navitem.sel .ipill{background:rgba(255,255,255,.18); color:var(--on)}
   .nbadge{font-family:var(--mono); font-size:10px; color:var(--muted2)}
   .navitem.sel .nbadge{color:rgba(255,255,255,.7)}
+  /* tree browsing: deeper nodes read as sentence-case topics, not shouty headers */
+  .treenode .kbglabel{text-transform:none; letter-spacing:.01em; font-family:var(--sans); font-size:13px; font-weight:600}
+  .treenode .treenode .kbglabel{font-weight:500; color:var(--body)}
+  .treepath{display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-family:var(--mono); font-size:11.5px}
+  .pcrumb{background:var(--soft); border-radius:var(--pill); padding:2px 9px; color:var(--body)}
+  .pcrumb:last-child{background:var(--teal-bg); color:var(--teal)}
+  .psep{color:var(--muted2)}
   .kbdetail{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-lg); padding:28px 30px}
   .dhead{display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap}
   .dtitle{font-size:25px; color:var(--ink); margin:0 0 10px; letter-spacing:-.02em; line-height:1.2}
@@ -609,7 +616,7 @@ const rel=iso=>{if(!iso)return"";const d=(Date.now()-new Date(iso).getTime())/10
 const CORE=["decision","constraint"], MID=["architecture","design"], LEAF=["reference","context","exploration"];
 
 let state={view:"overview", items:[], inbox:[], working:[], conflicts:[], counts:{}, stats:{}, feed:[], expanded:{},
-  kbSel:null, kbMode:"subject", kbQuery:"", kbRelated:{}, leader:true,
+  kbSel:null, kbMode:"tree", kbQuery:"", kbRelated:{}, leader:true,
   lenses:[], kbLens:null, lensIds:null, workmem:[],
   threads:[], currentThread:null, openThread:null, threadView:null, unsorted:[], hotkey:"", activity:[], highlightCard:null,
   kbView:"ask", ask:{history:[],loading:false}, factPanel:null, factData:{}, kbOpen:{}};
@@ -903,8 +910,13 @@ async function finishThread(id){
   await post(`/threads/${id}/finish`,{}); toast("✓ Finished"); state.openThread=null; state.threadView=null; await load();
 }
 async function promoteThread(id){
+  // distillation runs in the BACKGROUND (an LLM per card) — give immediate, honest
+  // feedback and send the user to Review where the learnings will arrive on poll.
   const r=await post(`/threads/${id}/promote`,{});
-  toast(`✓ ${r.staged||0} learning(s) staged in Review`); await load();
+  const n=r.promotable||0;
+  toast(n?`✦ Distilling ${n} learning(s) into Review… they'll appear shortly`
+         :"Nothing durable to promote yet — dump some decisions first");
+  if(n){ closeThread(); setView('decisions'); }
 }
 async function copyBrief(id){
   // state-aware assembly: current working memory + KB relevant to right now
@@ -1146,6 +1158,7 @@ function vKBBrowse(main){
           </div>
           <div class="kbcount" id="kbcount"></div>
           <div class="kbmodes">
+            <button class="kbmode ${state.kbMode==='tree'?'on':''}" onclick="setKbMode('tree')">Tree</button>
             <button class="kbmode ${state.kbMode==='subject'?'on':''}" onclick="setKbMode('subject')">By subject</button>
             <button class="kbmode ${state.kbMode==='topic'?'on':''}" onclick="setKbMode('topic')">By tag</button>
           </div>
@@ -1194,6 +1207,7 @@ function kbSubjectGroups(main){
 }
 function kbNav(main){
   const conf=conflictIds();
+  if(state.kbMode==='tree') return kbTree(main,conf);
   const groups = state.kbMode==='topic' ? kbTopicGroups(main)
                : state.kbMode==='subject' ? kbSubjectGroups(main)
                : state.kbMode==='domain' ? kbDomainGroups(main)
@@ -1215,10 +1229,62 @@ function kbNav(main){
 function toggleGroup(el){
   const g=el.closest('.kbgroup'); if(!g) return;
   const k=g.dataset.key;
-  state.kbOpen[k]=!state.kbOpen[k];
-  g.classList.toggle('open', state.kbOpen[k]);
+  const now=!g.classList.contains('open');   // DOM-driven so default-open nodes work
+  state.kbOpen[k]=now;
+  g.classList.toggle('open', now);
 }
 window.toggleGroup=toggleGroup;
+
+/* ---- KB tree (taxonomy browsing): facts grouped by their subject_path ---- */
+function kbBuildTree(items){
+  const root={seg:'',path:'',children:{},items:[]}; const unfiled=[];
+  items.forEach(i=>{
+    const p=(i.subject_path||'').trim();
+    if(!p){ unfiled.push(i); return; }
+    let node=root;
+    p.split('/').forEach((s,idx,arr)=>{
+      node.children[s]=node.children[s]||{seg:s,path:arr.slice(0,idx+1).join('/'),children:{},items:[]};
+      node=node.children[s];
+    });
+    node.items.push(i);
+  });
+  return {root,unfiled};
+}
+function treeTotal(node){
+  return node.items.length + Object.values(node.children).reduce((a,c)=>a+treeTotal(c),0);
+}
+function prettySeg(s){ return (s||'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function kbTreeNode(node,conf,depth){
+  const key='tree:'+node.path;
+  const open = key in state.kbOpen ? state.kbOpen[key] : depth<1;   // roots open by default
+  const kids=Object.values(node.children).sort((a,b)=>treeTotal(b)-treeTotal(a));
+  const childHTML=kids.map(k=>kbTreeNode(k,conf,depth+1)).join("");
+  const ownItems=node.items.map(i=>navItem(i,conf)).join("");
+  return `<div class="kbgroup treenode ${open?'open':''}" data-key="${esc(key)}">
+    <div class="kbghead" onclick="toggleGroup(this)">
+      <span class="caret">▸</span>
+      <span class="kbglabel">${esc(prettySeg(node.seg))}</span>
+      <span class="gcount">${treeTotal(node)}</span>
+    </div>
+    <div class="kbgitems">${childHTML}${ownItems}</div>
+  </div>`;
+}
+function kbTree(items,conf){
+  const {root,unfiled}=kbBuildTree(items);
+  const roots=Object.values(root.children).sort((a,b)=>treeTotal(b)-treeTotal(a));
+  let html=roots.map(r=>kbTreeNode(r,conf,0)).join("");
+  if(unfiled.length){
+    const open=!!state.kbOpen['tree:__unfiled'];
+    html+=`<div class="kbgroup treenode ${open?'open':''}" data-key="tree:__unfiled">
+      <div class="kbghead" onclick="toggleGroup(this)">
+        <span class="caret">▸</span>
+        <span class="kbglabel">Unfiled <span class="gsub">not yet placed in the tree</span></span>
+        <span class="gcount">${unfiled.length}</span>
+      </div>
+      <div class="kbgitems">${unfiled.map(i=>navItem(i,conf)).join("")}</div></div>`;
+  }
+  return html || '<div class="muted2" style="font-size:13px;padding:8px">No facts yet.</div>';
+}
 function kbTierGroups(main){
   return TIER_ORDER.map(t=>[TIER_LABEL[t],TIER_DESC[t],main.filter(i=>(i.tier||'leaf')===t)])
     .filter(g=>g[2].length);
@@ -1255,16 +1321,20 @@ function kbDetail(it){
     : `<div class="dsection"><div class="pl">CONNECTIONS</div><div class="muted2" style="font-size:13px">No links yet. In Review, use “Extend” to connect related facts.</div></div>`;
   // Filing (level/topic) — editable for the leader so a wrong auto-classification
   // is a one-click fix, not a dead end. Read-only pills for members.
+  const crumb = it.subject_path
+    ? it.subject_path.split('/').map(s=>`<span class="pcrumb">${esc(prettySeg(s))}</span>`).join('<span class="psep">›</span>')
+    : '<span class="muted2" style="font-size:12px">unfiled — not yet placed in the tree</span>';
   const filingBlock = state.leader ? `
-    <div class="dsection"><div class="pl">How it's filed — change it anytime</div>
-      <div class="filing">
-        <span class="fsel"><span class="lbl">subject</span><input class="subin" value="${esc(it.subject||'')}" placeholder="what it's about…" onchange="saveFiling('${it.id}','subject',this.value)"/></span>
+    <div class="dsection"><div class="pl">Where it lives in the tree — change it anytime</div>
+      <div class="treepath">${crumb}</div>
+      <div class="filing" style="margin-top:8px">
+        <span class="fsel"><span class="lbl">path</span><input class="subin" style="min-width:240px" value="${esc(it.subject_path||'')}" placeholder="e.g. crux/features/review" onchange="saveFiling('${it.id}','subject_path',this.value)"/></span>
         <span class="fsel"><span class="lbl">level</span><select onchange="saveFiling('${it.id}','tier',this.value)">${TIER_ORDER.map(t=>`<option value="${t}" ${(it.tier||'leaf')===t?'selected':''}>${TIER_LABEL[t]}</option>`).join("")}</select></span>
       </div>
-      <div class="fhint">🛈 <b>CRUX filed this for you.</b> If it landed in the wrong place, pick the right one above — it sticks right away.</div>
+      <div class="fhint">🛈 <b>CRUX placed this in the tree for you.</b> Re-path it with a slash form like <span class="mono">crux/design-system/color</span> — it moves right away.</div>
     </div>`
-    : `<div class="dsection"><div class="pl">How it's filed</div>
-      <div class="filing">${it.subject?`<span class="ipill">${esc(it.subject)}</span>`:''}<span class="ipill tier-${it.tier||'leaf'}">${TIER_LABEL[it.tier||'leaf']}</span></div></div>`;
+    : `<div class="dsection"><div class="pl">Where it lives</div>
+      <div class="treepath">${crumb}</div></div>`;
   return `
     <div class="dhead">
       <span class="tier teal">◆ VERIFIED · ${esc(it.type)}${it.promoted_at?` · ${it.promoted_at.slice(0,10)}`:''}</span>
@@ -1368,6 +1438,7 @@ async function saveFiling(id,field,value){
   // tier is filing-only. Both re-render so the grouping updates immediately.
   await post(`/items/${id}/edit`,{[field]:value});
   toast(field==='tier'?"✓ Moved to "+TIER_LABEL[value]
+        : field==='subject_path'?(value.trim()?"✓ Moved to "+value.trim():"✓ Unfiled")
         : field==='subject'?(value.trim()?"✓ Subject set to “"+value.trim()+"”":"✓ Subject cleared")
         : "✓ Filed under "+(DOMAIN_LABEL[value]||value));
   await load();}
@@ -1421,8 +1492,12 @@ function inboxDeep(it){
   }
   const tier=it.tier||'leaf';
   const opt=(t)=>`<option value="${t}" ${t===tier?'selected':''}>${TIER_LABEL[t]} — ${TIER_DESC[t]}</option>`;
+  const pathCrumb = it.subject_path
+    ? `<div class="kv"><div class="pl">FILES INTO</div><div class="treepath">${it.subject_path.split('/').map(s=>`<span class="pcrumb">${esc(prettySeg(s))}</span>`).join('<span class="psep">›</span>')}</div></div>`
+    : '';
   return `<div class="ideep">
     <div class="kv"><div class="pl">EXTRACTED KNOWLEDGE</div><div class="extracted">${esc(it.summary||it.title)}</div></div>
+    ${pathCrumb}
     ${fit}
     <div class="discs">
       <details class="disc"><summary>Show original text</summary><div class="raw">${esc(it.raw_content||it.summary||it.title)}</div></details>

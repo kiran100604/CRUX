@@ -1229,3 +1229,36 @@ def test_contradiction_is_scoped_to_the_node(store):
     a = s2.capture("The cache size is 30 megabytes.", type_hint="reference")
     b = s2.capture("The cache size is 60 megabytes now.", type_hint="reference")
     assert a.subject_path == "" and b.subject_path == ""    # unplaced → global scan
+
+
+def test_promote_thread_is_per_card_and_skips_noise(store):
+    t = store.create_thread("api", "build the sync API", seed=False)
+    store.add_step("We will use Postgres for storage.", thread_id=t["id"], kind="decision")
+    store.add_step("All writes must be idempotent.", thread_id=t["id"], kind="constraint")
+    store.add_step("ok sounds good, thanks!", thread_id=t["id"], kind="note")        # noise
+    store.add_step("Draft me a migration script", thread_id=t["id"], kind="prompt")  # noise
+    facts = store.promote_thread(t["id"])
+    # one fact per SIGNAL card; the note and the prompt are dropped
+    assert len(facts) == 2
+    types = sorted(f.type for f in facts)
+    assert types == ["constraint", "decision"]        # kind→type mapping applied
+
+
+def test_backfill_tree_files_unplaced_facts(store):
+    a = store.capture("Latency budget is tight.", type_hint="constraint")
+    assert a.subject_path == ""                        # offline + no subject → unplaced
+    n = store.backfill_tree(root="crux")
+    assert n >= 1
+    moved = store.db.get(a.id)
+    assert moved.subject_path.startswith("crux/")      # orphan filed under the root
+    assert store.db.get_node(moved.subject_path) is not None   # node materialized
+
+
+def test_edit_subject_path_moves_fact_and_builds_node(store):
+    a = store.capture("Webhooks retry with backoff.", type_hint="reference")
+    store.edit(a.id, subject_path="Crux / Features / Webhooks")   # messy input
+    moved = store.db.get(a.id)
+    assert moved.subject_path == "crux/features/webhooks"         # normalized
+    assert store.db.get_node("crux/features/webhooks") is not None
+    assert store.db.get_node("crux/features") is not None         # ancestor too
+    assert any(f["id"] == a.id for f in store.node_facts("crux/features"))
