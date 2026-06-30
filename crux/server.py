@@ -372,6 +372,25 @@ def create_app(cfg: Config):
     def related(id: str, limit: int = 6):
         return {"items": store.related(id, limit)}
 
+    @app.get("/tree")
+    def tree():
+        # the KB taxonomy: every node with its direct + recursive fact counts, so
+        # the dashboard can render the knowledge base as a browsable doc tree
+        return {"nodes": store.tree()}
+
+    @app.get("/tree/facts")
+    def tree_facts(path: str):
+        # the facts living at a node or anywhere beneath it (subtree view)
+        return {"path": path, "items": _enrich_paths(store.node_facts(path))}
+
+    def _enrich_paths(items: list[dict]) -> list[dict]:
+        counts = store.db.usage_counts()
+        last = store.db.usage_last()
+        for d in items:
+            d["usage_count"] = counts.get(d["id"], 0)
+            d["last_used"] = last.get(d["id"])
+        return items
+
     class AskIn(BaseModel):
         question: str
         history: list[dict] = []

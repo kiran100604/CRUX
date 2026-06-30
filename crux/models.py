@@ -129,7 +129,8 @@ class ContextItem:
     type: str
     tier: str = "leaf"  # core | mid | leaf — altitude, set by enrichment
     domain: str = "other"  # product | technical | user | market | … — coarse area (legacy)
-    subject: str = ""   # the specific thing it's ABOUT (service/feature/area) — scoping key
+    subject: str = ""   # the specific thing it's ABOUT (service/feature/area) — leaf label
+    subject_path: str = ""  # where it lives in the KB tree, e.g. crux/features/review
     tags: list[str] = field(default_factory=list)
     source: str | None = None
     scope: str = "individual"  # everything starts in the working layer
@@ -162,6 +163,7 @@ class ContextItem:
             tier=(row["tier"] if "tier" in row.keys() else None) or "leaf",
             domain=(row["domain"] if "domain" in row.keys() else None) or "other",
             subject=(row["subject"] if "subject" in row.keys() else None) or "",
+            subject_path=(row["subject_path"] if "subject_path" in row.keys() else None) or "",
             tags=json.loads(row["tags"] or "[]"),
             source=row["source"],
             scope=row["scope"],

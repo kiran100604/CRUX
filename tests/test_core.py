@@ -1179,3 +1179,53 @@ def test_offline_working_memory_stays_grounded(store):
                  "for inspiration", "identified the need"]
     assert filler_hits(memory, forbidden) == []
     assert "hexagon" in memory.lower()        # grounded in the real capture
+
+
+# --- KB tree (taxonomy) ------------------------------------------------------
+
+def test_fake_place_uses_hint_then_domain_subject():
+    from crux.processing import FakeProcessor
+    p = FakeProcessor()
+    # a section-path hint is real structure → used verbatim (slugified)
+    r = p.place({"subject": "color", "domain": "design"}, hint="Crux › Design System › Color")
+    assert r["path"] == "crux/design-system/color"
+    # no hint → file by domain/subject
+    r2 = p.place({"subject": "review", "domain": "product"})
+    assert r2["path"] == "product/review"
+    # no signal at all → unplaced (None), never a guess
+    assert p.place({"subject": "", "domain": "other"}) is None
+
+
+def test_ingest_builds_nested_tree_from_headings(store):
+    doc = ("# Crux\n## Features\n### Review\nFacts are promoted to Review.\n"
+           "### Working memory\nThe thread keeps a living timeline.\n"
+           "## Design System\n### Color\nCanvas is #fdf8ec and ink is #080808.\n")
+    store.ingest(doc, source_type="file", source_ref="design.md")
+    paths = {n["path"]: n for n in store.tree()}
+    assert "crux/features/review" in paths
+    assert "crux/features/working-memory" in paths
+    assert "crux/design-system/color" in paths
+    # parent rolls up its descendants' facts; the root totals everything
+    assert paths["crux/features"]["total"] == 2
+    assert paths["crux"]["total"] == 3
+    assert paths["crux/features"]["count"] == 0      # no fact lives directly on the parent
+    # subtree view returns everything beneath a node
+    assert len(store.node_facts("crux/features")) == 2
+    assert len(store.node_facts("crux/design-system/color")) == 1
+
+
+def test_contradiction_is_scoped_to_the_node(store):
+    # two facts that DISAGREE on the same topic, filed into the same node by their
+    # heading path — flagged even though their similarity (~0.72) is below the
+    # global 0.90 bar, because within one node a differently-worded opposite counts.
+    store.ingest("# Crux\n## Config\n### Timeout\nThe request timeout is 30 seconds.",
+                 source_type="file", source_ref="a.md")
+    store.ingest("# Crux\n## Config\n### Timeout\nThe request timeout is 60 seconds now.",
+                 source_type="file", source_ref="b.md")
+    assert store.open_conflicts(), "a same-node contradiction should be flagged"
+    # the same disagreement with NO node (plain captures) stays under the global
+    # bar — confirming the scoping, not a looser global threshold, is what caught it
+    s2 = store
+    a = s2.capture("The cache size is 30 megabytes.", type_hint="reference")
+    b = s2.capture("The cache size is 60 megabytes now.", type_hint="reference")
+    assert a.subject_path == "" and b.subject_path == ""    # unplaced → global scan

@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS items (
     tier            TEXT NOT NULL DEFAULT 'leaf',
     domain          TEXT NOT NULL DEFAULT 'other',
     subject         TEXT NOT NULL DEFAULT '',
+    subject_path    TEXT NOT NULL DEFAULT '',
     tags            TEXT NOT NULL DEFAULT '[]',
     source          TEXT,
     scope           TEXT NOT NULL DEFAULT 'individual',
@@ -208,12 +209,28 @@ CREATE TABLE IF NOT EXISTS lenses (
     intent     TEXT,
     created_at TEXT NOT NULL
 );
+
+-- the KB taxonomy: a growing tree of subjects, like documentation. Each fact
+-- lives at one node (items.subject_path); a node is one segment of a slash path
+-- (e.g. "crux/features/working-memory"). The tree is what makes "where does this
+-- new knowledge go?" and "what does it contradict?" answerable — placement picks
+-- a node, contradiction-checking compares within a node's subtree. Cross-branch
+-- relations still live in `relations` (knowledge is a graph, navigated as a tree).
+CREATE TABLE IF NOT EXISTS nodes (
+    path        TEXT PRIMARY KEY,   -- canonical slug path, e.g. crux/features/review
+    title       TEXT NOT NULL,      -- human label for this segment, e.g. "Review"
+    parent      TEXT,               -- parent path; NULL/'' for a root
+    description TEXT,               -- one line: what knowledge lives under here
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent);
 """
 
 # columns a caller may update via `update()` — whitelist guards against injection
-_UPDATABLE = {"title", "summary", "type", "tier", "domain", "subject", "tags", "source", "scope",
-              "owner", "proposed", "confidence", "superseded_by", "archived",
-              "promoted_at", "version"}
+_UPDATABLE = {"title", "summary", "type", "tier", "domain", "subject", "subject_path",
+              "tags", "source", "scope", "owner", "proposed", "confidence",
+              "superseded_by", "archived", "promoted_at", "version"}
 
 
 class Database:
@@ -260,6 +277,8 @@ class Database:
             self.conn.execute("ALTER TABLE items ADD COLUMN domain TEXT NOT NULL DEFAULT 'other'")
         if "subject" not in cols:
             self.conn.execute("ALTER TABLE items ADD COLUMN subject TEXT NOT NULL DEFAULT ''")
+        if "subject_path" not in cols:
+            self.conn.execute("ALTER TABLE items ADD COLUMN subject_path TEXT NOT NULL DEFAULT ''")
         if "owner" not in cols:
             self.conn.execute("ALTER TABLE items ADD COLUMN owner TEXT")
         if "proposed" not in cols:
@@ -537,13 +556,13 @@ class Database:
 
     def insert(self, item: ContextItem, embedding: list[float]) -> ContextItem:
         self.conn.execute(
-            """INSERT INTO items (id, raw_content, title, summary, type, tier, domain, subject, tags, source,
+            """INSERT INTO items (id, raw_content, title, summary, type, tier, domain, subject, subject_path, tags, source,
                    scope, owner, proposed, confidence, superseded_by, archived, embedding, embedding_model,
                    content_hash, version, promoted_at, source_episode_id, locator,
                    captured_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (item.id, item.raw_content, item.title, item.summary, item.type, item.tier,
-             item.domain, item.subject, json.dumps(item.tags), item.source, item.scope, item.owner,
+             item.domain, item.subject, item.subject_path, json.dumps(item.tags), item.source, item.scope, item.owner,
              int(item.proposed), item.confidence,
              item.superseded_by, int(item.archived), pack(embedding), item.embedding_model,
              item.content_hash, item.version, item.promoted_at, item.source_episode_id,
@@ -610,6 +629,48 @@ class Database:
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         for row in self.conn.execute(f"SELECT id, embedding FROM items{where}", params):
             yield row["id"], unpack(row["embedding"])
+
+    # --- KB taxonomy (the tree) ---------------------------------------------
+
+    def upsert_node(self, path: str, title: str, parent: str | None,
+                    description: str, ts: str) -> None:
+        """Create a node, or refresh its title/description if it already exists.
+        Idempotent — ensuring an ancestor twice is a no-op."""
+        self.conn.execute(
+            """INSERT INTO nodes (path, title, parent, description, created_at, updated_at)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(path) DO UPDATE SET
+                   title=excluded.title,
+                   description=CASE WHEN excluded.description!='' THEN excluded.description
+                                    ELSE nodes.description END,
+                   updated_at=excluded.updated_at""",
+            (path, title, parent or None, description or "", ts, ts))
+        self.conn.commit()
+
+    def get_node(self, path: str) -> dict | None:
+        row = self.conn.execute("SELECT * FROM nodes WHERE path=?", (path,)).fetchone()
+        return dict(row) if row else None
+
+    def list_nodes(self) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM nodes ORDER BY path")]
+
+    def subtree_item_ids(self, path: str, include_archived: bool = False) -> list[str]:
+        """Ids of every live fact at `path` OR any descendant node — the scope a
+        contradiction check or a node view should compare within."""
+        clauses = ["(subject_path=? OR subject_path LIKE ?)"]
+        params: list = [path, path + "/%"]
+        if not include_archived:
+            clauses.append("archived=0")
+        sql = f"SELECT id FROM items WHERE {' AND '.join(clauses)}"
+        return [r["id"] for r in self.conn.execute(sql, params)]
+
+    def node_counts(self) -> dict[str, int]:
+        """Direct (non-recursive) live-fact count per node path."""
+        rows = self.conn.execute(
+            "SELECT subject_path AS p, COUNT(*) AS n FROM items "
+            "WHERE archived=0 AND subject_path!='' GROUP BY subject_path")
+        return {r["p"]: r["n"] for r in rows}
 
     def fts_search(self, query: str, limit: int, include_archived: bool = False,
                    scope: str | None = None):
