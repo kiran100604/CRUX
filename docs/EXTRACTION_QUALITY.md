@@ -91,13 +91,45 @@ LLM produces those). **Set a real provider key and re-run** to see true numbers
 and to measure a prompt change before/after. Fixtures live in
 `eval/extract_cases.json`; add cases as you dogfood.
 
+## Tree-structured KB (the foundation, shipped)
+
+The flat `subject` string is now backed by a **taxonomy tree** — the KB grows like
+documentation (a product at the root → areas → topics → details), so new knowledge
+has a *place* and contradictions are checked *in context*.
+
+- **Schema** (`db.py`): a `nodes` table (`path`, `title`, `parent`, `description`)
+  and a `subject_path` column on items (e.g. `crux/design-system/color`). Both
+  added via the in-place migration; existing DBs upgrade on open.
+- **Placement** (`processing.py::place`): when a fact is stored, the processor
+  picks the node it belongs at — **reusing** an existing path when one fits,
+  proposing a new one otherwise. Markdown heading trails ("Review › Conflicts")
+  are passed as a structural hint, so even **offline** a document builds a properly
+  nested tree from its own structure; the LLM placer handles free-form pastes and
+  keeps the root stable. A placement failure never blocks the write — the fact
+  just lands unplaced.
+- **Node-scoped contradiction** (`store.py::_detect_conflicts`): a new fact is
+  compared against its **subtree** (same node + descendants), not the whole KB.
+  Within a node the candidates are already about the same thing, so a contradiction
+  is flagged at a *lower* similarity (0.72 vs the global 0.90) — it catches
+  differently-worded opposites ("timeout is 30s" vs "60s") the global scan missed,
+  while not firing on lexical lookalikes in unrelated areas.
+- **Reading it** (`store.py::tree`, `/tree` + `/tree/facts`): every node with its
+  direct and rolled-up (recursive) fact counts, plus a subtree fact view — the
+  data a browsable doc-tree UI renders from.
+- **Cross-branch relations** still live in `relations` (the existing graph edges):
+  the tree is for navigation/placement, the graph for "this also relates to that."
+
 ## Candidate next experiments (not done here)
 
-- **Chunking for structured pastes.** A Figma-style export has section labels
-  ("Colors", "Typography", "Iconography") but no `#` markdown, so the chunker
-  treats it as prose and packs it into 1400-char blocks — the section headings
-  never become locators/subjects. Teaching the chunker to recognize these labels
-  would give each section its own chunk + subject and a much cleaner fact. Risky
-  heuristic; gate it behind the harness.
+- **Browsable tree UI** in the dashboard (render `/tree`, click a node → its facts).
+- **Fix `Save learnings to Review`** (`promote_thread`): it runs the LLM
+  **synchronously on the request thread**, so a slow/unreachable model hangs the
+  button with no feedback ("nothing happened"), and it collapses the whole thread
+  into one over-merged fact. Background it like `/ingest`, show a pending→result
+  state, and place each learning in the tree.
+- **Visibility**: a pending/result indicator on every slow action (promote, ingest,
+  refine) so a click is never silent.
+- **Doc/PDF/URL onboarding**: text extraction in front of the existing ingest →
+  value-rich facts → placed in the tree → conflict-checked per node.
 - **A `reference`/spec ingest path** that keeps a token list verbatim as one
   pullable reference rather than atomizing it at all.

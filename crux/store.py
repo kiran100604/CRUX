@@ -101,11 +101,91 @@ class Store:
             promoted_at=now_iso() if scope == "main" else None,
             embedding_model=self.embedder.model, content_hash=h,
             source_episode_id=episode_id, locator=locator or None)
+        # File the fact into the KB tree BEFORE write, so it's stored with its node
+        # and contradiction-checking can scope to that node's subtree.
+        item.subject_path = self._place_in_tree(item, locator=locator)
         vec = self.embedder.embed(self._descriptor(
             subject=item.subject, type=item.type, title=item.title, summary=item.summary))
         stored = self.db.insert(item, vec)
         self._detect_conflicts(stored)  # flag contradictions at write time
         return stored
+
+    # --- KB tree: where each fact lives, so the KB grows like documentation ---
+
+    def _tree_outline(self, limit: int = 200) -> str:
+        """The current taxonomy as `path | description` lines — the context the
+        placer reasons over to reuse a node instead of inventing a near-duplicate."""
+        lines = []
+        for n in self.db.list_nodes()[:limit]:
+            desc = (n.get("description") or "").strip()
+            lines.append(f"{n['path']} | {desc}" if desc else n["path"])
+        return "\n".join(lines)
+
+    def _ensure_node_path(self, path: str, leaf_title: str | None = None,
+                          leaf_desc: str = "") -> None:
+        """Materialize a path and every ancestor as nodes (idempotent). Intermediate
+        segments get a title derived from the slug; the leaf keeps the placer's
+        title/description so the deepest node reads well."""
+        segs = [s for s in path.split("/") if s]
+        ts = now_iso()
+        for i, seg in enumerate(segs):
+            p = "/".join(segs[: i + 1])
+            parent = "/".join(segs[:i]) or None
+            is_leaf = i == len(segs) - 1
+            title = (leaf_title if is_leaf and leaf_title
+                     else seg.replace("-", " ").capitalize())
+            self.db.upsert_node(p, title, parent, leaf_desc if is_leaf else "", ts)
+
+    @staticmethod
+    def _locator_path(locator: str | None) -> str:
+        """A markdown heading trail ("Review › Conflicts") is itself a tree path —
+        turn it into a slug path ("review/conflicts") to seed placement with the
+        document's real structure."""
+        if not locator:
+            return ""
+        from .processing import _norm_path
+        segs = [s for s in re.split(r"›|/", locator) if s.strip()]
+        return _norm_path("/".join(s.strip() for s in segs))
+
+    def _place_in_tree(self, item: ContextItem, *, locator: str | None = None) -> str:
+        """Ask the processor which node this fact belongs at (reuse or new), then
+        ensure that node + ancestors exist. Best-effort: a placement failure must
+        never block the write — the fact just lands unplaced (subject_path='')."""
+        try:
+            res = self.processor.place(
+                {"title": item.title, "summary": item.summary,
+                 "subject": item.subject, "domain": item.domain, "type": item.type},
+                tree=self._tree_outline(), hint=self._locator_path(locator))
+        except Exception:
+            res = None
+        if not res or not res.get("path"):
+            return ""
+        self._ensure_node_path(res["path"], res.get("title"), res.get("description", ""))
+        return res["path"]
+
+    def tree(self) -> list[dict]:
+        """The KB taxonomy for display: each node with its direct fact count and a
+        recursive total (so a parent shows how much lives beneath it)."""
+        nodes = self.db.list_nodes()
+        direct = self.db.node_counts()
+        total: dict[str, int] = {}
+        for n in nodes:                       # roll direct counts up to every ancestor
+            segs = n["path"].split("/")
+            for i in range(len(segs)):
+                total["/".join(segs[: i + 1])] = total.get("/".join(segs[: i + 1]), 0)
+        for path, c in direct.items():
+            segs = path.split("/")
+            for i in range(len(segs)):
+                anc = "/".join(segs[: i + 1])
+                total[anc] = total.get(anc, 0) + c
+        return [{**n, "count": direct.get(n["path"], 0),
+                 "total": total.get(n["path"], 0)} for n in nodes]
+
+    def node_facts(self, path: str) -> list[dict]:
+        """The facts that live at a node or anywhere beneath it (subtree view)."""
+        ids = set(self.db.subtree_item_ids(path))
+        return [it.to_public_dict() for it in self.db.list(archived=False, limit=100000)
+                if it.id in ids and not it.superseded_by]
 
     def capture(self, content: str, *, source: str | None = None,
                 type_hint: str | None = None, scope: str = "individual",
@@ -216,6 +296,7 @@ class Store:
                 tier=d.get("tier", "leaf"),
                 domain=d.get("domain", "other"),
                 subject=d.get("subject", ""),
+                subject_path=d.get("subject_path", ""),
                 tags=d.get("tags", []),
                 source=d.get("source"),
                 scope=d.get("scope", "individual"),
@@ -1018,24 +1099,38 @@ class Store:
 
     # --- contradiction-aware writes (the "neighborhood update") --------------
 
-    NEIGH_THRESHOLD = 0.80   # only check genuinely close neighbors
-    HEURISTIC_FLAG = 0.90    # offline (no LLM judge): flag above this similarity
+    NEIGH_THRESHOLD = 0.80   # global scan: only check genuinely close neighbors
+    HEURISTIC_FLAG = 0.90    # global, offline (no LLM judge): flag above this similarity
+    # Within a fact's own KB node the candidates are already about the same thing,
+    # so a contradiction is meaningful at lower similarity (differently-worded
+    # opposites) — scan wider and flag (offline) at a lower bar than the global scan.
+    NODE_NEIGH_THRESHOLD = 0.55
+    NODE_HEURISTIC_FLAG = 0.72
     MAX_CHECK = 3            # cap judgments per new fact (bounds cost on bulk ingest)
 
     def _detect_conflicts(self, item: ContextItem) -> None:
         """When a fact lands, scan its neighborhood and flag likely
         contradictions — LLM-judged with a real key, similarity-based offline.
-        Never auto-resolves; just records candidates for the human in Review."""
+        Scoped to the fact's KB-tree subtree when it has one (apples-to-apples;
+        fewer false positives, catches differently-worded opposites), else a global
+        neighborhood scan. Never auto-resolves; records candidates for Review."""
         from .embeddings import cosine
         vec = self.db.embedding_of(item.id)
         if not vec:
             return
+        if item.subject_path:
+            ids = self.db.subtree_item_ids(item.subject_path)
+            candidates = ((oid, self.db.embedding_of(oid)) for oid in ids)
+            neigh, flag = self.NODE_NEIGH_THRESHOLD, self.NODE_HEURISTIC_FLAG
+        else:
+            candidates = self.db.all_embeddings()  # non-archived only
+            neigh, flag = self.NEIGH_THRESHOLD, self.HEURISTIC_FLAG
         sims = []
-        for oid, ovec in self.db.all_embeddings():  # non-archived only
+        for oid, ovec in candidates:
             if oid == item.id or not ovec:
                 continue
             s = cosine(vec, ovec)
-            if s >= self.NEIGH_THRESHOLD:
+            if s >= neigh:
                 sims.append((s, oid))
         sims.sort(reverse=True)
         for s, oid in sims[: self.MAX_CHECK]:
@@ -1045,7 +1140,7 @@ class Store:
             if other.source_episode_id and other.source_episode_id == item.source_episode_id:
                 continue  # facts from the same document aren't contradictions
             verdict, reason = self.processor.judge_contradiction(item.summary, other.summary)
-            flagged = (s >= self.HEURISTIC_FLAG) if verdict is None else verdict
+            flagged = (s >= flag) if verdict is None else verdict
             if flagged:
                 self.db.add_conflict(item.id, oid, round(s, 3),
                                      reason or f"{int(s * 100)}% similar", now_iso())

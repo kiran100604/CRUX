@@ -339,6 +339,36 @@ Plain text only — NO markdown, NO asterisks, no preamble or heading; use leadi
 spaces to indent detail lines. Just the timeline."""
 
 
+_PLACE_PROMPT = """You maintain a knowledge base organized as a TREE of subjects,
+like documentation: a product at the root, then areas (overview, features,
+market, design), then specific topics, then details. You decide where a NEW FACT
+belongs so the KB reads like a well-organized doc, not a flat pile.
+
+CURRENT TREE (path | one-line description). Empty means the KB is brand new.
+{tree}
+
+NEW FACT:
+  title:   {title}
+  summary: {summary}
+  about:   {subject}
+  type:    {type}
+  source section (a structural hint, may be empty): {hint}
+
+Return ONLY minified JSON:
+{{"path":"<slug/slug/slug>","title":"<label for the LAST segment, <=4 words>",
+  "description":"<one line: what knowledge lives at this node>","reason":"<=10 words"}}
+
+Rules:
+- path is lowercase slugs joined by "/", coarse→specific (e.g.
+  "crux/features/working-memory" or "crux/design-system/color"). 2-4 segments.
+- REUSE an existing path when the fact clearly belongs there — do NOT invent a
+  near-duplicate (don't add "colors" next to an existing "color"). Match by meaning.
+- Add a NEW leaf only when the fact is genuinely a distinct topic. Keep the root
+  STABLE — everything about one product shares the same first segment.
+- Details (implementation specifics, exact values) nest UNDER the feature/area
+  they detail (e.g. a token list → "<product>/design-system/color")."""
+
+
 _ANSWER_PROMPT = """You answer questions about a team's own knowledge base. Use
 ONLY the numbered FACTS below — they are the team's verified knowledge. Cite the
 facts you rely on inline as [n]. If the facts don't cover the question, say so
@@ -354,6 +384,35 @@ FACTS:
 QUESTION: {question}
 
 Answer (grounded in the facts, with [n] citations):"""
+
+
+def slug(text: str) -> str:
+    """A path segment: lowercase, spaces/punct → single hyphens, trimmed."""
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "").strip().lower()).strip("-")
+    return s[:40]
+
+
+def _norm_path(path: str, depth: int = 4) -> str:
+    """Clean an LLM/heuristic path into canonical slug/slug form, capped depth.
+    Accepts either "/" or "›" (a markdown heading trail) as the segment separator."""
+    segs = [slug(p) for p in re.split(r"[/›]", str(path or ""))]
+    segs = [s for s in segs if s][:depth]
+    return "/".join(segs)
+
+
+def _parse_place(text: str) -> dict | None:
+    """Parse the placer's JSON into {path, title, description}; None if unusable."""
+    try:
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        d = json.loads(m.group(0) if m else text)
+    except Exception:
+        return None
+    path = _norm_path(d.get("path", ""))
+    if not path:
+        return None
+    return {"path": path,
+            "title": (str(d.get("title", "")).strip() or path.split("/")[-1]),
+            "description": str(d.get("description", "")).strip()[:160]}
 
 
 @dataclass
@@ -513,6 +572,26 @@ class FakeProcessor:
                        *, incremental: bool = False) -> str:
         return _offline_timeline(items, prior, incremental)
 
+    def place(self, fact: dict, tree: str = "", root: str = "", hint: str = "") -> dict | None:
+        # Offline can't reason about a tree, but it can still file deterministically.
+        # A `hint` (the source section path, e.g. "review/conflicts" from markdown
+        # headings) is real structure — prefer it so the offline tree actually nests.
+        # Otherwise fall back to domain → subject. Real placement (a coherent
+        # product/feature tree) needs a model. Returns None when there's nothing to
+        # file on, so the caller leaves it unplaced rather than guessing.
+        if _norm_path(hint):
+            path = _norm_path(hint)
+        else:
+            subject = slug(fact.get("subject", ""))
+            domain = slug(fact.get("domain", "")) if fact.get("domain") not in (None, "other") else ""
+            segs = [s for s in (root, domain, subject) if s]
+            if not segs:
+                return None
+            path = "/".join(dict.fromkeys(segs))   # dedupe repeated segment
+        leaf = (fact.get("subject") or path.split("/")[-1].replace("-", " ")).strip()
+        return {"path": path, "title": leaf.title()[:40] or path.split("/")[-1],
+                "description": ""}
+
 
 class AnthropicProcessor:
     def __init__(self, model: str, api_key: str | None):
@@ -646,6 +725,22 @@ class AnthropicProcessor:
             return entries if entries else FakeProcessor.extract_entries(self, content)
         except Exception:
             return FakeProcessor.extract_entries(self, content)
+
+    def place(self, fact: dict, tree: str = "", root: str = "", hint: str = "") -> dict | None:
+        """Pick the KB-tree node a fact belongs at — reusing an existing path when
+        one fits, proposing a new one otherwise — so the KB grows like documentation.
+        `hint` (the source section path) is offered as a structural prior. Falls back
+        to the offline filing on any failure."""
+        try:
+            text = self._call(_PLACE_PROMPT.format(
+                tree=tree or "(empty — this is the first fact)",
+                title=fact.get("title", "")[:120], summary=fact.get("summary", "")[:400],
+                subject=fact.get("subject", "") or "(unspecified)",
+                hint=hint or "(none)",
+                type=fact.get("type", "context")), 180)
+            return _parse_place(text) or FakeProcessor.place(self, fact, tree, root, hint)
+        except Exception:
+            return FakeProcessor.place(self, fact, tree, root, hint)
 
     def answer(self, question: str, facts: list, history: list | None = None) -> str:
         """Grounded Q&A over the knowledge base: synthesize an answer from the
