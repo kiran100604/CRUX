@@ -75,7 +75,7 @@ def _route_pending(cfg: Config, thread_id: str) -> None:
 
 def create_app(cfg: Config):
     try:
-        from fastapi import FastAPI, HTTPException, Request
+        from fastapi import FastAPI, File, HTTPException, Request, UploadFile
         from fastapi.responses import FileResponse, RedirectResponse
         from pydantic import BaseModel
     except ImportError as e:  # pragma: no cover
@@ -360,6 +360,43 @@ def create_app(cfg: Config):
                                   body.source_type, body.source_ref)
         return {"episode_id": ep.id, "status": "processing"}
 
+    def _ingest_text(text: str, source_ref: str, title: str | None):
+        """Shared tail for URL/file ingest: persist the episode, extract facts in
+        the background (chunk→place in tree→conflict-check), return its id."""
+        text = (text or "").strip()
+        if not text:
+            raise HTTPException(status_code=422, detail="no text extracted from that source")
+        ep = store.create_episode(text, source_type="file", source_ref=source_ref, title=title)
+        app.state.executor.submit(_bg_process, cfg, ep.id, text, "file", source_ref)
+        return {"episode_id": ep.id, "status": "processing", "chars": len(text),
+                "title": title or source_ref}
+
+    class UrlIn(BaseModel):
+        url: str
+
+    @app.post("/ingest/url")
+    def ingest_url(body: UrlIn):
+        # Onboarding: pull a web page / online doc / PDF link into the KB.
+        from .ingest_sources import SourceError, fetch_url
+        try:
+            text, title = fetch_url(body.url)
+        except SourceError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        return _ingest_text(text, source_ref=body.url, title=title)
+
+    @app.post("/ingest/file")
+    async def ingest_upload(file: UploadFile = File(...)):
+        # Onboarding: upload a PDF / markdown / HTML / text doc → facts in the tree.
+        from .ingest_sources import SourceError, extract_text
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=422, detail="empty file")
+        try:
+            text, title = extract_text(file.filename or "upload", data)
+        except SourceError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        return _ingest_text(text, source_ref=(file.filename or "upload"), title=title)
+
     @app.post("/items/{item_id}/edit")
     def edit(item_id: str, body: EditIn, request: Request):
         _leader(request)
@@ -598,6 +635,22 @@ def create_app(cfg: Config):
     @app.get("/unsorted")
     def unsorted():
         return {"steps": [e.to_public_dict() for e in store.db.unsorted_steps()]}
+
+    @app.post("/unsorted/{step_id}/ingest")
+    def unsorted_ingest(step_id: str):
+        # extract a loose capture into KB facts (lands in Review); then it's gone
+        return store.ingest_step(step_id)
+
+    @app.post("/unsorted/{step_id}/to-thread")
+    def unsorted_to_thread(step_id: str):
+        t = store.thread_from_step(step_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="no such capture")
+        return t
+
+    @app.delete("/unsorted/{step_id}")
+    def unsorted_delete(step_id: str):
+        return {"ok": store.delete_step(step_id)}
 
     class RetrieveIn(BaseModel):
         prompt: str

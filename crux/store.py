@@ -534,6 +534,44 @@ class Store:
         return {"episode": self.db.get_episode(ep.id).to_public_dict(),
                 "thread_id": thread_id, "card_id": ep.id, "tagged": tagged}
 
+    # --- unsorted captures: a dump made with no active thread ----------------
+    # Without these, a capture taken before any thread exists (the popup/hotkey,
+    # or a paste while no thread is current) is a dead end — visible but inert.
+    # These give it the three things you can sensibly do with it.
+
+    def ingest_step(self, step_id: str) -> dict:
+        """Turn a loose capture into KB facts: run it through the document pipeline
+        (chunk → extract → place in the tree → conflict-check → Review), then drop
+        the raw step. The learnings land in Review like any other ingest."""
+        ep = self.db.get_episode(step_id)
+        if not ep:
+            return {"ok": False, "facts": 0}
+        res = self.ingest((ep.raw_content or "").strip(), source_type="paste",
+                          source_ref=ep.source_ref or "capture")
+        self.db.delete_episode(step_id)
+        return {"ok": True, "facts": len(res["facts"])}
+
+    def thread_from_step(self, step_id: str) -> dict | None:
+        """Promote a loose capture into a new working thread (it becomes the first
+        dump), so you can keep working from it instead of losing it."""
+        ep = self.db.get_episode(step_id)
+        if not ep:
+            return None
+        title = " ".join((ep.raw_content or "").split())[:50] or "New thread"
+        t = self.create_thread(title, "", seed=False)
+        self.add_step(ep.raw_content, thread_id=t["id"], source=ep.source_type or "note",
+                      source_ref=ep.source_ref, route=True)
+        self.db.delete_episode(step_id)
+        self.set_current_thread(t["id"])
+        return self.thread_view(t["id"])
+
+    def delete_step(self, step_id: str) -> bool:
+        ep = self.db.get_episode(step_id)
+        if not ep:
+            return False
+        self.db.delete_episode(step_id)
+        return True
+
     def resolve_thread(self, ref: str | None, *, create: bool = False) -> str | None:
         """Map a project reference (thread id, or exact active title) to a thread id.
         Falls back to the current thread when ref is empty. With create=True, an

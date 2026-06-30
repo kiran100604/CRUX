@@ -1262,3 +1262,64 @@ def test_edit_subject_path_moves_fact_and_builds_node(store):
     assert store.db.get_node("crux/features/webhooks") is not None
     assert store.db.get_node("crux/features") is not None         # ancestor too
     assert any(f["id"] == a.id for f in store.node_facts("crux/features"))
+
+
+# --- doc/PDF/URL onboarding + unsorted-capture actions -----------------------
+
+def test_ingest_sources_extract_text():
+    from crux.ingest_sources import html_to_text, extract_text, SourceError
+    txt, title = html_to_text("<title>Docs</title><body><h1>Setup</h1>"
+                              "<p>Use the API key.</p><script>x()</script></body>")
+    assert "Setup" in txt and "Use the API key." in txt and "x()" not in txt
+    assert title == "Docs"
+    t2, _ = extract_text("notes.txt", b"plain decision text")
+    assert t2 == "plain decision text"
+    with pytest.raises(SourceError):
+        extract_text("empty.txt", b"")
+
+
+def test_unsorted_capture_actions(store):
+    r = store.add_step("CRUX color tokens: canvas #fdf8ec, ink #080808", source="note")
+    sid = r["card_id"]
+    assert r["thread_id"] is None and len(store.db.unsorted_steps()) == 1
+    # extract → facts staged, the loose step consumed
+    res = store.ingest_step(sid)
+    assert res["ok"] and res["facts"] >= 1
+    assert len(store.db.unsorted_steps()) == 0
+    # a second loose capture → promoted into a fresh thread (as its first dump)
+    r2 = store.add_step("explore retrieval approaches", source="note")
+    tv = store.thread_from_step(r2["card_id"])
+    assert tv and tv["card_count"] == 1 and len(store.db.unsorted_steps()) == 0
+    # a third → just deleted
+    r3 = store.add_step("scratch note", source="note")
+    assert store.delete_step(r3["card_id"]) and len(store.db.unsorted_steps()) == 0
+
+
+def _app(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRUX_HOME", str(tmp_path))
+    monkeypatch.setenv("CRUX_DB_PATH", str(tmp_path / "c.db"))
+    from fastapi.testclient import TestClient
+    from crux.config import Config
+    from crux.server import create_app
+    return TestClient(create_app(Config.load()))
+
+
+def test_ingest_url_endpoint(tmp_path, monkeypatch):
+    import crux.ingest_sources as src
+    monkeypatch.setattr(src, "fetch_url", lambda u, **k: ("# Doc\nWe use Postgres.", "doc"))
+    c = _app(tmp_path, monkeypatch)
+    r = c.post("/ingest/url", json={"url": "http://example.com/doc"})
+    assert r.status_code == 200 and r.json()["status"] == "processing"
+    # a SourceError surfaces as a clean 422, not a 500
+    monkeypatch.setattr(src, "fetch_url",
+                        lambda u, **k: (_ for _ in ()).throw(src.SourceError("nope")))
+    assert c.post("/ingest/url", json={"url": "http://x"}).status_code == 422
+
+
+def test_ingest_file_endpoint(tmp_path, monkeypatch):
+    c = _app(tmp_path, monkeypatch)
+    r = c.post("/ingest/file",
+               files={"file": ("notes.md", b"# Title\nWe chose SQLite for storage.", "text/markdown")})
+    assert r.status_code == 200 and r.json()["chars"] > 0
+    assert c.post("/ingest/file",
+                  files={"file": ("e.txt", b"", "text/plain")}).status_code == 422
