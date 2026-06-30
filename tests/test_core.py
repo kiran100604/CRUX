@@ -1141,3 +1141,41 @@ def test_query_embedding_is_cached(store):
     store.search("sync engine storage", scope="main")
     store.search("sync engine storage", scope="main")        # identical → cache hit
     assert len(store._qcache) == 1
+
+
+# --- extraction-quality metrics (eval/extract_quality.py) --------------------
+
+def test_vagueness_metric_flags_promise_without_value():
+    from eval.extract_quality import is_vague, has_concrete
+    # the exact shape of the bad KB facts: gestures at specifics, names none
+    assert is_vague("The design system includes 36 color tokens with specific hex values")
+    assert is_vague("uses specific fonts for headings and body")
+    # a summary that actually names the values is NOT vague
+    assert not is_vague("Color tokens: canvas #fdf8ec, ink #080808, teal #143030")
+    assert not is_vague("Dark mode: add class 'crux-dark' to the html element")
+    assert has_concrete("stroke is 1.7px with round caps")
+    assert not has_concrete("the icons follow consistent guidelines")
+
+
+def test_value_retention_and_filler_metrics():
+    from eval.extract_quality import value_retention, filler_hits
+    frac, lost = value_retention("Fonts: Inter and JetBrains Mono", ["Inter", "Roboto"])
+    assert frac == 0.5 and lost == ["Roboto"]
+    hits = filler_hits("Started with a blank slate, began exploring various platforms",
+                       ["blank slate", "began exploring", "shipped v1"])
+    assert set(hits) == {"blank slate", "began exploring"}
+
+
+def test_offline_working_memory_stays_grounded(store):
+    """The offline timeline must never invent the generic-journey filler the LLM
+    path was producing — it only ever echoes the actual captures."""
+    from eval.extract_quality import filler_hits
+    t = store.create_thread("site", "Build a marketing website for Crux", seed=False)
+    for txt, k in [("Make it creative, not a templated SaaS landing page", "requirement"),
+                   ("Leaning toward a parchment look with a hexagon mark", "suggestion")]:
+        store.add_step(txt, thread_id=t["id"], kind=k, route=True)
+    memory = store.thread_view(t["id"])["context"]
+    forbidden = ["blank slate", "began exploring", "considered various",
+                 "for inspiration", "identified the need"]
+    assert filler_hits(memory, forbidden) == []
+    assert "hexagon" in memory.lower()        # grounded in the real capture
