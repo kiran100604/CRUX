@@ -38,13 +38,27 @@ Snippet:
 
 _MULTI_PROMPT = """You extract durable, atomic facts from a section of a document
 for a developer/company context store. Pull out each distinct decision,
-constraint, architectural choice, or important reference — one fact each. Ignore
-filler, TODOs, and prose with no lasting signal. If the section holds nothing
-durable, return [].
+constraint, architectural choice, important reference, or concrete spec — one
+fact each. Ignore filler, TODOs, and prose with no lasting signal. If the section
+holds nothing durable, return [].
+
+CARRY THE SPECIFICS — this is the whole job. A fact exists for its concrete
+detail: the exact values, names, numbers, hex codes, class/file names,
+thresholds. A summary that GESTURES at specifics without naming them is worthless
+and must NEVER be produced — e.g. all of these are forbidden:
+  "uses specific fonts"  ·  "has 36 color tokens with specific hex values"
+  "a dark mode toggle with a class name"  ·  "line icons with stroke guidelines"
+Write instead what they ACTUALLY are: "Fonts: Inter (sans), JetBrains Mono
+(mono)"  ·  "Dark mode: add class 'crux-dark' to <html>"  ·  "Line icons: 1.7px
+stroke, round caps, ~15px in nav". If a section is a dense list of values (design
+tokens, a config block, an enum), emit ONE consolidated reference fact that
+ENUMERATES the values (e.g. "Color tokens: canvas #fdf8ec, ink #080808, teal
+#143030, coral #bf3422, …"), never a vague meta-statement and never dozens of
+one-value fragments.
 
 Return ONLY a minified JSON array; each element has keys: title, summary, subject, type, tier, domain, tags.
 - title: <= 8 words, no trailing punctuation
-- summary: exactly one sentence
+- summary: one tight sentence that NAMES the concrete values/specifics (not hand-waving about them)
 - subject: the specific thing it is ABOUT — a service / component / feature / area
     (e.g. "sync service", "auth", "pricing"); <=4 words, lowercase; "" if truly general
 - type: one of {types}
@@ -256,6 +270,14 @@ has a [tag] marking its place in the arc (plus where it came from):
 - [decision]/[requirement]/[constraint]/[conclusion] = a settled commitment
 {items}
 
+GROUND EVERYTHING IN THE CAPTURES. Use only what the captures actually say. Do
+NOT invent steps, explorations, motivations, or details that aren't there, and do
+NOT narrate generic process — phrases like "started with a blank slate", "began
+exploring various approaches", "considered several platforms/tools", "looked into
+competitors for inspiration", "identified the need for a clear goal" are FORBIDDEN
+filler: they describe nothing that actually happened. If little has happened, the
+memory is SHORT — three honest lines beats a padded page. Quality over coverage.
+
 Write the WORKING MEMORY as a short, readable TIMELINE that answers two things at
 once:
 1) WHAT the user was doing — the high-level progression, in order (e.g. "explored
@@ -265,15 +287,14 @@ once:
    was ruled out, tradeoffs weighed, what changed in the implementation, and what
    was intentionally deferred.
 
-Format — a chronological list of STEPS, each a HEADLINE plus its DETAILS:
+Format — a chronological list of STEPS, each a HEADLINE plus (where warranted) DETAILS:
    - <what was being done — the step, in plain words>
        - <a key idea, a decision AND what it ruled out, a tradeoff weighed, what
           changed, or what was deferred — with the SPECIFICS: names, values, the why>
-       - <another such detail, if it matters>
-Every step gets 1-3 indented detail lines. The headline ALONE is not enough — the
-reader must see WHAT was decided/considered/ruled-out and WHY, with concrete
-specifics, not just that a step happened. Group trivially-related captures into one
-step (don't transcribe every item), but do NOT drop the important specifics.
+Give a step indented detail lines ONLY where the captures supply real specifics
+(names, values, the why, what was ruled out). If a capture carries no detail, a
+bare one-line headline is correct — never manufacture detail to fill the shape.
+Group trivially-related captures into one step (don't transcribe every item).
 Treat an [idea] as explored-not-decided, [info] as context-to-be-aware-of (never
 restated as our decision). The LAST step should reflect where things stand RIGHT
 NOW. If any questions are unresolved, end with an "Open questions:" list.
@@ -300,12 +321,17 @@ context, never ours), [idea]/[suggestion]=exploring (not decided),
 [conclusion]=settled commitment.
 {items}
 
+Ground every addition in the NEW CAPTURES — never invent steps or details that
+aren't there, and never pad with generic process narration ("started exploring",
+"considered various options"). If the new captures carry little, add little.
+
 Fold the new captures into the timeline: continue it — add the next step, or
 enrich/close the current one (e.g. an [idea] that has now become a [decision], or
-[progress] that advances the latest step). Each step is a HEADLINE line plus 1-3
-indented DETAIL lines carrying the specifics (key idea, decision AND what it ruled
-out, tradeoff, what changed, what was deferred — names/values/the why). When you
-add or enrich a step, include those details — don't reduce it to a bare headline.
+[progress] that advances the latest step). A step is a HEADLINE line plus indented
+DETAIL lines that carry real specifics (key idea, decision AND what it ruled out,
+tradeoff, what changed, what was deferred — names/values/the why). Add detail
+lines where the captures supply specifics; a capture with none stays a bare
+headline — don't manufacture detail.
 Keep earlier steps (and their details) intact; replace a line only when a new
 capture supersedes it. The last step should reflect where things stand now.
 Keep/refresh an "Open questions:" list if any remain.

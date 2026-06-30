@@ -1,0 +1,40 @@
+{
+  "_comment": "Extraction-quality eval seed. Two kinds of case: 'document' cases feed a paste/file through KB fact extraction and check the facts CARRY the concrete values (not vague meta-statements); 'working_memory' cases feed a thread's dumps through working-memory synthesis and check it stays GROUNDED (no invented narrative filler). Run: python -m eval.extract_quality. Offline (fake) providers give a floor; plug in a real key to measure prompt changes — that's the point of the harness.",
+
+  "document_cases": [
+    {
+      "name": "design_system_dump",
+      "source_type": "paste",
+      "content": "CRUX Design System\nMade by kpp · updated 6/24/2026\n\nOpen source file\nColors · 36 tokens\n\nCanvas\n--canvas\n#fdf8ec\n\nSoft\n--soft\n#f4ecd8\n\nInk\n--ink\n#080808\n\nTeal\n--teal\n#143030\n\nCoral\n--coral\n#bf3422\n\nGreen\n--green\n#15833f\n\nType · 2 tokens\nSans: Inter\nMono: JetBrains Mono\n\nIconography - line icons\n1.7px stroke · round caps · ~15px in nav\n\nDark mode toggle\nLight / Dark theme - add class='crux-dark' to html\n\nCorner radii\nsm 8 · md 12 · lg 16 · xl 24 · pill\n\nCards\nParchment surfaces with accent tints",
+      "must_retain": ["#fdf8ec", "#080808", "#143030", "#bf3422", "Inter", "JetBrains Mono", "crux-dark", "1.7px"],
+      "note": "The value IS the fact. A KB card reading 'has 36 color tokens with specific hex values' is useless; the hexes, the class name, the stroke must survive into the displayed title/summary."
+    },
+    {
+      "name": "decision_prose",
+      "source_type": "paste",
+      "content": "After comparing options we decided to use Stripe over Razorpay, mainly for its international SDK support. All payment errors must be logged to Sentry — non-negotiable. We verify the webhook signature using the STRIPE_WEBHOOK_SECRET env var. Storage is SQLite (one file, local-first) rather than Postgres.",
+      "must_retain": ["Stripe", "Razorpay", "Sentry", "STRIPE_WEBHOOK_SECRET", "SQLite"],
+      "note": "Plain decision prose — the proper nouns and identifiers must survive."
+    }
+  ],
+
+  "working_memory_cases": [
+    {
+      "name": "sparse_website",
+      "intent": "Build a marketing website for Crux, a tool that manages AI agents' context",
+      "steps": [
+        {"content": "Make the site creative and non-generic, not a templated SaaS landing page", "kind": "requirement"},
+        {"content": "Crux features: automatic context fetching and hotkey-based context capture", "kind": "reference"},
+        {"content": "Leaning toward a parchment / paper visual identity with a hexagon mark", "kind": "suggestion"}
+      ],
+      "forbidden_filler": [
+        "blank slate", "no prior work", "began exploring", "considered various",
+        "various platforms", "looked into competitor", "for inspiration",
+        "identified the need", "clear goal and intent", "desired outcome and scope",
+        "no specific requirements", "no clear direction"
+      ],
+      "should_mention": ["hexagon", "parchment", "hotkey"],
+      "note": "Three real captures. The memory must reflect THOSE — not a hallucinated journey of exploring platforms and competitors that never happened."
+    }
+  ]
+}
