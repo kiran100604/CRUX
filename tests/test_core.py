@@ -1323,3 +1323,23 @@ def test_ingest_file_endpoint(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json()["chars"] > 0
     assert c.post("/ingest/file",
                   files={"file": ("e.txt", b"", "text/plain")}).status_code == 422
+
+
+def test_thread_background_gates_strictly_with_real_embeddings(store, monkeypatch):
+    """A fresh thread must not flood with same-product facts that only share a
+    generic word. With real embeddings the background gates on strong similarity,
+    not the looser per-prompt relevance flag."""
+    from crux.retrieval import Result
+    # pretend we're on a real embedder so the strict (sim-based) gate applies
+    class _RealEmbed:
+        model = "real"
+        def embed(self, *a, **k): return [0.0]
+    monkeypatch.setattr(store, "embedder", _RealEmbed())
+    a = store.capture("Data stored in local SQLite.", type_hint="architecture")
+    b = store.capture("Hero section uses a parchment palette.", type_hint="design")
+    close = Result(item=store.db.get(a.id), sim=0.62, relevant=True, score=1.0)
+    weak = Result(item=store.db.get(b.id), sim=0.20, relevant=True, score=0.9)  # word-overlap only
+    monkeypatch.setattr(store, "retrieve", lambda *a, **k: ([close, weak], []))
+    bg = store._kb_connections("build a website for crux")
+    assert "SQLite" in bg          # the strongly-related fact stays
+    assert "parchment" not in bg   # the weak word-overlap fact is gated out

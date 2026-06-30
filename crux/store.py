@@ -395,17 +395,30 @@ class Store:
     # You never organize: every included dump refines the context. The only control
     # is whether a card is IN the context — exclude one and the context forgets it.
 
+    # The thread-level "Knowledge base connections" sidebar is a STANDING
+    # orientation retrieved from the intent (a broad, weak query) — distinct from
+    # the per-prompt injection (Flow B), which keys on the actual task. So gate it
+    # STRICTER than the per-prompt path: a shared generic word ("crux", "data")
+    # must NOT pull the whole product KB into a fresh thread. Require a genuinely
+    # close fact (strong semantic similarity) when embeddings are real; offline,
+    # fall back to the standard relevance flag.
+    BG_RELEVANCE = 0.45
+
     def _kb_connections(self, intent: str, memory: str = "") -> str:
-        """The verified-KB facts RELEVANT to the current work — retrieved live
-        against intent + working memory, and RELEVANCE-GATED so an unrelated KB
-        shows nothing (no more 'CRUX background on a trading thread'). Recomputed
-        whenever the working memory refreshes, so it tracks what you're doing."""
+        """The verified-KB facts genuinely CLOSE to the current work — retrieved
+        live against intent + working memory and gated tightly, so a same-product
+        KB doesn't flood a fresh thread with loosely-related facts. Recomputed
+        whenever the working memory refreshes, so it sharpens as you work."""
         q = (intent + "\n" + memory).strip()
         if not q:
             return ""
+        from .embeddings import FakeEmbedding
         from .hooks import _format  # lazy: hooks imports nothing heavy from store
         results, links = self.retrieve(q, limit=6, scope="main")
-        rel = [r for r in results if r.relevant]
+        if isinstance(self.embedder, FakeEmbedding):
+            rel = [r for r in results if r.relevant]   # offline: sim isn't meaningful
+        else:
+            rel = [r for r in results if r.sim >= self.BG_RELEVANCE]
         if not rel:
             return ""
         keep = {r.item.id for r in rel}

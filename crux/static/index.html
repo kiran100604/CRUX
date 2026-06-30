@@ -834,8 +834,9 @@ function vThread(t){
           </div>
 
           <div class="cssec">
-            <div class="cslbl">⬡ Knowledge base connections</div>
-            ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:12.5px">No matching background yet — as your knowledge base grows, new threads start with more.</div>`}
+            <div class="cslbl">⬡ Related knowledge · whole thread</div>
+            ${t.background?`<div class="bgbox">${esc(t.background)}</div>`:`<div class="muted2" style="font-size:12.5px">Nothing strongly related yet — it fills in as the thread sharpens. (Your agent still pulls <b>task-specific</b> facts on every prompt, via the hook.)</div>`}
+            <div class="muted2" style="font-size:11.5px;margin-top:8px">A standing overview for the whole thread. Per-task context is fetched automatically on each prompt — use <b>“for a task…”</b> above to preview what your agent gets.</div>
           </div>
         </div>
       </aside>
