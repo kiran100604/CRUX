@@ -238,11 +238,12 @@ class Store:
     def edit(self, item_id: str, *, title: str | None = None, summary: str | None = None,
              type: str | None = None, tags: list | None = None,
              tier: str | None = None, domain: str | None = None,
-             subject: str | None = None) -> bool:
+             subject: str | None = None, subject_path: str | None = None) -> bool:
         """Edit a fact's text or filing. Re-embeds and re-checks contradictions
         when text changes so search and conflict detection never go stale.
-        tier/domain are filing-only (no re-embed). subject/title/summary/type feed
-        the embedded descriptor, so changing any of them re-embeds."""
+        tier/domain/subject_path are filing-only (no re-embed). subject/title/
+        summary/type feed the embedded descriptor, so changing any re-embeds.
+        Re-pathing materializes the new node so the tree stays consistent."""
         full = self.db.resolve_id(item_id)
         if not full:
             return False
@@ -255,6 +256,12 @@ class Store:
         if tier is not None: fields["tier"] = tier
         if domain is not None: fields["domain"] = domain
         if subject is not None: fields["subject"] = subject.strip().lower()
+        if subject_path is not None:
+            from .processing import _norm_path
+            path = _norm_path(subject_path)
+            fields["subject_path"] = path
+            if path:
+                self._ensure_node_path(path)
         self.db.update(full, fields, now_iso())
         updated = self.db.get(full)
         if any(x is not None for x in (title, summary, type, subject)):  # descriptor changed → re-embed
@@ -287,6 +294,7 @@ class Store:
             h = d.get("content_hash") or _hash(f"{d.get('title')}\n{d.get('summary')}")
             if self.db.get_by_hash(h):
                 continue
+            path = d.get("subject_path", "")
             it = ContextItem(
                 id=d.get("id") or str(uuid.uuid4()),
                 raw_content=d.get("raw_content", ""),
@@ -296,7 +304,7 @@ class Store:
                 tier=d.get("tier", "leaf"),
                 domain=d.get("domain", "other"),
                 subject=d.get("subject", ""),
-                subject_path=d.get("subject_path", ""),
+                subject_path=path,
                 tags=d.get("tags", []),
                 source=d.get("source"),
                 scope=d.get("scope", "individual"),
@@ -311,10 +319,36 @@ class Store:
                 captured_at=d.get("captured_at") or now_iso(),
                 updated_at=now_iso(),
             )
+            if path:                            # rebuild the tree as facts land
+                self._ensure_node_path(path)
             self.db.insert(it, self.embedder.embed(self._descriptor(
                 subject=it.subject, type=it.type, title=it.title, summary=it.summary)))
             n += 1
         return n
+
+    def backfill_tree(self, *, root: str = "") -> int:
+        """Place every still-unfiled fact into the KB tree (and materialize its
+        nodes). Run after upgrading a pre-tree DB, or after switching to a real
+        provider so the placement improves. Returns how many got filed."""
+        n = 0
+        for it in self.db.list(archived=False, limit=100000):
+            if it.subject_path or it.superseded_by:
+                continue
+            path = self._place_in_tree(it, locator=it.locator)
+            if not path and root:               # last resort so nothing stays orphaned
+                path = self._slug_root_path(it, root)
+                if path:
+                    self._ensure_node_path(path)
+            if path:
+                self.db.update(it.id, {"subject_path": path}, now_iso())
+                n += 1
+        return n
+
+    @staticmethod
+    def _slug_root_path(it: ContextItem, root: str) -> str:
+        from .processing import slug
+        seg = slug(it.subject) or slug(it.domain if it.domain != "other" else "") or "general"
+        return f"{slug(root)}/{seg}"
 
     def nominate(self, item_id: str) -> bool:
         """Push a private working-memory item into Review (proposed=True)."""
@@ -953,16 +987,36 @@ class Store:
             self.db.set_meta("current_thread", None)
         self.db.delete_thread(thread_id)
 
+    # A working card's KIND → the durable fact TYPE it becomes when promoted. Cards
+    # that aren't durable knowledge (a prompt, a bare note, an open question) map to
+    # None and are skipped — only real learnings graduate into the KB.
+    _PROMOTE_TYPE = {"decision": "decision", "constraint": "constraint",
+                     "requirement": "constraint", "insight": "context",
+                     "result": "context", "reference": "reference",
+                     "suggestion": "exploration", "architecture": "architecture",
+                     "question": None, "prompt": None, "note": None}
+
     def promote_thread(self, thread_id: str, *, proposed: bool = True) -> list[ContextItem]:
-        """Extract durable facts from a thread's cards and stage them for Review —
-        the lasting learnings graduate into the knowledge base. The thread stays put."""
-        steps = self.db.thread_steps(thread_id)
-        if not steps:
-            return []
-        combined = "\n\n".join(e.raw_content for e in steps)
-        return self.process_episode(steps[0].id, combined, source_type="thread",
-                                    source_ref=None, scope="individual",
-                                    confidence=0.6)
+        """Stage a thread's durable learnings for Review — ONE fact per signal card,
+        each enriched, placed into the KB tree, and conflict-checked in its node.
+        (Was: collapse the whole thread into one blob, which lost every specific.)
+        Skips prompts, notes and open questions; the thread itself stays put."""
+        cards = [c for c in self.db.thread_steps(thread_id)
+                 if c.included and self._PROMOTE_TYPE.get(c.kind, "context")]
+        facts: list[ContextItem] = []
+        seen: set[str] = set()
+        for c in cards[:60]:                       # bound cost on a huge thread
+            raw = (c.raw_content or "").strip()
+            if not raw:
+                continue
+            enr = self.processor.enrich(raw)
+            enr.type = self._PROMOTE_TYPE.get(c.kind) or enr.type
+            f = self._store_fact(raw=raw, enr=enr, episode_id=c.id, locator=None,
+                                 source=c.source_ref, scope="individual",
+                                 confidence=0.6, proposed=proposed)
+            if f.id not in seen:
+                seen.add(f.id); facts.append(f)
+        return facts
 
     def current_thread_id(self) -> str | None:
         tid = self.db.get_meta("current_thread")

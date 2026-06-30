@@ -48,6 +48,17 @@ def _bg_process(cfg: Config, episode_id: str, content: str,
         worker.close()
 
 
+def _promote_thread(cfg: Config, thread_id: str) -> None:
+    """Distill a thread's learnings into Review off the request path — the
+    extraction runs an LLM per card, so it must never block the button (a slow or
+    unreachable model used to hang it for up to a minute = 'nothing happened')."""
+    worker = Store(cfg)
+    try:
+        worker.promote_thread(thread_id)
+    finally:
+        worker.close()
+
+
 def _route_pending(cfg: Config, thread_id: str) -> None:
     """Classify ALL unrouted cards in the thread in one call, then refresh context —
     off the request path (own DB connection), so capture returns instantly and a
@@ -94,6 +105,7 @@ def create_app(cfg: Config):
     app.state.executor = ThreadPoolExecutor(max_workers=4)  # background ingest/route/refine
     app.state.routing = set()    # thread ids with an in-flight auto-route (dedupe polls)
     app.state.refreshing = set() # thread ids with an in-flight summary refresh
+    app.state.promoting = set()  # thread ids with an in-flight learnings promotion
     app.state.bg_lock = __import__("threading").Lock()  # guards the dedupe sets
 
     @app.middleware("http")
@@ -287,6 +299,7 @@ def create_app(cfg: Config):
         tier: str | None = None
         domain: str | None = None
         subject: str | None = None
+        subject_path: str | None = None
 
     @app.post("/capture")
     def capture(body: CaptureIn):
@@ -352,7 +365,8 @@ def create_app(cfg: Config):
         _leader(request)
         return {"ok": store.edit(item_id, title=body.title,
                                  summary=body.summary, type=body.type,
-                                 tier=body.tier, domain=body.domain, subject=body.subject)}
+                                 tier=body.tier, domain=body.domain, subject=body.subject,
+                                 subject_path=body.subject_path)}
 
     @app.get("/search")
     def search(q: str, limit: int = 5, scope: str | None = None):
@@ -564,8 +578,17 @@ def create_app(cfg: Config):
 
     @app.post("/threads/{thread_id}/promote")
     def promote_thread(thread_id: str, request: Request):
-        facts = store.promote_thread(thread_id)
-        return {"staged": len(facts)}
+        # Run the (LLM-heavy, per-card) distillation in the BACKGROUND so the button
+        # returns instantly and can't hang. The staged facts land in Review; the
+        # dashboard's poll surfaces them. Deduped so a double-click fires once.
+        if not store.db.get_thread(thread_id):
+            raise HTTPException(status_code=404, detail="no such thread")
+        promotable = sum(
+            1 for c in store.db.thread_steps(thread_id)
+            if c.included and store._PROMOTE_TYPE.get(c.kind, "context"))
+        _schedule_bg(thread_id, app.state.promoting,
+                     lambda: _promote_thread(cfg, thread_id))
+        return {"status": "distilling", "promotable": promotable}
 
     @app.delete("/threads/{thread_id}")
     def delete_thread(thread_id: str):

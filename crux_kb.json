@@ -26,7 +26,8 @@
       "source_episode_id": "b68fda9f-0abc-48c7-b9af-c4a46008c029",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.609358+00:00",
-      "updated_at": "2026-06-17T21:25:40.609361+00:00"
+      "updated_at": "2026-06-17T21:25:40.609361+00:00",
+      "subject_path": "crux/process"
     },
     {
       "id": "49b85570-adf6-4d09-9a90-a88c328abf1c",
@@ -53,7 +54,8 @@
       "source_episode_id": "757c104e-f7e3-4bb1-b4dc-d63e3a6ba4d7",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.510329+00:00",
-      "updated_at": "2026-06-17T21:25:40.510331+00:00"
+      "updated_at": "2026-06-17T21:25:40.510331+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "2e07aba8-6fbb-4b4b-a3b2-6a593cb48246",
@@ -80,7 +82,8 @@
       "source_episode_id": "24f4eda6-5423-40b5-9790-42b3df190f2b",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.416410+00:00",
-      "updated_at": "2026-06-17T21:25:40.416413+00:00"
+      "updated_at": "2026-06-17T21:25:40.416413+00:00",
+      "subject_path": "crux/process"
     },
     {
       "id": "2b240795-8f12-409c-b14c-f6827de6ad5b",
@@ -107,7 +110,8 @@
       "source_episode_id": "95fd9b9c-23e1-4401-ac7e-e6ad12c2d3b4",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.316661+00:00",
-      "updated_at": "2026-06-17T21:25:40.316665+00:00"
+      "updated_at": "2026-06-17T21:25:40.316665+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "7a365c51-d00d-49dd-85ba-233230d74abd",
@@ -134,7 +138,8 @@
       "source_episode_id": "fb797c31-b036-475d-b717-1fcbcac5b86b",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.214074+00:00",
-      "updated_at": "2026-06-17T21:25:40.214077+00:00"
+      "updated_at": "2026-06-17T21:25:40.214077+00:00",
+      "subject_path": "crux/technical"
     },
     {
       "id": "fa322ebe-d158-4c15-a7ed-59bf8ed71992",
@@ -161,7 +166,8 @@
       "source_episode_id": "59f89de7-97b4-46ce-9343-cc382a3ec4e7",
       "locator": null,
       "captured_at": "2026-06-17T21:25:40.121576+00:00",
-      "updated_at": "2026-06-17T21:25:40.121578+00:00"
+      "updated_at": "2026-06-17T21:25:40.121578+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "629d6ede-3436-423c-861a-064420db0fe8",
@@ -188,7 +194,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.415395+00:00",
-      "updated_at": "2026-06-17T21:25:39.982589+00:00"
+      "updated_at": "2026-06-17T21:25:39.982589+00:00",
+      "subject_path": "crux/process"
     },
     {
       "id": "2e35c885-5496-4dcf-a891-8f8bb5c397b1",
@@ -215,7 +222,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.341633+00:00",
-      "updated_at": "2026-06-17T21:25:39.984241+00:00"
+      "updated_at": "2026-06-17T21:25:39.984241+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "cb4baa10-22f0-403f-9758-578c45e4230a",
@@ -242,7 +250,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.250676+00:00",
-      "updated_at": "2026-06-17T21:25:39.985586+00:00"
+      "updated_at": "2026-06-17T21:25:39.985586+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "e35fd91f-ec70-4d5c-9cdf-349678818c33",
@@ -269,7 +278,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.171775+00:00",
-      "updated_at": "2026-06-17T21:25:39.987276+00:00"
+      "updated_at": "2026-06-17T21:25:39.987276+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "6a27b3bc-10f3-4c83-ac37-764582f449dc",
@@ -296,7 +306,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.096871+00:00",
-      "updated_at": "2026-06-17T21:25:39.988550+00:00"
+      "updated_at": "2026-06-17T21:25:39.988550+00:00",
+      "subject_path": "crux/technical"
     },
     {
       "id": "6c03011d-4761-4b1a-9965-2cff377f671b",
@@ -323,7 +334,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:38.019310+00:00",
-      "updated_at": "2026-06-17T21:25:39.989933+00:00"
+      "updated_at": "2026-06-17T21:25:39.989933+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "e941fb08-90e4-4270-8247-16a51e7df6d9",
@@ -350,7 +362,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T19:41:37.940819+00:00",
-      "updated_at": "2026-06-17T21:25:39.991115+00:00"
+      "updated_at": "2026-06-17T21:25:39.991115+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "0d4ee98d-2b83-4a36-81c6-241aaf98150c",
@@ -377,7 +390,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.959976+00:00",
-      "updated_at": "2026-06-17T21:25:39.992616+00:00"
+      "updated_at": "2026-06-17T21:25:39.992616+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "3bac1a85-6004-4fe4-9884-1dde29bc0ed9",
@@ -404,7 +418,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.890314+00:00",
-      "updated_at": "2026-06-17T21:25:39.993909+00:00"
+      "updated_at": "2026-06-17T21:25:39.993909+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "57dea7c0-f62e-42f2-b467-d9f3f99248a2",
@@ -431,7 +446,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.817149+00:00",
-      "updated_at": "2026-06-17T21:25:39.995359+00:00"
+      "updated_at": "2026-06-17T21:25:39.995359+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "d943c473-2add-4be5-9f5c-0afccade529f",
@@ -458,7 +474,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T17:15:43.749700+00:00",
-      "updated_at": "2026-06-17T21:25:39.996658+00:00"
+      "updated_at": "2026-06-17T21:25:39.996658+00:00",
+      "subject_path": "crux/users"
     },
     {
       "id": "0c25763f-a58b-4b9a-a7f2-ec6dbba9e610",
@@ -485,7 +502,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.842606+00:00",
-      "updated_at": "2026-06-17T21:25:39.997999+00:00"
+      "updated_at": "2026-06-17T21:25:39.997999+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "7c64c1d9-29f0-418e-9ab1-557df9b0aa9a",
@@ -512,7 +530,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.771532+00:00",
-      "updated_at": "2026-06-17T21:25:39.999457+00:00"
+      "updated_at": "2026-06-17T21:25:39.999457+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "2fa43b94-a90e-43cb-aee2-322968463379",
@@ -539,7 +558,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.700452+00:00",
-      "updated_at": "2026-06-17T21:25:40.000884+00:00"
+      "updated_at": "2026-06-17T21:25:40.000884+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "bff50c17-9d83-42fd-b3ab-6312a774ccc4",
@@ -566,7 +586,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.632385+00:00",
-      "updated_at": "2026-06-17T21:25:40.002088+00:00"
+      "updated_at": "2026-06-17T21:25:40.002088+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "74f292b5-dc14-46f9-b012-4d4186185827",
@@ -593,7 +614,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.562802+00:00",
-      "updated_at": "2026-06-17T21:25:40.003589+00:00"
+      "updated_at": "2026-06-17T21:25:40.003589+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "fe53994d-074e-4331-82fb-8ae081be4030",
@@ -620,7 +642,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.494378+00:00",
-      "updated_at": "2026-06-17T21:25:40.005295+00:00"
+      "updated_at": "2026-06-17T21:25:40.005295+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "410806d7-ffd6-4510-ae6d-ecbb2b1c4d3f",
@@ -647,7 +670,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:40:10.425138+00:00",
-      "updated_at": "2026-06-17T21:25:40.006788+00:00"
+      "updated_at": "2026-06-17T21:25:40.006788+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "fece0bff-ed93-428e-aa1b-8ea702a21095",
@@ -674,7 +698,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.423831+00:00",
-      "updated_at": "2026-06-17T21:25:40.007968+00:00"
+      "updated_at": "2026-06-17T21:25:40.007968+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "0779c432-e680-47e6-8f75-caf27a27301e",
@@ -701,7 +726,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.418735+00:00",
-      "updated_at": "2026-06-17T21:25:40.009224+00:00"
+      "updated_at": "2026-06-17T21:25:40.009224+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "7456529f-f300-4001-9ffa-d4dcbc1a29ed",
@@ -728,7 +754,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.413139+00:00",
-      "updated_at": "2026-06-17T21:25:40.010513+00:00"
+      "updated_at": "2026-06-17T21:25:40.010513+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "5403c74b-fd85-445d-8b08-c9118b41764d",
@@ -755,7 +782,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.406958+00:00",
-      "updated_at": "2026-06-17T21:25:40.011887+00:00"
+      "updated_at": "2026-06-17T21:25:40.011887+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "169e8bff-ca81-4193-8070-fcd955d3bb54",
@@ -782,7 +810,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.400956+00:00",
-      "updated_at": "2026-06-17T21:25:40.013095+00:00"
+      "updated_at": "2026-06-17T21:25:40.013095+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "251660e6-a110-428d-99dd-ecc63cf7a8b2",
@@ -809,7 +838,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.395410+00:00",
-      "updated_at": "2026-06-17T21:25:40.015464+00:00"
+      "updated_at": "2026-06-17T21:25:40.015464+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "baa79989-db04-455b-86bd-362a935fb08d",
@@ -836,7 +866,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.391005+00:00",
-      "updated_at": "2026-06-17T21:25:40.017554+00:00"
+      "updated_at": "2026-06-17T21:25:40.017554+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "0999b0fc-753d-468e-bfc7-a53161db7461",
@@ -863,7 +894,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.387033+00:00",
-      "updated_at": "2026-06-17T21:25:40.019825+00:00"
+      "updated_at": "2026-06-17T21:25:40.019825+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "ae12ebdb-73a4-4481-bf9b-e450f510c83f",
@@ -890,7 +922,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.380948+00:00",
-      "updated_at": "2026-06-17T21:25:40.021924+00:00"
+      "updated_at": "2026-06-17T21:25:40.021924+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "c1c746a0-b2e0-47b4-af73-40c1674e13dc",
@@ -917,7 +950,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.376103+00:00",
-      "updated_at": "2026-06-17T21:25:40.024122+00:00"
+      "updated_at": "2026-06-17T21:25:40.024122+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "22557414-0c26-41a7-bb4c-0fb9083011b0",
@@ -944,7 +978,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.370571+00:00",
-      "updated_at": "2026-06-17T21:25:40.026341+00:00"
+      "updated_at": "2026-06-17T21:25:40.026341+00:00",
+      "subject_path": "crux/general"
     },
     {
       "id": "d39c3b6f-44cc-4501-ab69-d9f2c3211c61",
@@ -971,7 +1006,8 @@
       "source_episode_id": null,
       "locator": null,
       "captured_at": "2026-06-17T16:17:29.365506+00:00",
-      "updated_at": "2026-06-17T21:25:40.028435+00:00"
+      "updated_at": "2026-06-17T21:25:40.028435+00:00",
+      "subject_path": "crux/general"
     }
   ]
 }
