@@ -15,7 +15,7 @@ server = ["fastapi>=0.110", "uvicorn>=0.27", "python-multipart>=0.0.9"]
 # PDF onboarding (upload/URL ingest of PDFs); HTML/markdown/text need nothing extra.
 pdf = ["pypdf>=4.0"]
 mcp = ["mcp>=1.0"]
-app = ["pystray>=0.19", "pynput>=1.7", "pillow>=10.0", "fastapi>=0.110", "uvicorn>=0.27"]
+app = ["pystray>=0.19", "pynput>=1.7", "pillow>=10.0", "fastapi>=0.110", "uvicorn>=0.27", "python-multipart>=0.0.9"]
 build = ["pyinstaller>=6.0"]
 dev = ["pytest>=8.0"]
 
