@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>CRUX</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f883d'/%3E%3Cpath d='M9 9 L23 23 M23 9 L9 23' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/tokens.css">
 <script>/* apply saved theme before paint to avoid a flash */
   try{if(localStorage.getItem('crux-theme')==='dark')document.documentElement.classList.add('crux-dark');}catch(e){}</script>
@@ -21,23 +22,27 @@
   /* nav */
   nav{position:sticky; top:0; z-index:30; height:64px; display:flex; align-items:center; gap:8px;
     padding:0 28px; background:var(--canvas); border-bottom:1px solid var(--hair)}
-  .brand{display:flex; align-items:center; gap:10px; margin-right:22px}
-  .brand .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
-    background:var(--ink); color:var(--on)}
-  .brand .logo svg{width:18px;height:18px}
-  .brand .logo svg path{stroke:currentColor} .brand .logo svg circle{fill:currentColor}
-  .brand .name{font-weight:700; letter-spacing:.16em; font-size:14px; color:var(--ink)}
-  .brand .sub{font-size:9px; letter-spacing:.22em; color:var(--muted2); margin-top:1px}
-  .tabs{display:flex; gap:4px}
-  .tab{border:none; background:none; color:var(--muted); font-size:14px; font-weight:500;
-    padding:8px 14px; border-radius:var(--pill); display:flex; align-items:center; gap:7px}
+  .brand{display:flex; align-items:center; margin-right:22px}
+  /* cruX wordmark — the X is two crossing strokes with a green core */
+  .wordmark{font-weight:800; letter-spacing:-.01em; font-size:19px; color:var(--ink);
+    display:inline-flex; align-items:center; font-family:var(--sans); user-select:none}
+  .wordmark .xmark{position:relative; display:inline-block; width:.74em; height:.86em; margin-left:.01em; color:var(--muted)}
+  .wordmark .xmark svg{position:absolute; inset:0; width:100%; height:100%}
+  .wordmark .xmark .core{fill:var(--green); stroke:none}
+  .tabs{display:flex; gap:2px}
+  /* GitHub-style tabs: text + underline-on-active, not a filled pill */
+  .tab{border:none; background:none; color:var(--body); font-size:14px; font-weight:500;
+    padding:7px 11px; border-radius:var(--r-sm); display:flex; align-items:center; gap:7px;
+    position:relative}
   .tab svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7;
     stroke-linecap:round; stroke-linejoin:round; flex:none}
-  .tab:hover{color:var(--ink)}
-  .tab.on{background:var(--ink); color:var(--on)}
-  .tab .badge{font-family:var(--mono); font-size:11px; background:rgba(0,0,0,.08); color:var(--muted);
+  .tab:hover{background:var(--soft)}
+  .tab.on{font-weight:600; color:var(--ink)}
+  .tab.on::after{content:""; position:absolute; left:11px; right:11px; bottom:-15px; height:2px;
+    background:#fd8c73; border-radius:2px}
+  .tab .badge{font-family:var(--mono); font-size:11px; background:var(--strong); color:var(--muted);
     padding:1px 7px; border-radius:var(--pill)}
-  .tab.on .badge{background:rgba(255,255,255,.2); color:#fff}
+  .tab.on .badge{background:var(--strong); color:var(--body)}
   .tab.alert .badge{background:var(--coral); color:#fff}
   .navright{margin-left:auto; display:flex; align-items:center; gap:14px}
   .themebtn{width:30px; height:30px; border:1px solid var(--hair); background:var(--canvas); color:var(--muted);
@@ -590,8 +595,7 @@
 <body>
 <nav>
   <div class="brand">
-    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z" stroke-width="1.6"/><circle cx="12" cy="12" r="3"/></svg></span>
-    <div><div class="name">CRUX</div><div class="sub">CONTEXT BRAIN</div></div>
+    <span class="wordmark">cru<span class="xmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 5 L19 19 M19 5 L5 19"/><circle class="core" cx="12" cy="12" r="3.4"/></svg></span></span>
   </div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-v="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Overview</button>

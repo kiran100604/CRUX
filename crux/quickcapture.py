@@ -9,16 +9,16 @@ Win+Shift+S snip overlay — no "did anything happen?" uncertainty.
 
 from __future__ import annotations
 
-# CRUX dark palette (mirrors tokens.css html.crux-dark) so the popup feels part
-# of the product, not a stray OS dialog.
-_BG = "#0f0f0f"      # canvas
-_CARD = "#1f1f1f"    # paper (the text well)
-_FG = "#e8e6e2"      # body text
-_INKW = "#fafaf8"    # strong text / caret
-_MUT = "#8b8876"     # muted
-_LINE = "#404040"    # hairline
-_TEAL = "#6fb3b0"    # accent
-_TEAL_BG = "#15302e"
+# CRUX dark palette (mirrors tokens.css html.crux-dark — GitHub-inspired) so the
+# popup feels part of the product, not a stray OS dialog.
+_BG = "#0d1117"      # canvas
+_CARD = "#161b22"    # surface (the text well)
+_FG = "#e6edf3"      # body text
+_INKW = "#f0f6fc"    # strong text / caret
+_MUT = "#7d8590"     # muted
+_LINE = "#30363d"    # border
+_TEAL = "#3fb950"    # brand green accent
+_TEAL_BG = "#12261e"
 
 # The tags name the ROLE the user knows but the agent CAN'T infer from the text
 # alone — is this my prompt/directive, info to note, an idea I'm exploring,
@@ -29,11 +29,11 @@ _TEAL_BG = "#15302e"
 # a Decision is authoritative. Picking one is the ONLY action; Auto (Enter) lets
 # CRUX classify.  (key, kind, label, fg, bg)
 _POPUP_TAGS = [
-    ("1", "requirement", "Prompt", "#84c46f", "#1b2e19"),   # my directive → what we want
-    ("2", "reference", "Info", "#6fb3b0", "#15302e"),       # note & be aware of
-    ("3", "suggestion", "Idea", "#d4915c", "#33240f"),      # exploring, not yet decided
-    ("4", "result", "Progress", "#dcbb5e", "#33290f"),      # status / current state
-    ("5", "decision", "Decision", "#88b6ec", "#16263a"),    # settled, authoritative
+    ("1", "requirement", "Prompt", "#7ee787", "#12261e"),   # my directive → what we want
+    ("2", "reference", "Info", "#d2a8ff", "#241a33"),       # note & be aware of
+    ("3", "suggestion", "Idea", "#e3b341", "#272115"),      # exploring, not yet decided
+    ("4", "result", "Progress", "#39c5cf", "#0f2a2c"),      # status / current state
+    ("5", "decision", "Decision", "#79c0ff", "#0d2d4f"),    # settled, authoritative
 ]
 
 

@@ -8,24 +8,30 @@
      3. Signal tags       — the decision/requirement/constraint taxonomy colors
      4. Radii / type      — shape + font tokens
      5. Dark mode         — every token redefined under html.crux-dark
-   Warm, editorial, paper-like: parchment surfaces, near-black ink, three
-   editorial accent inks (teal=trusted, peach=working, coral=conflict).
+
+   v2 — GitHub-inspired (Primer). Neutral gray surfaces, ONE brand accent (CRUX
+   green, used where GitHub uses blue), tight borders instead of shadows, 6px
+   radii, system font. The three accent trios keep their NAMES for back-compat:
+     --teal  = brand green (trusted / primary / links)
+     --peach = attention amber (working / owned)
+     --coral = danger red (conflict / constraint)
    ============================================================================ */
 
 :root {
-  /* 1. Base — surfaces (cream/parchment ramp) */
-  --canvas:#fdf8ec; --soft:#f4ecd8; --card:#efe6d0; --strong:#e3d9bf; --hair:#d6ccb2;
-  --paper:#fffdf7;                 /* near-white for floating cards (was hardcoded #fff) */
+  /* 1. Base — surfaces (GitHub light: white canvas, subtle gray insets) */
+  --canvas:#ffffff; --soft:#f6f8fa; --card:#f6f8fa; --strong:#eaeef2; --hair:#d1d9e0;
+  --paper:#ffffff;                 /* near-white for floating cards */
 
   /* Base — text */
-  --ink:#080808; --body:#2a251e; --muted:#574f41; --muted2:#83785f;
-  --on:#ffffff;                    /* text on an --ink fill (flips in dark mode) */
+  --ink:#010409; --body:#1f2328; --muted:#59636e; --muted2:#818b98;
+  --on:#ffffff;                    /* text on an --ink/accent fill */
 
   /* Base — accents, each a fg / bg / line trio (used as MEANING, not decoration) */
-  --teal:#143030;  --teal-bg:#e3ede9;  --teal-line:#bcd2cb;   /* trusted / main graph */
-  --peach:#a8541d; --peach-bg:#fbead8; --peach-line:#eccba9;  /* working / owned */
-  --coral:#bf3422; --coral-bg:#fbe2dc; --coral-line:#eebcb1;  /* conflict / constraint / danger */
-  --green:#15833f;                 /* live / verified / success */
+  --teal:#1f883d;  --teal-bg:#dafbe1;  --teal-line:#1f883d40;   /* BRAND GREEN — trusted/primary */
+  --peach:#9a6700; --peach-bg:#fff8c5; --peach-line:#d4a72c66;  /* attention amber — working/owned */
+  --coral:#cf222e; --coral-bg:#ffebe9; --coral-line:#cf222e40;  /* danger red — conflict/constraint */
+  --green:#1f883d;                 /* live / verified / success (== brand) */
+  --info:#0969da;                  /* informational blue (links, decision) */
 
   /* 2. Semantic aliases — reach for these when the ROLE matters more than the value */
   --surface:var(--canvas); --surface-card:var(--paper); --surface-sunken:var(--soft);
@@ -33,48 +39,55 @@
   --accent:var(--teal); --accent-bg:var(--teal-bg); --accent-line:var(--teal-line);
   --danger:var(--coral); --danger-bg:var(--coral-bg); --danger-line:var(--coral-line);
 
-  /* 3. Signal/kind tags — taxonomy colors (tokenized so dark mode can adapt them) */
-  --k-decision-bg:#e3eefb;  --k-decision-fg:#1f5fb0;
-  --k-requirement-bg:#e6efe0; --k-requirement-fg:#3d6b2a;
-  --k-constraint-bg:var(--coral-bg); --k-constraint-fg:var(--coral);
-  --k-insight-bg:#fbf0d0;   --k-insight-fg:#8a6a17;
-  --k-question-bg:var(--coral-bg); --k-question-fg:var(--coral);
-  --k-prompt-bg:#eae3f5;    --k-prompt-fg:#5b3fa0;
-  --k-suggestion-bg:var(--peach-bg); --k-suggestion-fg:var(--peach);
-  --k-result-bg:#e6efe0;    --k-result-fg:#3d6b2a;
-  --k-reference-bg:var(--teal-bg); --k-reference-fg:var(--teal);
+  /* 3. Signal/kind tags — GitHub-label style (tinted bg + readable text). The five
+     capture ROLES map onto these: Prompt=requirement, Info=reference, Idea=
+     suggestion, Progress=result, Decision=decision. */
+  --k-decision-bg:#ddf4ff;   --k-decision-fg:#0969da;   /* blue */
+  --k-requirement-bg:#dafbe1; --k-requirement-fg:#1a7f37; /* green */
+  --k-constraint-bg:#ffebe9; --k-constraint-fg:#cf222e;  /* red */
+  --k-question-bg:#fff1e5;   --k-question-fg:#bc4c00;    /* orange */
+  --k-insight-bg:#faf0fe;    --k-insight-fg:#8250df;     /* purple */
+  --k-prompt-bg:#ffeff7;     --k-prompt-fg:#bf3989;      /* pink */
+  --k-suggestion-bg:#fff8c5; --k-suggestion-fg:#9a6700;  /* yellow (idea) */
+  --k-result-bg:#d9f7f5;     --k-result-fg:#1b7c83;      /* teal (progress) */
+  --k-reference-bg:#faf0fe;  --k-reference-fg:#8250df;   /* purple (info) */
 
-  /* 4. Radii + type */
-  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --pill:9999px;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  /* 4. Radii + type — tighter, GitHub-flat */
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --pill:9999px;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
 
   /* shadows (borders do most of the work; elevation is rare + flat) */
-  --shadow-card:0 1px 2px rgba(20,16,8,.04);
-  --shadow-pop:0 20px 50px rgba(40,30,10,.14);
-  --ring:0 0 0 3px rgba(20,48,48,.28);
+  --shadow-card:0 1px 0 rgba(31,35,40,.04);
+  --shadow-pop:0 8px 24px rgba(140,149,159,.2);
+  --ring:0 0 0 3px rgba(31,136,61,.3);
 }
 
-/* 5. Dark mode — near-black ramp, desaturated-but-readable accents.
+/* 5. Dark mode — GitHub dark (#0d1117 ramp), brighter accents for contrast.
    Same token NAMES, so no component CSS changes are needed. */
 html.crux-dark {
-  --canvas:#0f0f0f; --soft:#1a1a1a; --card:#242424; --strong:#303030; --hair:#404040;
-  --paper:#1f1f1f;
-  --ink:#fafaf8; --body:#e8e6e2; --muted:#a6a39a; --muted2:#8b8876;
-  --on:#0f0f0f;
+  --canvas:#0d1117; --soft:#161b22; --card:#161b22; --strong:#1c2128; --hair:#30363d;
+  --paper:#161b22;
+  --ink:#f0f6fc; --body:#e6edf3; --muted:#7d8590; --muted2:#6e7681;
+  --on:#ffffff;
 
-  --teal:#6fb3b0;  --teal-bg:#15302e;  --teal-line:#2d5550;
-  --peach:#d4915c; --peach-bg:#33240f; --peach-line:#5a3f2a;
-  --coral:#ff6b5b; --coral-bg:#3a201c; --coral-line:#5a3a30;
-  --green:#52d45a;
+  --teal:#3fb950;  --teal-bg:#12261e;  --teal-line:#3fb95055;   /* brand green */
+  --peach:#d29922; --peach-bg:#272115; --peach-line:#d2992255;  /* attention */
+  --coral:#f85149; --coral-bg:#25171a; --coral-line:#f8514955;  /* danger */
+  --green:#3fb950;
+  --info:#2f81f7;
 
-  --k-decision-bg:#16263a;  --k-decision-fg:#88b6ec;
-  --k-requirement-bg:#1b2e19; --k-requirement-fg:#84c46f;
-  --k-insight-bg:#33290f;   --k-insight-fg:#dcbb5e;
-  --k-prompt-bg:#241a33;    --k-prompt-fg:#b89ae4;
-  --k-result-bg:#1b2e19;    --k-result-fg:#84c46f;
+  --k-decision-bg:#0d2d4f;   --k-decision-fg:#79c0ff;
+  --k-requirement-bg:#12261e; --k-requirement-fg:#7ee787;
+  --k-constraint-bg:#2d1516; --k-constraint-fg:#ff7b72;
+  --k-question-bg:#2b1c10;   --k-question-fg:#ffa657;
+  --k-insight-bg:#241a33;    --k-insight-fg:#d2a8ff;
+  --k-prompt-bg:#31132a;     --k-prompt-fg:#f778ba;
+  --k-suggestion-bg:#272115; --k-suggestion-fg:#e3b341;
+  --k-result-bg:#0f2a2c;     --k-result-fg:#39c5cf;
+  --k-reference-bg:#241a33;  --k-reference-fg:#d2a8ff;
 
-  --shadow-card:0 1px 2px rgba(0,0,0,.4);
-  --shadow-pop:0 20px 50px rgba(0,0,0,.55);
-  --ring:0 0 0 3px rgba(111,179,176,.35);
+  --shadow-card:0 0 transparent;
+  --shadow-pop:0 8px 24px rgba(1,4,9,.6);
+  --ring:0 0 0 3px rgba(63,185,80,.35);
 }

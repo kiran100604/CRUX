@@ -36,34 +36,44 @@ def _popup_command() -> list[str]:
 
 
 def _render_icon_png(size: int = 128) -> bytes:
-    """CRUX's mark as a PNG, drawn in pure Python (no Pillow): a teal disc with a
-    cream core on a transparent ground. Antialiased edges so it looks crisp at
-    taskbar size."""
+    """CRUX's mark as a PNG, drawn in pure Python (no Pillow): the brand — a green
+    rounded square with a white X — matching the favicon. Antialiased so it stays
+    crisp at taskbar size."""
+    import math
     import struct
     import zlib
 
     cx = cy = size / 2.0
-    r_out = size * 0.46
-    r_in = size * 0.13
-    teal = (20, 48, 48)
-    cream = (253, 248, 236)
-
-    def _cov(d: float, edge: float) -> float:  # 1px-soft edge coverage
-        return max(0.0, min(1.0, (edge - d) + 0.5))
+    green = (31, 136, 61)       # #1f883d
+    white = (255, 255, 255)
+    half = size * 0.44          # half the rounded square
+    rr = size * 0.22            # corner radius
+    arm = size * 0.24           # half-length of each X stroke
+    stroke = size * 0.075       # half stroke width
+    inv = 1.0 / math.sqrt(2)
 
     raw = bytearray()
     for y in range(size):
         raw.append(0)  # PNG filter type 0 for the row
         for x in range(size):
-            d = ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5
-            a_out = _cov(d, r_out)
-            if a_out <= 0:
+            px, py = x + 0.5, y + 0.5
+            # rounded-square background (signed-distance, antialiased)
+            qx = abs(px - cx) - (half - rr)
+            qy = abs(py - cy) - (half - rr)
+            dq = math.hypot(max(qx, 0.0), max(qy, 0.0)) + min(max(qx, qy), 0.0) - rr
+            a_bg = max(0.0, min(1.0, 0.5 - dq))
+            if a_bg <= 0:
                 raw.extend((0, 0, 0, 0)); continue
-            a_in = _cov(d, r_in)
-            r = int(cream[0] * a_in + teal[0] * (1 - a_in))
-            g = int(cream[1] * a_in + teal[1] * (1 - a_in))
-            b = int(cream[2] * a_in + teal[2] * (1 - a_in))
-            raw.extend((r, g, b, int(255 * a_out)))
+            # white X on top
+            dx, dy = px - cx, py - cy
+            a_x = 0.0
+            if abs(dx) <= arm and abs(dy) <= arm:
+                d = min(abs(dx - dy) * inv, abs(dx + dy) * inv)
+                a_x = max(0.0, min(1.0, 0.5 + (stroke - d)))
+            r = int(white[0] * a_x + green[0] * (1 - a_x))
+            g = int(white[1] * a_x + green[1] * (1 - a_x))
+            b = int(white[2] * a_x + green[2] * (1 - a_x))
+            raw.extend((r, g, b, int(255 * a_bg)))
 
     def _chunk(typ: bytes, data: bytes) -> bytes:
         body = typ + data
