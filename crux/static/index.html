@@ -276,8 +276,8 @@
   .fsel .subin{border:none; background:none; color:var(--ink); font-family:var(--sans); font-size:13px;
     font-weight:500; outline:none; padding:6px 4px; width:150px}
   .fhint{margin-top:10px; font-size:12.5px; color:var(--muted); line-height:1.5;
-    background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-md); padding:10px 13px}
-  .fhint b{color:var(--teal)}
+    background:var(--card); border:1px solid var(--hair); border-left:3px solid var(--info); border-radius:var(--r-md); padding:10px 13px}
+  .fhint b{color:var(--body)}
   /* threads / working */
   .newthread{display:flex; gap:10px; margin:6px 0 24px}
   .ntinput{flex:1; height:48px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md);
@@ -487,7 +487,7 @@
   .kbglabel{flex:1; font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--ink); min-width:0}
   .kbglabel .gsub{color:var(--muted2); text-transform:none; letter-spacing:0; font-family:var(--sans); font-size:11px}
   .gcount{font-family:var(--mono); font-size:10px; color:var(--muted2); background:var(--soft); border-radius:var(--pill); padding:2px 8px; flex:none}
-  .kbgroup.open .gcount{background:var(--teal-bg); color:var(--teal)}
+  .kbgroup.open .gcount{background:var(--strong); color:var(--body)}
   .kbgitems{display:none; padding:2px 0 6px 14px; margin-left:6px; border-left:1px solid var(--hair)}
   .kbgroup.open .kbgitems{display:block}
   /* while searching, flatten: hide headers and reveal every matching fact */
@@ -495,7 +495,7 @@
   .kbnav.searching .kbgitems{display:block; padding-left:0; margin-left:0; border-left:none}
   .navitem{padding:9px 11px; border-radius:var(--r-sm); cursor:pointer; border:1px solid transparent}
   .navitem:hover{background:var(--soft)}
-  .navitem.sel{background:var(--strong); border-color:var(--hair); box-shadow:inset 2px 0 0 var(--accent)}
+  .navitem.sel{background:var(--strong); border-color:var(--hair); box-shadow:inset 2px 0 0 var(--info)}
   .navitem.sel .nt{color:var(--ink); font-weight:600}
   .navitem .nt{font-size:13.5px; color:var(--ink); font-weight:500; line-height:1.35;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -506,7 +506,7 @@
   .treenode .treenode .kbglabel{font-weight:500; color:var(--body)}
   .treepath{display:flex; flex-wrap:wrap; align-items:center; gap:5px; font-family:var(--mono); font-size:11.5px}
   .pcrumb{background:var(--soft); border-radius:var(--pill); padding:2px 9px; color:var(--body)}
-  .pcrumb:last-child{background:var(--teal-bg); color:var(--teal)}
+  .pcrumb:last-child{background:var(--strong); color:var(--ink)}
   .psep{color:var(--muted2)}
   .kbdetail{background:var(--canvas); border:1px solid var(--hair); border-radius:var(--r-lg); padding:28px 30px}
   .dhead{display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap}
