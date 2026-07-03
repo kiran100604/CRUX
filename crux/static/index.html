@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>CRUX</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f883d'/%3E%3Cpath d='M9 9 L23 23 M23 9 L9 23' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23046E2B'/%3E%3Cpath d='M9 9 L23 23 M23 9 L9 23' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/tokens.css">
 <script>/* apply saved theme before paint to avoid a flash */
   try{if(localStorage.getItem('crux-theme')==='dark')document.documentElement.classList.add('crux-dark');}catch(e){}</script>
@@ -23,12 +23,13 @@
   nav{position:sticky; top:0; z-index:30; height:64px; display:flex; align-items:center; gap:8px;
     padding:0 28px; background:var(--canvas); border-bottom:1px solid var(--hair)}
   .brand{display:flex; align-items:center; margin-right:22px}
-  /* cruX wordmark — the X is two crossing strokes with a green core */
-  .wordmark{font-weight:800; letter-spacing:-.01em; font-size:19px; color:var(--ink);
-    display:inline-flex; align-items:center; font-family:var(--sans); user-select:none}
-  .wordmark .xmark{position:relative; display:inline-block; width:.74em; height:.86em; margin-left:.01em; color:var(--muted)}
-  .wordmark .xmark svg{position:absolute; inset:0; width:100%; height:100%}
-  .wordmark .xmark .core{fill:var(--green); stroke:none}
+  /* cruX logo lockup — brand tile (green square, white X) + wordmark, mirrors the favicon */
+  .wordmark{font-weight:800; letter-spacing:-.02em; font-size:19px; color:var(--ink);
+    display:inline-flex; align-items:center; gap:8px; font-family:var(--sans); user-select:none}
+  .wordmark .tile{width:23px; height:23px; border-radius:7px; background:var(--accent-solid);
+    display:inline-grid; place-items:center; flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .wordmark .tile svg{width:13px; height:13px}
+  .wordmark .tile svg path{stroke:#fff; stroke-width:3.2; stroke-linecap:round}
   .tabs{display:flex; gap:2px}
   /* GitHub-style tabs: text + underline-on-active, not a filled pill */
   .tab{border:none; background:none; color:var(--body); font-size:14px; font-weight:500;
@@ -77,16 +78,20 @@
   .hero h1{font-size:54px; margin:0 0 14px}
   .hero p{font-size:17px; color:var(--muted); max-width:620px; margin:0 0 26px; line-height:1.5}
   .row{display:flex; align-items:center; gap:18px; flex-wrap:wrap}
-  .btn{border:none; border-radius:var(--r-md); font-size:14px; font-weight:600; padding:0 20px; height:46px;
-    display:inline-flex; align-items:center; gap:9px}
-  .btn.primary{background:var(--ink); color:var(--on)}
-  .btn.primary:hover{filter:brightness(1.15)}
-  .btn.ghost{background:transparent; color:var(--ink); text-decoration:underline; text-underline-offset:3px;
-    padding:0 4px; font-weight:500}
-  .btn.teal{background:var(--teal); color:#fff}
-  .btn.sm{height:38px; font-size:13px; padding:0 15px}
-  .btn.out{background:var(--canvas); border:1px solid var(--hair); color:var(--ink)}
+  .btn{border:1px solid transparent; border-radius:var(--r-md); font-size:14px; font-weight:600; padding:0 16px; height:44px;
+    display:inline-flex; align-items:center; gap:9px; cursor:pointer}
+  /* primary = the ONE important/positive action per view → brand green (GitHub-style) */
+  .btn.primary,.btn.teal{background:var(--accent-solid); color:var(--on-accent); border-color:rgba(0,0,0,.12)}
+  .btn.primary:hover,.btn.teal:hover{background:var(--accent-solid-hover)}
+  .btn.ghost{background:transparent; color:var(--info); text-decoration:none;
+    padding:0 6px; font-weight:600}
+  .btn.ghost:hover{text-decoration:underline; text-underline-offset:3px}
+  .btn.sm{height:36px; font-size:13px; padding:0 13px}
+  /* default = neutral gray, the secondary action */
+  .btn.out{background:var(--canvas); border:1px solid var(--hair); color:var(--body)}
+  .btn.out:hover{background:var(--soft); border-color:var(--muted2)}
   .btn.danger{background:transparent; color:var(--coral); border:1px solid var(--coral-line)}
+  .btn.danger:hover{background:var(--coral); color:#fff; border-color:var(--coral)}
 
   .seedbox{width:100%; min-height:120px; border:1px solid var(--hair); background:var(--canvas);
     border-radius:var(--r-md); padding:14px 16px; font-size:15px; color:var(--ink); outline:none;
@@ -132,7 +137,7 @@
   .ev2 .evtxt{flex:1; min-width:0; font-size:13.5px; color:var(--body); line-height:1.45; overflow:hidden; text-overflow:ellipsis}
   .ev2 .evtxt b{color:var(--ink); font-weight:600}
   .ev2 .evwhen{font-size:11px; color:var(--muted2); flex:none}
-  .ev2 .evopen{font-size:12px; color:var(--teal); cursor:pointer; flex:none; white-space:nowrap}
+  .ev2 .evopen{font-size:12px; color:var(--info); cursor:pointer; flex:none; white-space:nowrap}
   .ev2 .evopen:hover{text-decoration:underline}
   .dumpcard.hl{box-shadow:0 0 0 3px rgba(20,48,48,.28); border-color:var(--teal-line)}
 
@@ -224,16 +229,16 @@
   .srcurl{flex:1; min-width:220px; border:1px solid var(--hair); background:var(--canvas); color:var(--ink);
     border-radius:var(--r-sm); padding:8px 12px; font-size:13.5px; font-family:var(--sans)}
   .srcurl:focus{outline:none; border-color:var(--teal-line)}
-  .filebtn{font-size:13px; color:var(--teal); border:1px solid var(--teal-line); background:var(--teal-bg);
+  .filebtn{font-size:13px; color:var(--body); border:1px solid var(--hair); background:var(--canvas);
     border-radius:var(--r-sm); padding:7px 12px; cursor:pointer; flex:none}
-  .filebtn:hover{filter:brightness(.97)}
+  .filebtn:hover{background:var(--soft); border-color:var(--muted2)}
   .srcstatus{font-size:12px; color:var(--muted2); flex-basis:100%; min-height:0}
   .srcstatus.busy{color:var(--peach)} .srcstatus.ok{color:var(--teal)} .srcstatus.err{color:var(--coral)}
   .lensbar{display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 14px}
   .lens{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:var(--pill);
     padding:6px 14px; font-size:13px; cursor:pointer}
   .lens:hover{border-color:var(--muted2)}
-  .lens.on{background:var(--ink); color:var(--on); border-color:var(--ink)}
+  .lens.on{background:var(--emphasis); color:var(--on-emphasis); border-color:var(--emphasis)}
   .lens.new{border-style:dashed; color:var(--muted)}
   .lens .lx{margin-left:6px; opacity:.55} .lens .lx:hover{opacity:1; color:var(--coral)}
 
@@ -250,8 +255,8 @@
   .kbclear:hover{color:var(--ink)}
   .kbsearch{width:100%; height:38px; border:1px solid var(--hair); background:var(--soft); border-radius:var(--r-md);
     padding:0 28px 0 30px; font-size:13px; color:var(--ink); outline:none; box-sizing:border-box}
-  .kbsearch:focus{border-color:var(--teal); background:var(--canvas)}
-  .kbcount{font-family:var(--mono); font-size:10px; color:var(--teal); min-height:13px; margin:-4px 2px 6px}
+  .kbsearch:focus{border-color:var(--info); background:var(--canvas)}
+  .kbcount{font-family:var(--mono); font-size:10px; color:var(--muted); min-height:13px; margin:-4px 2px 6px}
   .kbnav.searching .kbgroup{margin-bottom:2px}
   .kbmodes{display:inline-flex; gap:2px; background:var(--card); border-radius:var(--pill); padding:3px; margin-bottom:12px}
   .kbmode{border:none; background:none; color:var(--muted); font-family:var(--mono); font-size:11px; padding:5px 12px; border-radius:var(--pill)}
@@ -288,7 +293,7 @@
   .curpill{font-family:var(--mono); font-size:10px; color:var(--teal); background:var(--canvas);
     border:1px solid var(--teal-line); border-radius:var(--pill); padding:2px 8px}
   .tcmeta{display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex:none}
-  .bk{cursor:pointer; color:var(--teal)} .bk:hover{text-decoration:underline}
+  .bk{cursor:pointer; color:var(--info)} .bk:hover{text-decoration:underline}
   .threadhd{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:22px}
   .thactions{display:flex; gap:8px; align-items:center; flex:none}
   .tcols{display:grid; grid-template-columns:1fr 380px; gap:30px; align-items:start}
@@ -352,16 +357,16 @@
     border-radius:var(--r-md); padding:11px 14px; font-size:15px; line-height:1.5; color:var(--ink);
     font-weight:500; outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
   .intbox:focus{border-color:var(--ink)}
-  .ctxpanel{background:var(--teal-bg); border:1px solid var(--teal-line); border-radius:var(--r-lg); padding:16px 18px; margin-bottom:18px}
+  .ctxpanel{background:var(--card); border:1px solid var(--hair); border-radius:var(--r-lg); padding:16px 18px; margin-bottom:18px}
   .ctxhd{display:flex; align-items:center; gap:8px; margin-bottom:10px}
-  .ctxlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--teal); flex:1; min-width:0}
-  .ctxbox{width:100%; min-height:120px; border:1px solid var(--teal-line); background:var(--canvas);
+  .ctxlbl{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); flex:1; min-width:0}
+  .ctxbox{width:100%; min-height:120px; border:1px solid var(--hair); background:var(--canvas);
     border-radius:var(--r-md); padding:14px 16px; font-size:14.5px; line-height:1.6; color:var(--ink);
     outline:none; resize:vertical; font-family:var(--sans); white-space:pre-wrap}
-  .ctxbox:focus{border-color:var(--teal)}
+  .ctxbox:focus{border-color:var(--info)}
   .ownedtag,.autotag{font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:var(--pill)}
-  .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--canvas); color:var(--teal)}
-  .resum{cursor:pointer; color:var(--teal); font-family:var(--sans); font-size:12px; white-space:nowrap}
+  .ownedtag{background:var(--peach-bg); color:var(--peach)} .autotag{background:var(--canvas); color:var(--muted)}
+  .resum{cursor:pointer; color:var(--info); font-family:var(--sans); font-size:12px; white-space:nowrap}
   .resum:hover{text-decoration:underline}
   .savedrow{display:none; align-items:center; gap:12px; margin-top:10px}
   .dumprow{display:flex; gap:10px; margin:6px 0 8px}
@@ -369,7 +374,7 @@
   .dumptags .tglbl{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin-right:2px}
   .tagchip{font-size:12px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; transition:.12s}
   .tagchip:hover{border-color:var(--teal); color:var(--ink)}
-  .tagchip.on{background:var(--teal); border-color:var(--teal); color:#fff}
+  .tagchip.on{background:var(--emphasis); border-color:var(--emphasis); color:var(--on-emphasis)}
   .tagchip.clear{border-style:dashed; color:var(--muted2)}
   .tagchip.hidden{display:none}
   .dumphd{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:18px 0 10px}
@@ -381,7 +386,7 @@
   .dcside{flex:none; padding-top:1px}
   .incl{width:26px; height:26px; border-radius:50%; border:1px solid var(--hair); background:var(--canvas);
     color:var(--muted2); font-size:13px; line-height:1; display:grid; place-items:center}
-  .incl.on{background:var(--teal); border-color:var(--teal); color:#fff}
+  .incl.on{background:var(--emphasis); border-color:var(--emphasis); color:var(--on-emphasis)}
   .incl:hover{border-color:var(--muted2)}
   .dcmain{flex:1; min-width:0; cursor:pointer}
   .dctop{display:flex; align-items:center; gap:8px; margin-bottom:6px}
@@ -390,7 +395,7 @@
   .dcsrc{font-family:var(--mono); font-size:9px; color:var(--muted2); background:var(--soft); border-radius:var(--pill); padding:2px 7px}
   .dctext{font-size:13.5px; color:var(--body); line-height:1.5; word-break:break-word; white-space:pre-wrap}
   .dctext:not(.full){display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
-  .more-link{display:inline-block; margin-top:6px; color:var(--teal); font-size:12px; cursor:pointer}
+  .more-link{display:inline-block; margin-top:6px; color:var(--info); font-size:12px; cursor:pointer}
   .dcdel{flex:none; background:none; color:var(--muted2); font-size:18px; line-height:1; padding:0 2px}
   .dcdel:hover{color:var(--coral)}
   .kind{font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 8px; border-radius:var(--pill); background:var(--soft); color:var(--muted); font-weight:600}
@@ -415,7 +420,7 @@
   .kbhdrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px}
   .kbtoggle{display:inline-flex; gap:2px; background:var(--card); border:1px solid var(--hair); border-radius:var(--pill); padding:3px; flex:none}
   .kbtog{border:none; background:none; color:var(--muted); font-size:13px; padding:6px 14px; border-radius:var(--pill)}
-  .kbtog.on{background:var(--ink); color:var(--on)}
+  .kbtog.on{background:var(--emphasis); color:var(--on-emphasis)}
   /* chat fills the viewport: header + input pinned, only the stream scrolls.
      In ask mode the body scroll is locked (see body.kb-ask) so nothing drifts. */
   .askview{display:flex; flex-direction:column; height:calc(100vh - 100px); min-height:440px}
@@ -423,13 +428,13 @@
   .askstream{flex:1; overflow-y:auto; margin:16px 0 0; padding:4px 2px 8px; min-height:0}
   .askfoot{flex:none; padding-top:12px; border-top:1px solid var(--hair); margin-top:4px}
   .qrow{display:flex; justify-content:flex-end; margin-bottom:14px}
-  .qbub{background:var(--teal); color:#fff; border-radius:14px 14px 4px 14px; padding:11px 15px; font-size:14.5px; max-width:75%}
+  .qbub{background:var(--info); color:#fff; border-radius:14px 14px 4px 14px; padding:11px 15px; font-size:14.5px; max-width:75%}
   .arow{margin-bottom:24px}
   .abub{background:var(--canvas); border:1px solid var(--hair); border-radius:4px 14px 14px 14px; padding:16px 18px;
     font-size:14.5px; line-height:1.65; color:var(--body); max-width:820px}
-  .cite{font-family:var(--mono); font-size:10px; background:var(--teal-bg); color:var(--teal); border-radius:5px;
+  .cite{font-family:var(--mono); font-size:10px; background:var(--k-decision-bg); color:var(--info); border-radius:5px;
     padding:1px 5px; vertical-align:super; cursor:pointer; margin:0 1px}
-  .cite:hover{background:var(--teal); color:#fff}
+  .cite:hover{background:var(--info); color:#fff}
   .askthinking{display:flex; align-items:center; gap:10px; color:var(--muted2); font-size:13px; padding:8px 2px}
   .srclabel{font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted2); margin:16px 0 9px}
   /* sources are collapsed by default — answer first, evidence on demand */
@@ -457,7 +462,7 @@
   .schip:hover{border-color:var(--teal-line)}
   .askbar{display:flex; gap:10px}
   .askbar input{flex:1; height:50px; border:1px solid var(--hair); background:var(--canvas); border-radius:13px; padding:0 18px; font-size:15px; color:var(--ink); outline:none}
-  .askbar input:focus{border-color:var(--teal)}
+  .askbar input:focus{border-color:var(--info)}
   .askbar .btn{height:50px}
   .askground{font-size:11px; color:var(--muted2); text-align:center; margin-top:8px}
   /* fact detail overlay */
@@ -490,14 +495,12 @@
   .kbnav.searching .kbgitems{display:block; padding-left:0; margin-left:0; border-left:none}
   .navitem{padding:9px 11px; border-radius:var(--r-sm); cursor:pointer; border:1px solid transparent}
   .navitem:hover{background:var(--soft)}
-  .navitem.sel{background:var(--ink)}
-  .navitem.sel .nt{color:var(--on)}
+  .navitem.sel{background:var(--strong); border-color:var(--hair); box-shadow:inset 2px 0 0 var(--accent)}
+  .navitem.sel .nt{color:var(--ink); font-weight:600}
   .navitem .nt{font-size:13.5px; color:var(--ink); font-weight:500; line-height:1.35;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .navitem .ni{display:flex; align-items:center; gap:6px; margin-top:5px}
-  .navitem.sel .ipill{background:rgba(255,255,255,.18); color:var(--on)}
   .nbadge{font-family:var(--mono); font-size:10px; color:var(--muted2)}
-  .navitem.sel .nbadge{color:rgba(255,255,255,.7)}
   /* tree browsing: deeper nodes read as sentence-case topics, not shouty headers */
   .treenode .kbglabel{text-transform:none; letter-spacing:.01em; font-family:var(--sans); font-size:13px; font-weight:600}
   .treenode .treenode .kbglabel{font-weight:500; color:var(--body)}
@@ -530,7 +533,7 @@
   .empty .big{font-size:20px; color:var(--muted); margin-bottom:8px; font-weight:500}
 
   .toast{position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(16px); z-index:60;
-    background:var(--ink); color:var(--on); border-radius:var(--r-md); padding:12px 20px; font-size:14px; opacity:0;
+    background:var(--emphasis); color:var(--on-emphasis); border-radius:var(--r-md); padding:12px 20px; font-size:14px; opacity:0;
     transition:.3s; pointer-events:none}
   .toast.on{opacity:1; transform:translateX(-50%)}
   footer{background:var(--soft); border-top:1px solid var(--hair); padding:34px 28px; text-align:center;
@@ -595,7 +598,7 @@
 <body>
 <nav>
   <div class="brand">
-    <span class="wordmark">cru<span class="xmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 5 L19 19 M19 5 L5 19"/><circle class="core" cx="12" cy="12" r="3.4"/></svg></span></span>
+    <span class="wordmark"><span class="tile"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6 L18 18 M18 6 L6 18"/></svg></span>crux</span>
   </div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-v="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Overview</button>

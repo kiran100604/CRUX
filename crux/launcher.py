@@ -44,7 +44,7 @@ def _render_icon_png(size: int = 128) -> bytes:
     import zlib
 
     cx = cy = size / 2.0
-    green = (31, 136, 61)       # #1f883d
+    green = (4, 110, 43)        # #046E2B — CRUX brand green
     white = (255, 255, 255)
     half = size * 0.44          # half the rounded square
     rr = size * 0.22            # corner radius

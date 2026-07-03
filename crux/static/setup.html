@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>CRUX — Setup</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f883d'/%3E%3Cpath d='M9 9 L23 23 M23 9 L9 23' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23046E2B'/%3E%3Cpath d='M9 9 L23 23 M23 9 L9 23' stroke='white' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/tokens.css">
 <script>try{if(localStorage.getItem('crux-theme')==='dark')document.documentElement.classList.add('crux-dark');}catch(e){}</script>
 <style>
@@ -16,11 +16,12 @@
     -webkit-font-smoothing:antialiased; display:flex; align-items:flex-start; justify-content:center}
   .wrap{width:100%; max-width:680px; padding:48px 24px 80px}
   .brand{display:flex; align-items:center; margin-bottom:34px}
-  .wordmark{font-weight:800; letter-spacing:-.01em; font-size:22px; color:var(--ink);
-    display:inline-flex; align-items:center; font-family:var(--sans)}
-  .wordmark .xmark{position:relative; display:inline-block; width:.74em; height:.86em; margin-left:.01em; color:var(--muted)}
-  .wordmark .xmark svg{position:absolute; inset:0; width:100%; height:100%}
-  .wordmark .xmark .core{fill:var(--green); stroke:none}
+  .wordmark{font-weight:800; letter-spacing:-.02em; font-size:22px; color:var(--ink);
+    display:inline-flex; align-items:center; gap:9px; font-family:var(--sans)}
+  .wordmark .tile{width:27px; height:27px; border-radius:8px; background:var(--accent-solid);
+    display:inline-grid; place-items:center; flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .wordmark .tile svg{width:15px; height:15px}
+  .wordmark .tile svg path{stroke:#fff; stroke-width:3.2; stroke-linecap:round}
   .kicker{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
     color:var(--muted2); margin-bottom:14px}
   h1{font-size:38px; font-weight:600; letter-spacing:-.02em; color:var(--ink); margin:0 0 12px; line-height:1.1}
@@ -40,7 +41,7 @@
   .chord{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:10px;
     padding:11px 15px; font-family:var(--mono); font-size:13px; cursor:pointer; transition:.12s}
   .chord:hover{border-color:var(--muted2)}
-  .chord.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .chord.on{border-color:var(--emphasis); background:var(--emphasis); color:var(--on-emphasis)}
   .recorder{border:1.5px dashed var(--muted2); border-radius:10px; padding:14px 16px; font-family:var(--mono);
     font-size:14px; color:var(--ink); background:var(--canvas); cursor:text; outline:none; text-align:center}
   .recorder:focus{border-style:solid; border-color:var(--ink); background:var(--soft)}
@@ -55,9 +56,9 @@
   .toggle .lbl small{display:block; color:var(--muted); font-weight:400; font-size:12.5px; margin-top:2px}
   .hint{font-size:12.5px; color:var(--muted2); margin-top:12px; line-height:1.5}
   .go{margin-top:26px; display:flex; align-items:center; gap:16px}
-  .btn{border:none; border-radius:12px; font-size:15px; font-weight:600; padding:0 26px; height:50px;
-    background:var(--ink); color:#fff; cursor:pointer; display:inline-flex; align-items:center; gap:9px}
-  .btn:hover{filter:brightness(1.2)} .btn:disabled{opacity:.5; cursor:default}
+  .btn{border:1px solid rgba(0,0,0,.12); border-radius:12px; font-size:15px; font-weight:600; padding:0 26px; height:50px;
+    background:var(--accent-solid); color:var(--on-accent); cursor:pointer; display:inline-flex; align-items:center; gap:9px}
+  .btn:hover{background:var(--accent-solid-hover)} .btn:disabled{opacity:.5; cursor:default}
   .skip{font-size:14px; color:var(--muted); text-decoration:underline; text-underline-offset:3px; cursor:pointer}
   .done{text-align:center; padding:40px 0}
   .done .tick{width:64px;height:64px;border-radius:50%;background:var(--teal-bg);border:1px solid var(--teal-line);
@@ -71,7 +72,7 @@
 <body>
 <div class="wrap" id="root">
   <div class="brand">
-    <span class="wordmark">cru<span class="xmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M5 5 L19 19 M19 5 L5 19"/><circle class="core" cx="12" cy="12" r="3.4"/></svg></span></span>
+    <span class="wordmark"><span class="tile"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6 L18 18 M18 6 L6 18"/></svg></span>crux</span>
   </div>
   <div id="body"></div>
   <div class="privacy">LOCAL-FIRST · YOUR DATA NEVER LEAVES THIS MACHINE</div>

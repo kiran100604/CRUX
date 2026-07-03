@@ -26,11 +26,16 @@
   --ink:#010409; --body:#1f2328; --muted:#59636e; --muted2:#818b98;
   --on:#ffffff;                    /* text on an --ink/accent fill */
 
-  /* Base — accents, each a fg / bg / line trio (used as MEANING, not decoration) */
-  --teal:#1f883d;  --teal-bg:#dafbe1;  --teal-line:#1f883d40;   /* BRAND GREEN — trusted/primary */
+  /* Base — accents, each a fg / bg / line trio (used as MEANING, not decoration).
+     Green is used SPARINGLY — for positive/important moments (primary action,
+     verified, ready) — not as a blanket accent. Neutral + blue carry the rest. */
+  --teal:#046E2B;  --teal-bg:#e6f4ea;  --teal-line:#046E2B33;   /* BRAND GREEN — success/primary */
+  --accent-solid:#046E2B; --accent-solid-hover:#035c23;         /* filled primary button */
+  --on-accent:#ffffff;                                           /* text on a green/emphasis fill */
+  --emphasis:#1f2328; --on-emphasis:#ffffff;                    /* neutral dark fill (selected/toast) */
   --peach:#9a6700; --peach-bg:#fff8c5; --peach-line:#d4a72c66;  /* attention amber — working/owned */
   --coral:#cf222e; --coral-bg:#ffebe9; --coral-line:#cf222e40;  /* danger red — conflict/constraint */
-  --green:#1f883d;                 /* live / verified / success (== brand) */
+  --green:#046E2B;                 /* live / verified / success (== brand) */
   --info:#0969da;                  /* informational blue (links, decision) */
 
   /* 2. Semantic aliases — reach for these when the ROLE matters more than the value */
@@ -71,7 +76,10 @@ html.crux-dark {
   --ink:#f0f6fc; --body:#e6edf3; --muted:#7d8590; --muted2:#6e7681;
   --on:#ffffff;
 
-  --teal:#3fb950;  --teal-bg:#12261e;  --teal-line:#3fb95055;   /* brand green */
+  --teal:#3fb950;  --teal-bg:#0c2818;  --teal-line:#3fb95044;   /* brand green (brighter for text on dark) */
+  --accent-solid:#046E2B; --accent-solid-hover:#0a7d33;         /* filled primary button */
+  --on-accent:#ffffff;
+  --emphasis:#e6edf3; --on-emphasis:#0d1117;                    /* neutral light fill (selected/toast) */
   --peach:#d29922; --peach-bg:#272115; --peach-line:#d2992255;  /* attention */
   --coral:#f85149; --coral-bg:#25171a; --coral-line:#f8514955;  /* danger */
   --green:#3fb950;
