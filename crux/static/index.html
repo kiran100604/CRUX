@@ -61,7 +61,9 @@
     border-radius:var(--pill); padding:5px 11px}
   .status b{color:var(--green)}
   .who{display:flex; align-items:center; gap:8px; border:1px solid var(--hair); border-radius:var(--pill);
-    padding:4px 12px 4px 4px; font-size:13px; color:var(--ink)}
+    padding:4px 12px 4px 4px; font-size:13px; color:var(--ink); cursor:pointer; transition:.12s}
+  .who:hover{border-color:var(--muted2); background:var(--soft)}
+  .who:focus-visible{outline:2px solid var(--emphasis); outline-offset:2px}
   .who .av{width:26px;height:26px;border-radius:50%;background:var(--teal);color:#fff;font-size:11px;
     font-weight:600;display:grid;place-items:center}
 
@@ -221,6 +223,36 @@
   .edges .ep:hover{filter:brightness(.97)}
   .acts{display:flex; flex-direction:column; gap:9px}
   .acts .btn{justify-content:center; width:100%}
+
+  /* settings drawer */
+  .setsec{border-top:1px solid var(--hair); padding:20px 0 4px; margin-top:4px}
+  .setsec:first-of-type{border-top:none; padding-top:0}
+  .setsec .sh{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--teal); margin-bottom:6px}
+  .setsec .sp{font-size:13px; color:var(--muted); line-height:1.55; margin:0 0 14px}
+  .setfield{display:block; margin-bottom:12px}
+  .setfield>span{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--muted); margin-bottom:6px}
+  .setfield .set-on{font-family:var(--mono); font-size:10px; letter-spacing:.05em; color:var(--green)}
+  .setfield .set-off{font-family:var(--mono); font-size:10px; letter-spacing:.05em; color:var(--muted2)}
+  .setin{width:100%; height:44px; border:1px solid var(--hair); background:var(--canvas); border-radius:var(--r-md);
+    padding:0 14px; font-size:14px; color:var(--ink); outline:none; font-family:var(--mono)}
+  .setin:focus{border-color:var(--ink)}
+  details.setadv{margin:2px 0 0} details.setadv summary{font-size:13px; color:var(--muted); cursor:pointer; padding:6px 0; list-style:none}
+  details.setadv[open] summary{margin-bottom:8px}
+  .chords{display:flex; flex-wrap:wrap; gap:8px}
+  .chord{border:1px solid var(--hair); background:var(--canvas); color:var(--body); border-radius:10px;
+    padding:9px 13px; font-family:var(--mono); font-size:12.5px; cursor:pointer; transition:.12s}
+  .chord:hover{border-color:var(--muted2)}
+  .chord.on{border-color:var(--emphasis); background:var(--emphasis); color:var(--on-emphasis)}
+  .recorder{border:1.5px dashed var(--muted2); border-radius:10px; padding:12px 14px; font-family:var(--mono);
+    font-size:13px; color:var(--ink); background:var(--canvas); cursor:text; outline:none; text-align:center; margin-top:10px}
+  .recorder:focus{border-style:solid; border-color:var(--ink); background:var(--soft)}
+  .vmsg{font-size:12px; color:var(--muted); margin-top:8px} .vmsg.ok{color:var(--green)} .vmsg.bad{color:var(--coral)}
+  .toggle{display:flex; align-items:center; gap:12px; cursor:pointer}
+  .switch{width:44px; height:26px; border-radius:var(--pill); background:var(--strong,#e3d9bf); position:relative; transition:.18s; flex:none; border:1px solid var(--hair)}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.18s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .toggle.on .switch{background:var(--green); border-color:var(--green)}
+  .toggle.on .switch::after{transform:translateX(18px)}
+  .toggle .lbl{font-size:14px; color:var(--ink); font-weight:500} .toggle .lbl small{display:block; color:var(--muted); font-weight:400; font-size:12.5px; margin-top:2px}
 
   /* lenses (emergent topics) */
   .srcbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 14px; padding:12px 14px;
@@ -611,7 +643,7 @@
     <button class="pinbtn" id="pinbtn" onclick="addToTaskbar()" title="Add a capture icon to your taskbar — copy text anywhere, click it, pick a tag" aria-label="Add to taskbar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z"/><path d="M12 16v4"/></svg><span class="pinlbl">Add to taskbar</span></button>
     <button class="themebtn" id="themebtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">◐</button>
     <span class="status">Local · <b>READY</b></span>
-    <span class="who"><span class="av" id="av">U</span><span id="whoname">You</span></span>
+    <span class="who" id="who" role="button" tabindex="0" onclick="openSettings()" title="Settings — API keys, capture hotkey, Claude Code hook"><span class="av" id="av">U</span><span id="whoname">You</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:.55"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
   </div>
 </nav>
 
@@ -1743,6 +1775,151 @@ document.getElementById("scrim").addEventListener("click",closeDrawer);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
 document.addEventListener("click",e=>{const box=document.getElementById("res");
   if(box&&!e.target.closest(".capture"))box.classList.remove("on");});
+
+/* ---------------- settings ---------------- */
+// Local state for the settings drawer (keys are write-only; we only learn
+// whether each is already set, never the value itself).
+let SET={data:null, sel:0, custom:null, customMode:false, presets:[], hook:true};
+const _scap=m=>m==="cmd"?"Super":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
+const _chordLabel=(mods,key)=>[...mods.map(_scap),(key==="space"?"Space":key.toUpperCase())].join(" + ");
+const _RESERVED={"ctrl+shift+i":"browser DevTools","ctrl+shift+j":"browser DevTools","ctrl+shift+c":"browser DevTools",
+  "ctrl+shift+k":"browser console","ctrl+w":"close tab","ctrl+t":"new tab","ctrl+n":"new window","ctrl+q":"quit app",
+  "ctrl+c":"copy","ctrl+v":"paste","ctrl+x":"cut","ctrl+z":"undo","ctrl+a":"select all","ctrl+s":"save",
+  "alt+tab":"switch windows","alt+f4":"close window"};
+function _validateChord(mods,key){
+  if(!key) return {ok:false,msg:"Press a key."};
+  if(!/^([a-z0-9]|space|f([1-9]|1[0-2]))$/.test(key)) return {ok:false,msg:"Use a letter, number, Space, or F-key."};
+  if(!mods.some(m=>["ctrl","alt","cmd"].includes(m))) return {ok:false,msg:"Add Ctrl, Alt, or Super — a bare key fires all the time."};
+  if(SET.data&&SET.data.platform!=="darwin"&&mods.includes("cmd")) return {ok:false,msg:"Super/Win gets grabbed by the desktop — use Ctrl or Alt."};
+  const id=["ctrl","alt","shift","cmd"].filter(m=>mods.includes(m)).join("+")+"+"+key;
+  if(_RESERVED[id]) return {ok:false,msg:`Reserved for ${_RESERVED[id]} — pick another.`};
+  return {ok:true,msg:"Looks good."};
+}
+function _buildPresets(plat){
+  const mk=(mods,key)=>({mods,key,label:_chordLabel(mods,key)});
+  if(plat==="darwin") return [mk(["cmd","shift"],"space"),mk(["cmd","ctrl"],"c"),mk(["cmd","ctrl"],"space"),mk(["cmd","shift"],"u")];
+  return [mk(["ctrl","shift"],"space"),mk(["ctrl","alt"],"c"),mk(["ctrl","alt"],"k"),mk(["ctrl","alt"],"space")];
+}
+function _normKey(e){
+  if(e.key===" "||e.code==="Space") return "space";
+  if(/^[a-zA-Z]$/.test(e.key)) return e.key.toLowerCase();
+  if(/^[0-9]$/.test(e.key)) return e.key;
+  if(/^F([1-9]|1[0-2])$/.test(e.key)) return e.key.toLowerCase();
+  return e.key.toLowerCase();
+}
+async function openSettings(){
+  document.getElementById("drawer").innerHTML='<div class="booting"><div class="spin"></div>Loading settings…</div>';
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("scrim").classList.add("on");
+  let d; try{ d=await api("/api/setup"); }catch(e){ toast("⚠ Couldn't load settings"); return; }
+  SET.data=d; SET.presets=_buildPresets(d.platform); SET.hook=!!d.hook_installed; SET.custom=null; SET.customMode=false;
+  // preselect the preset matching the current hotkey (from whoami), else Custom
+  SET.sel=0;
+  const cur=(state.hotkey||"").trim();
+  const pi=SET.presets.findIndex(p=>p.label===cur);
+  if(cur){ if(pi>=0){ SET.sel=pi; } else { SET.customMode=true; } }
+  renderSettings();
+}
+function renderSettings(){
+  const d=SET.data, plat=d.platform==="darwin"?"macOS":d.platform==="win32"?"Windows":"Linux";
+  const status=set=>set?'<span class="set-on">● set — leave blank to keep</span>':'<span class="set-off">not set</span>';
+  document.getElementById("drawer").innerHTML=`
+    <span class="tier teal">⚙ SETTINGS</span>
+    <h2>Settings</h2>
+    <div class="ds">Everything here stays on this ${plat} machine. Leave a key blank to keep the current one.</div>
+
+    <div class="setsec">
+      <div class="sh">Model &amp; API keys</div>
+      <p class="sp">One <b>NVIDIA API key</b> powers the LLM and embeddings. Free key at <span class="mono">build.nvidia.com</span>. Blank = stay offline.</p>
+      <label class="setfield"><span>NVIDIA API key ${status(d.has_nvidia)}</span>
+        <input id="set-nv" class="setin" type="password" placeholder="${d.has_nvidia?'••••••••':'nvapi-…'}" autocomplete="off"></label>
+      <details class="setadv" ${(d.has_anthropic||d.has_openai)?'open':''}><summary>Use a different provider</summary>
+        <label class="setfield"><span>Anthropic API key (LLM) ${status(d.has_anthropic)}</span>
+          <input id="set-ak" class="setin" type="password" placeholder="${d.has_anthropic?'••••••••':'sk-ant-…'}" autocomplete="off"></label>
+        <label class="setfield"><span>OpenAI API key (embeddings) ${status(d.has_openai)}</span>
+          <input id="set-ok" class="setin" type="password" placeholder="${d.has_openai?'••••••••':'sk-…'}" autocomplete="off"></label>
+      </details>
+    </div>
+
+    <div class="setsec">
+      <div class="sh">Capture hotkey</div>
+      <p class="sp">Select text anywhere → press the chord → it's saved. Active while the CRUX tray app runs.</p>
+      <div class="chords" id="set-chords"></div>
+      <div id="set-chordhint" class="vmsg"></div>
+    </div>
+
+    <div class="setsec">
+      <div class="sh">Claude Code</div>
+      <p class="sp">Auto-injects your verified knowledge on every prompt — writes to <span class="mono">~/.claude/settings.json</span>.</p>
+      <div class="toggle ${SET.hook?'on':''}" id="set-hooktoggle">
+        <div class="switch"></div>
+        <div class="lbl">Install the Claude Code hook${d.hook_installed?' <small>currently installed</small>':'<small>currently off</small>'}</div>
+      </div>
+    </div>
+
+    <div class="acts" style="margin-top:20px">
+      <button class="btn teal" id="set-save" onclick="saveSettings()">Save settings</button>
+      <button class="btn out" onclick="closeDrawer()">Cancel</button>
+    </div>`;
+  document.getElementById("set-hooktoggle").onclick=()=>{SET.hook=!SET.hook;
+    document.getElementById("set-hooktoggle").classList.toggle("on",SET.hook);};
+  drawSetChords();
+}
+function drawSetChords(){
+  const box=document.getElementById("set-chords"); if(!box) return;
+  box.innerHTML=SET.presets.map((c,i)=>`<button class="chord ${(!SET.customMode&&i===SET.sel)?'on':''}" data-i="${i}">${c.label}</button>`).join("")
+    +`<button class="chord ${SET.customMode?'on':''}" id="set-customchip">✎ Custom…</button>`;
+  box.querySelectorAll(".chord[data-i]").forEach(b=>b.onclick=()=>{SET.customMode=false; SET.sel=+b.dataset.i; drawSetChords();});
+  document.getElementById("set-customchip").onclick=()=>{SET.customMode=true; drawSetChords();
+    setTimeout(()=>{const r=document.getElementById("set-recorder"); if(r) r.focus();},0);};
+  updateSetHint();
+}
+function updateSetHint(){
+  const h=document.getElementById("set-chordhint"); if(!h) return;
+  if(SET.customMode){
+    const v=SET.custom?_validateChord(SET.custom.mods,SET.custom.key):null;
+    h.innerHTML=`<div tabindex="0" id="set-recorder" class="recorder">${SET.custom?SET.custom.label:"Click here, then press your shortcut…"}</div>`
+      +`<div class="vmsg ${v?(v.ok?'ok':'bad'):''}">`+(v?(v.ok?"✓ ":"⚠ ")+v.msg:"Press a modifier + a letter/number/Space/F-key.")+`</div>`;
+    const r=document.getElementById("set-recorder");
+    if(r) r.onkeydown=e=>{e.preventDefault();
+      if(["Control","Alt","Shift","Meta","OS"].includes(e.key)) return;
+      const mods=[]; if(e.ctrlKey)mods.push("ctrl"); if(e.altKey)mods.push("alt"); if(e.shiftKey)mods.push("shift"); if(e.metaKey)mods.push("cmd");
+      const key=_normKey(e); SET.custom={mods,key,label:_chordLabel(mods,key)}; updateSetHint();};
+    return;
+  }
+  const c=SET.presets[SET.sel];
+  const tips={darwin:"The tray app registers this chord (needs Accessibility permission).",
+    win32:"The tray app registers this chord directly.",
+    linux:"On Wayland, run `crux bind` to register it at the OS level."};
+  h.className="vmsg"; h.textContent=`Chosen: ${c.label}. `+(tips[SET.data.platform]||"");
+}
+async function saveSettings(){
+  let mods,key;
+  if(SET.customMode){
+    const v=SET.custom&&_validateChord(SET.custom.mods,SET.custom.key);
+    if(!v||!v.ok){ updateSetHint(); toast("⚠ Pick a valid custom hotkey first"); return; }
+    mods=SET.custom.mods; key=SET.custom.key;
+  } else { mods=SET.presets[SET.sel].mods; key=SET.presets[SET.sel].key; }
+  const val=id=>{const el=document.getElementById(id); return (el&&el.value.trim())||null;};
+  const btn=document.getElementById("set-save"); if(btn){btn.disabled=true; btn.textContent="Saving…";}
+  try{
+    const r=await post("/api/setup",{
+      nvidia_key:val("set-nv"), anthropic_key:val("set-ak"), openai_key:val("set-ok"),
+      install_hook:SET.hook, chord_mods:mods, chord_key:key});
+    state.hotkey=r.chord||state.hotkey;
+    const bits=[`Hotkey ${r.chord}`];
+    if(r.chord_rejected) bits.push(`(kept old — ${r.chord_rejected})`);
+    if(r.keys_saved&&r.keys_saved.length) bits.push(`${r.keys_saved.length} key${r.keys_saved.length>1?'s':''} saved`);
+    if(r.providers&&r.providers!=="offline") bits.push(`live on ${r.providers}`);
+    toast("✓ "+bits.join(" · "));
+    closeDrawer();
+  }catch(e){ toast("⚠ Couldn't save settings ("+e+")"); }
+  if(btn){btn.disabled=false; btn.textContent="Save settings";}
+}
+// keyboard access for the avatar button
+(function(){const w=document.getElementById("who");
+  if(w) w.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault(); openSettings();}});})();
+window.openSettings=openSettings;window.saveSettings=saveSettings;
 
 window.setView=setView;window.openItem=openItem;window.doCapture=doCapture;window.promote=promote;
 window.promoteRefined=promoteRefined;window.archive=archive;window.demote=demote;window.supersede=supersede;
