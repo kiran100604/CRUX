@@ -204,7 +204,23 @@ def create_app(cfg: Config):
             "hook_installed": hook,
             "default_mods": ["cmd" if plat == "darwin" else "ctrl", "shift"],
             "default_key": "space",
+            "cwd": os.getcwd(),
         }
+
+    class ConnectEditorIn(BaseModel):
+        editor: str
+        project_dir: str | None = None
+        write_rules: bool = True
+
+    @app.post("/api/connect-editor")
+    def connect_editor_api(body: ConnectEditorIn):
+        import sys as _sys
+        from .install import connect_editor
+        try:
+            return connect_editor(body.editor, body.project_dir, _sys.executable,
+                                  write_rules=body.write_rules, crux_home=cfg.home)
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:200]}
 
     @app.post("/api/setup")
     def setup_apply(body: SetupIn):
