@@ -1779,7 +1779,7 @@ document.addEventListener("click",e=>{const box=document.getElementById("res");
 /* ---------------- settings ---------------- */
 // Local state for the settings drawer (keys are write-only; we only learn
 // whether each is already set, never the value itself).
-let SET={data:null, sel:0, custom:null, customMode:false, presets:[], hook:true};
+let SET={data:null, sel:0, custom:null, customMode:false, presets:[], hook:true, autostart:false};
 const _scap=m=>m==="cmd"?"Super":m==="ctrl"?"Ctrl":m[0].toUpperCase()+m.slice(1);
 const _chordLabel=(mods,key)=>[...mods.map(_scap),(key==="space"?"Space":key.toUpperCase())].join(" + ");
 const _RESERVED={"ctrl+shift+i":"browser DevTools","ctrl+shift+j":"browser DevTools","ctrl+shift+c":"browser DevTools",
@@ -1812,7 +1812,7 @@ async function openSettings(){
   document.getElementById("drawer").classList.add("on");
   document.getElementById("scrim").classList.add("on");
   let d; try{ d=await api("/api/setup"); }catch(e){ toast("⚠ Couldn't load settings"); return; }
-  SET.data=d; SET.presets=_buildPresets(d.platform); SET.hook=!!d.hook_installed; SET.custom=null; SET.customMode=false;
+  SET.data=d; SET.presets=_buildPresets(d.platform); SET.hook=!!d.hook_installed; SET.autostart=!!d.autostart; SET.custom=null; SET.customMode=false;
   // preselect the preset matching the current hotkey (from whoami), else Custom
   SET.sel=0;
   const cur=(state.hotkey||"").trim();
@@ -1869,13 +1869,37 @@ function renderSettings(){
       <div id="set-editor-result" class="vmsg"></div>
     </div>
 
+    <div class="setsec">
+      <div class="sh">Start on login</div>
+      <p class="sp">Run CRUX in the background when you log in — no terminal to keep open, and the dashboard is always a click away. Takes effect immediately.</p>
+      <div class="toggle ${SET.autostart?'on':''}" id="set-autostart">
+        <div class="switch"></div>
+        <div class="lbl">Start CRUX automatically on login<small id="set-autostart-note">${SET.autostart?'currently on':'currently off'}</small></div>
+      </div>
+    </div>
+
     <div class="acts" style="margin-top:20px">
       <button class="btn teal" id="set-save" onclick="saveSettings()">Save settings</button>
       <button class="btn out" onclick="closeDrawer()">Cancel</button>
     </div>`;
   document.getElementById("set-hooktoggle").onclick=()=>{SET.hook=!SET.hook;
     document.getElementById("set-hooktoggle").classList.toggle("on",SET.hook);};
+  document.getElementById("set-autostart").onclick=()=>toggleAutostart();
   drawSetChords();
+}
+async function toggleAutostart(){
+  const el=document.getElementById("set-autostart"), note=document.getElementById("set-autostart-note");
+  const want=!SET.autostart;
+  el.style.opacity=".6"; if(note) note.textContent=want?"enabling…":"disabling…";
+  try{
+    const r=await post("/api/autostart",{enabled:want});
+    if(r&&r.ok!==false){ SET.autostart=want; el.classList.toggle("on",want);
+      if(note) note.textContent=want?"currently on":"currently off";
+      toast((want?"✓ ":"")+((r&&r.message)||(want?"Starts on login.":"Won't start on login.")));
+    } else { if(note) note.textContent=SET.autostart?"currently on":"currently off";
+      toast("⚠ "+((r&&(r.error||r.message))||"Couldn't change autostart.")); }
+  }catch(e){ if(note) note.textContent=SET.autostart?"currently on":"currently off"; toast("⚠ Couldn't change autostart ("+e+")"); }
+  el.style.opacity="";
 }
 function drawSetChords(){
   const box=document.getElementById("set-chords"); if(!box) return;
@@ -1946,7 +1970,7 @@ async function connectEditor(editor){
 // keyboard access for the avatar button
 (function(){const w=document.getElementById("who");
   if(w) w.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault(); openSettings();}});})();
-window.openSettings=openSettings;window.saveSettings=saveSettings;window.connectEditor=connectEditor;
+window.openSettings=openSettings;window.saveSettings=saveSettings;window.connectEditor=connectEditor;window.toggleAutostart=toggleAutostart;
 
 window.setView=setView;window.openItem=openItem;window.doCapture=doCapture;window.promote=promote;
 window.promoteRefined=promoteRefined;window.archive=archive;window.demote=demote;window.supersede=supersede;

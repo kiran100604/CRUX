@@ -18,7 +18,7 @@ def _ask(prompt: str, default_yes: bool = True) -> bool:
 
 def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
         openai_key: str | None = None, install_hook: bool = True,
-        write_hotkey: bool = True) -> None:
+        write_hotkey: bool = True, enable_login: bool = True) -> None:
     """Configure CRUX. In --yes/non-interactive mode it never prompts: it uses
     the keys passed in (or leaves you on offline models) and applies the
     recommended defaults, so an installer script can run it unattended."""
@@ -75,6 +75,16 @@ def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
         print("   " + ("✓ " if res.get("ok") else "· ") + res.get("message", "") + "\n")
     else:
         print("   · skipped — add it later from the dashboard or `crux install-launcher`\n")
+
+    # 5. Start on login — so there's no terminal to keep open (the whole point of
+    #    "run one command and it's ready"). Best-effort: never fail setup over it.
+    print("5) Start CRUX automatically on login (no terminal to keep open).")
+    if enable_login if non_interactive else _ask("   Start CRUX in the background on login?"):
+        from .autostart import enable_autostart
+        r = enable_autostart(cfg)
+        print("   " + ("✓ " if r.get("ok") else "· ") + r.get("message", "") + "\n")
+    else:
+        print("   · skipped — run `crux enable` anytime\n")
 
     cfg.mark_bootstrapped()   # launcher + hook + hotkey done → bare `crux` won't redo it
     cfg.mark_configured()     # setup finished → the dashboard opens straight in, not /setup

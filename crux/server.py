@@ -205,7 +205,26 @@ def create_app(cfg: Config):
             "default_mods": ["cmd" if plat == "darwin" else "ctrl", "shift"],
             "default_key": "space",
             "cwd": os.getcwd(),
+            "autostart": _autostart_status(),
         }
+
+    def _autostart_status() -> bool:
+        try:
+            from .autostart import autostart_status
+            return bool(autostart_status(cfg).get("enabled"))
+        except Exception:
+            return False
+
+    class AutostartIn(BaseModel):
+        enabled: bool
+
+    @app.post("/api/autostart")
+    def autostart_api(body: AutostartIn):
+        from .autostart import disable_autostart, enable_autostart
+        try:
+            return (enable_autostart if body.enabled else disable_autostart)(cfg)
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:200]}
 
     class ConnectEditorIn(BaseModel):
         editor: str
