@@ -446,6 +446,33 @@ def cmd_serve(args):
     run(cfg)
 
 
+def cmd_enable(args):
+    """Run CRUX in the background on login, so there's no terminal to keep open."""
+    from .autostart import enable_autostart
+    cfg = Config.load()
+    r = enable_autostart(cfg)
+    print(("✓ " if r.get("ok") else "⚠ ") + r.get("message", ""))
+    if r.get("ok"):
+        print(f"  ({r['method']} → {r['path']})")
+        print("  Starting it now too…")
+        # bring it up for this session immediately, detached from this terminal
+        import subprocess as _sp
+        from .autostart import _service_argv
+        try:
+            _sp.Popen(_service_argv(cfg), stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                      start_new_session=True)
+            print(f"  CRUX is live at http://{cfg.host}:{cfg.port}. Disable anytime: crux disable")
+        except Exception as e:
+            print(f"  (couldn't launch now: {e} — it'll start on next login)")
+
+
+def cmd_disable(args):
+    """Stop CRUX from starting on login (removes the autostart entry)."""
+    from .autostart import disable_autostart
+    r = disable_autostart(Config.load())
+    print(("✓ " if r.get("ok") else "⚠ ") + r.get("message", ""))
+
+
 def cmd_mcp(args):
     from .mcp_server import run
     run()
@@ -887,6 +914,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-open", action="store_true", help="don't auto-open the dashboard")
     sp.set_defaults(func=cmd_start)
     sub.add_parser("serve").set_defaults(func=cmd_serve)
+    sub.add_parser("enable", help="start CRUX automatically on login (no terminal to keep open)").set_defaults(func=cmd_enable)
+    sub.add_parser("disable", help="stop CRUX from starting on login").set_defaults(func=cmd_disable)
     sub.add_parser("doctor", help="diagnose why the capture hotkey isn't firing").set_defaults(func=cmd_doctor)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
     sub.add_parser("install-mcp", help="register CRUX with Claude Code (agent can pull + log)").set_defaults(func=cmd_install_mcp)
