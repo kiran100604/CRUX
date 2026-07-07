@@ -77,6 +77,7 @@ def run(*, non_interactive: bool = False, anthropic_key: str | None = None,
         print("   · skipped — add it later from the dashboard or `crux install-launcher`\n")
 
     cfg.mark_bootstrapped()   # launcher + hook + hotkey done → bare `crux` won't redo it
+    cfg.mark_configured()     # setup finished → the dashboard opens straight in, not /setup
 
     print("  Done. Just run:")
     print("    • crux              → opens the dashboard; the capture icon is installed")
