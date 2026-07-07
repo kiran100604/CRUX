@@ -1850,11 +1850,23 @@ function renderSettings(){
 
     <div class="setsec">
       <div class="sh">Claude Code</div>
-      <p class="sp">Auto-injects your verified knowledge on every prompt — writes to <span class="mono">~/.claude/settings.json</span>.</p>
+      <p class="sp">Ambient: auto-injects your verified knowledge on every prompt and captures decisions — writes to <span class="mono">~/.claude/settings.json</span>.</p>
       <div class="toggle ${SET.hook?'on':''}" id="set-hooktoggle">
         <div class="switch"></div>
         <div class="lbl">Install the Claude Code hook${d.hook_installed?' <small>currently installed</small>':'<small>currently off</small>'}</div>
       </div>
+    </div>
+
+    <div class="setsec">
+      <div class="sh">Other editors · Cursor &amp; VS Code</div>
+      <p class="sp">These connect through CRUX's <b>MCP server</b> — the agent gets <span class="mono">get_context</span> and <span class="mono">log_work</span> tools. We also drop a small rules file so the agent calls them on its own (closest thing to the Claude Code hook).</p>
+      <label class="setfield"><span>Project folder <span class="set-off">for the rules file &amp; VS Code config</span></span>
+        <input id="set-proj" class="setin" type="text" placeholder="/path/to/your/project" value="${esc(d.cwd||'')}"></label>
+      <div class="chords" style="margin-bottom:4px">
+        <button class="chord" onclick="connectEditor('cursor')">➜ Connect Cursor</button>
+        <button class="chord" onclick="connectEditor('vscode')">➜ Connect VS Code</button>
+      </div>
+      <div id="set-editor-result" class="vmsg"></div>
     </div>
 
     <div class="acts" style="margin-top:20px">
@@ -1916,10 +1928,25 @@ async function saveSettings(){
   }catch(e){ toast("⚠ Couldn't save settings ("+e+")"); }
   if(btn){btn.disabled=false; btn.textContent="Save settings";}
 }
+async function connectEditor(editor){
+  const out=document.getElementById("set-editor-result"); if(!out) return;
+  const proj=(document.getElementById("set-proj")||{}).value||"";
+  out.className="vmsg"; out.textContent="Connecting "+(editor==="vscode"?"VS Code":"Cursor")+"…";
+  try{
+    const r=await post("/api/connect-editor",{editor, project_dir:proj.trim()||null, write_rules:true});
+    if(!r.ok){ out.className="vmsg bad"; out.textContent="⚠ "+(r.error||"Couldn't connect."); return; }
+    const files=(r.written||[]).map(f=>`<div class="mono" style="font-size:11.5px">wrote ${esc(f)}</div>`).join("");
+    const notes=(r.notes||[]).map(n=>`<div style="margin-top:4px">• ${esc(n)}</div>`).join("");
+    out.className="vmsg ok";
+    out.innerHTML=`✓ Connected ${esc(r.editor)}.${files?`<div style="margin-top:6px">${files}</div>`:''}`
+      +`${r.next?`<div style="margin-top:6px;color:var(--muted)">Next: ${esc(r.next)}</div>`:''}${notes?`<div style="color:var(--muted)">${notes}</div>`:''}`;
+    toast("✓ Connected "+r.editor);
+  }catch(e){ out.className="vmsg bad"; out.textContent="⚠ Couldn't connect ("+e+")"; }
+}
 // keyboard access for the avatar button
 (function(){const w=document.getElementById("who");
   if(w) w.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault(); openSettings();}});})();
-window.openSettings=openSettings;window.saveSettings=saveSettings;
+window.openSettings=openSettings;window.saveSettings=saveSettings;window.connectEditor=connectEditor;
 
 window.setView=setView;window.openItem=openItem;window.doCapture=doCapture;window.promote=promote;
 window.promoteRefined=promoteRefined;window.archive=archive;window.demote=demote;window.supersede=supersede;

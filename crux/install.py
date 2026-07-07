@@ -71,3 +71,126 @@ def install_claude_hook(settings: Path) -> str:
     """Back-compat shim: install the full hook set, return a single status string."""
     res = install_claude_hooks(settings)
     return "installed" if any(v == "installed" for v in res.values()) else "already-installed"
+
+
+# --------------------------------------------------------------------------- #
+# Editor integration (Cursor / VS Code) via MCP.
+#
+# Claude Code gets the ambient hook path above. Every other agent connects
+# through CRUX's MCP server (`crux mcp`), which exposes get_context / log_work /
+# remember. These helpers write the right config for each editor so the user
+# never hand-edits JSON, and (optionally) drop a small "rules" file that tells
+# the agent to call those tools on its own — the closest thing to hooks that
+# Cursor and VS Code offer.
+# --------------------------------------------------------------------------- #
+
+# Cursor reads project rules from .cursor/rules/*.mdc (MDC = markdown + frontmatter).
+CURSOR_RULES = """\
+---
+description: Use CRUX shared project memory
+alwaysApply: true
+---
+This project uses **CRUX** for shared, verified context, exposed as MCP tools.
+
+- BEFORE starting any task, call the MCP tool `get_context` with a short
+  description of what you're about to do. Treat returned constraints as hard
+  rules, follow prior decisions, and flag anything in the request that conflicts.
+- AFTER finishing a meaningful unit of work, call `log_work` with the durable
+  decisions, constraints, and knowledge you produced. Log generously —
+  everything is proposed for human review before it becomes trusted.
+"""
+
+# VS Code (Copilot agent mode) reads .github/copilot-instructions.md. We fence our
+# block so re-running is idempotent and we never clobber the user's own guidance.
+VSCODE_RULES = """\
+<!-- CRUX:start -->
+## CRUX shared project memory
+
+This project uses **CRUX** for shared, verified context, exposed as MCP tools.
+
+- BEFORE starting any task, call `get_context` with a short description of what
+  you're about to do. Treat returned constraints as hard rules and follow prior
+  decisions.
+- AFTER finishing meaningful work, call `log_work` with the durable decisions,
+  constraints, and knowledge you produced. Everything is proposed for human
+  review before it becomes trusted.
+<!-- CRUX:end -->
+"""
+
+
+def _mcp_spec(python_exe: str, crux_home: Path | None = None) -> dict:
+    """The stdio command an editor runs to launch CRUX's MCP server. Carries
+    CRUX_HOME only when it's non-default, so a custom home still resolves."""
+    spec: dict = {"command": python_exe, "args": ["-m", "crux.cli", "mcp"]}
+    default_home = (Path.home() / ".crux").resolve()
+    if crux_home and crux_home.resolve() != default_home:
+        spec["env"] = {"CRUX_HOME": str(crux_home)}
+    return spec
+
+
+def _merge_mcp(path: Path, key: str, spec: dict, wrap: dict | None = None) -> None:
+    """Idempotently add the crux server under `key` (mcpServers / servers),
+    preserving any other servers the user already configured."""
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data.setdefault(key, {})["crux"] = {**(wrap or {}), **spec}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def connect_editor(editor: str, project_dir: str | None, python_exe: str,
+                   write_rules: bool = True, crux_home: Path | None = None) -> dict:
+    """Wire an editor up to CRUX's MCP server (+ optional auto-use rules file).
+    Returns {ok, editor, written:[paths], notes:[...], next} for the UI to show."""
+    editor = (editor or "").strip().lower()
+    spec = _mcp_spec(python_exe, crux_home)
+    written: list[str] = []
+    notes: list[str] = []
+    proj: Path | None = None
+    if project_dir:
+        proj = Path(project_dir).expanduser()
+        if not proj.is_dir():
+            return {"ok": False, "error": f"Project folder not found: {proj}"}
+
+    if editor == "cursor":
+        # Cursor's MCP config is global (~/.cursor/mcp.json) → CRUX is available in
+        # every Cursor project without picking a folder. Rules are per-project.
+        p = Path.home() / ".cursor" / "mcp.json"
+        _merge_mcp(p, "mcpServers", spec)
+        written.append(str(p))
+        if write_rules:
+            if proj:
+                r = proj / ".cursor" / "rules" / "crux.mdc"
+                r.parent.mkdir(parents=True, exist_ok=True)
+                r.write_text(CURSOR_RULES, encoding="utf-8")
+                written.append(str(r))
+            else:
+                notes.append("No project folder given — connected MCP globally but "
+                             "skipped the auto-use rules file (it's per-project).")
+        return {"ok": True, "editor": "Cursor", "written": written, "notes": notes,
+                "next": "Restart Cursor, then check Settings → MCP for 'crux'."}
+
+    if editor in ("vscode", "vs code", "code"):
+        # VS Code's MCP config is per-workspace (.vscode/mcp.json, `servers` key).
+        if not proj:
+            return {"ok": False,
+                    "error": "VS Code needs a project folder — its MCP config is per-workspace."}
+        p = proj / ".vscode" / "mcp.json"
+        _merge_mcp(p, "servers", spec, wrap={"type": "stdio"})
+        written.append(str(p))
+        if write_rules:
+            ci = proj / ".github" / "copilot-instructions.md"
+            ci.parent.mkdir(parents=True, exist_ok=True)
+            existing = ci.read_text(encoding="utf-8") if ci.exists() else ""
+            if "CRUX:start" not in existing:
+                sep = "\n\n" if existing.strip() else ""
+                ci.write_text(existing + sep + VSCODE_RULES, encoding="utf-8")
+            written.append(str(ci))
+        return {"ok": True, "editor": "VS Code", "written": written, "notes": notes,
+                "next": "In VS Code: Command Palette → 'MCP: List Servers' → start 'crux' (agent mode)."}
+
+    return {"ok": False, "error": f"Unknown editor: {editor!r}"}
